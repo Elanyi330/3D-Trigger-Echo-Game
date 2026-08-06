@@ -1,12 +1,14 @@
 extends Node
-## 下蹲组件（替代原 Sprint）——CS 风格下蹲
-## 设计规格（2026-08-06 定稿）：
-##   胶囊高 2.0m → 1.3m；相机全局 1.64m → 0.95m；移速 10 → 6 m/s（60%）
-##   设计联动：未来矮掩体统一 1.4m —— 蹲下完全隐蔽，站立露头 0.24m
+## 下蹲组件（替代原 Sprint）——2026-08-06 完全照搬 CS 数值
+## 设计规格（CS/Source 引擎，20 年竞技验证）：
+##   胶囊高 1.83m → 1.37m（中心 y=0 → -0.23，底部固定 -0.915 贴地）
+##   相机全局 1.63m → 1.17m（Head 本地 0.715 → 0.255）
+##   移速 6.35 → 2.59 m/s
+##   掩体 1.22m（CS 箱子 48u）：蹲下 1.37m > 1.22m 仍露头（CS 式"减少暴露"博弈）
 ## 输入：sprint 动作（保留 FirstPersonStarter 输入名，语义改为下蹲）
-## 几何（玩家 origin 在 y=0 处；胶囊底部固定 y=-1 贴地）：
-##   站立：胶囊高 2.0 → Collision 节点 y=0（中心在 origin），Head 本地 y=0.64（相机全局 1.64）
-##   下蹲：胶囊高 1.3 → Collision 节点 y=-0.35（中心 -0.35，底部仍 -1），Head 本地 y=-0.05（相机全局 0.95）
+## 几何（玩家 origin 在 y=0 处；胶囊底部固定 y=-0.915 贴地）：
+##   站立：胶囊高 1.83 → Collision 节点 y=0（中心在 origin），Head 本地 y=0.715（相机全局 1.63）
+##   下蹲：胶囊高 1.37 → Collision 节点 y=-0.23（中心 -0.23，底部仍 -0.915），Head 本地 y=0.255（相机全局 1.17）
 
 @export_node_path("MovementController") var controller_path := NodePath("../")
 @onready var controller: MovementController = get_node(controller_path)

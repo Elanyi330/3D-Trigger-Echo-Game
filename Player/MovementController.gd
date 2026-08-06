@@ -6,6 +6,7 @@ class_name MovementController
 @export var speed: float = 6.35
 @export var acceleration := 8
 @export var deceleration := 10
+# 注意：空中加速已按 CS 禁用（temp_accel=0），此参数保留为未来 airstrafe 扩展预留
 @export_range(0.0, 1.0, 0.05) var air_control := 0.3
 @export var jump_height := 7.54
 var direction := Vector3()

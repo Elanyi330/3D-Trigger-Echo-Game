@@ -11,7 +11,7 @@ var controller: MovementController
 func before_each() -> void:
     controller = MovementController.new()
     # 镜像生产场景（MovementController.tscn）的碰撞配置：
-    # capsule（默认 radius=0.5, height=2.0）、layer=2(Player)、mask=3(Objects+Player)
+    # capsule（默认 radius=0.5, height=1.83 CS）、layer=2(Player)、mask=3(Objects+Player)
     controller.collision_layer = 2
     controller.collision_mask = 3
     controller.floor_snap_length = 0.5
@@ -74,7 +74,7 @@ func test_jump_impulse() -> void:
 # ── 用例 6：CS 式纯物理跳上 1.22m 掩体（掩体附近起跳窗口）──
 # 设计（2026-08-06 CS 照搬）：jump_height=7.54、重力 19.6——升到 1.22m 需 0.231s，
 #   水平位移 1.47m——掩体前 1.47m 内起跳都能跳上（CS 式提前量窗口）。
-func test_jump_clears_1_4m_cover() -> void:
+func test_jump_clears_1_22m_cover() -> void:
     _make_floor()
     await wait_physics_frames(25)
     assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")

@@ -110,7 +110,7 @@ func test_crouch_hidden_behind_cover() -> void:
     await wait_physics_frames(30)
     Input.action_release("sprint")
     print("CROUCHED_CAM_Y=", controller.get_node("Head").global_position.y)
-    # CS 数值：下蹲胶囊顶 1.37m（中心 -0.23 + 0.685）；站立 1.83m
-    var capsule_top: float = controller.get_node("Collision").global_position.y + 0.65
+    # CS 数值：下蹲胶囊顶 = 中心 -0.23 + 半高 0.685 = 1.37m；站立 1.83m
+    var capsule_top: float = controller.get_node("Collision").global_position.y + 0.685  # 1.37/2 半高
     print("CAPSULE_TOP_Y=", capsule_top)
     assert_gt(capsule_top, 1.22, "下蹲胶囊顶（1.37m）> 掩体顶（1.22m）——CS 式：蹲下仍露头")
