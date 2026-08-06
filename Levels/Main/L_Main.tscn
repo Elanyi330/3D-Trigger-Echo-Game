@@ -1,7 +1,8 @@
-[gd_scene load_steps=10 format=3 uid="uid://bk05ln7m4nm87"]
+[gd_scene load_steps=11 format=3 uid="uid://bk05ln7m4nm87"]
 
 [ext_resource type="Script" path="res://Levels/Main/L_Main.gd" id="1_lmain"]
 [ext_resource type="PackedScene" uid="uid://bdupkh0grwy27" path="res://Player/Player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://Levels/Geometry/CoverShort.tscn" id="3_cover"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
 size = Vector3(20, 1, 20)
@@ -90,3 +91,6 @@ environment = SubResource("Environment_env")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="CoverShort" parent="." instance=ExtResource("3_cover")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.61, -3)

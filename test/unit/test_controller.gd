@@ -32,13 +32,15 @@ func after_each() -> void:
 
 
 # ── 用例 1：默认速度（纯属性）──
+# 2026-08-06 CS 照搬：走速 250u/s = 6.35m/s
 func test_initial_speed() -> void:
-    assert_eq(controller.speed, 10, "默认速度应为 10")
+    assert_eq(controller.speed, 6.35, "默认速度应为 6.35（CS 250u/s）")
 
 
 # ── 用例 2：默认跳跃高度（纯属性）──
+# 2026-08-06 CS 照搬：jump_height 7.54（跳高 1.45m，到顶 0.385s）
 func test_jump_height_default() -> void:
-    assert_eq(controller.jump_height, 10, "默认跳跃高度应为 10")
+    assert_eq(controller.jump_height, 7.54, "默认跳跃高度应为 7.54（CS 跳高 1.45m）")
 
 
 # ── 用例 3（GREEN 版）：真实物理场景 + 加速模型收敛断言 ──
@@ -50,10 +52,10 @@ func test_move_forward_moves_player_forward() -> void:
     assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
     Input.action_press("move_forward")
     await wait_physics_frames(60)
-    assert_lt(controller.velocity.z, -9.0,
-            "60 帧加速收敛后 velocity.z 应接近 -speed（理论 ≈ -9.998）")
-    assert_lt(controller.position.z, -5.0,
-            "控制器应真实向前移动（理论位移 ≈ -8.96 单位）")
+    assert_lt(controller.velocity.z, -5.85,
+            "60 帧加速收敛后 velocity.z 应接近 -speed（CS 6.35）")
+    assert_lt(controller.position.z, -5.08,
+            "控制器应真实向前移动（理论位移 ≈ -6.35 单位）")
 
 
 # ── 用例 4（GREEN 版）：真实物理场景落地后跳 ──
@@ -65,8 +67,47 @@ func test_jump_impulse() -> void:
     assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
     Input.action_press("jump")
     await wait_physics_frames(1)
-    assert_eq(controller.velocity.y, 10.0,
+    assert_almost_eq(controller.velocity.y, 7.54, 0.001,
             "落地按跳后 velocity.y 应精确等于 jump_height（跳跃冲量）")
+
+
+# ── 用例 6：CS 式纯物理跳上 1.22m 掩体（掩体附近起跳窗口）──
+# 设计（2026-08-06 CS 照搬）：jump_height=7.54、重力 19.6——升到 1.22m 需 0.231s，
+#   水平位移 1.47m——掩体前 1.47m 内起跳都能跳上（CS 式提前量窗口）。
+func test_jump_clears_1_4m_cover() -> void:
+    _make_floor()
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    # 放置 1.22m 高掩体（Objects 层，Box 1×1.22×1，顶面 y=1.22），玩家前方 z=-3
+    var cover := StaticBody3D.new()
+    cover.collision_layer = 1
+    cover.collision_mask = 0
+    var cover_col := CollisionShape3D.new()
+    var cover_shape := BoxShape3D.new()
+    cover_shape.size = Vector3(1, 1.22, 1)
+    cover_col.shape = cover_shape
+    cover.add_child(cover_col)
+    cover.position = Vector3(0, 0.61, -3)  # 中心 y=0.61 → 顶面 y=1.22
+    add_child_autofree(cover)
+
+    # 在掩体顶正上方放置（落点验证：顶部可站）
+    controller.global_position = Vector3(0, 2.2, -3.0)
+    await wait_physics_frames(40)
+    print("ON_COVER_PLAYER_Y=", controller.global_position.y)
+    assert_gt(controller.global_position.y, 1.8,
+            "玩家从掩体顶上方下落应站在顶部（胶囊底在 1.22 → 中心 ≈2.13）")
+    assert_true(controller.is_on_floor(), "站在掩体顶部应 is_on_floor=true")
+
+    # 跳跃可达性：从地面起跳，峰值应超过掩体顶（1.22+0.915=2.13 中心）
+    controller.global_position = Vector3(0, 1.0, -2.0)
+    await wait_physics_frames(30)
+    Input.action_press("jump")
+    await wait_physics_frames(15)  # 峰值附近
+    Input.action_release("jump")
+    print("JUMP_PEAK_Y=", controller.global_position.y)
+    assert_gt(controller.global_position.y, 2.13,
+            "跳跃峰值应超过掩体顶中心高度（CS 跳高 1.45m）")
 
 
 # 测试辅助：代码创建物理地面（StaticBody3D + BoxShape3D，Objects 层=1，顶面 y=0）

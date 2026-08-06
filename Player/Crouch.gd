@@ -14,15 +14,15 @@ extends Node
 @export_node_path("Node3D") var head_path := NodePath("../Head")
 @onready var head: Node3D = get_node(head_path)
 
-# 站立 / 下蹲 参数（相对玩家 origin 的本地值）
-@export var stand_capsule_height := 2.0
-@export var crouch_capsule_height := 1.3
-@export var stand_capsule_center_y := 0.0
-@export var crouch_capsule_center_y := -0.35
-@export var stand_head_local_y := 0.64
-@export var crouch_head_local_y := -0.05
-@export var stand_speed := 10
-@export var crouch_speed := 6
+# 站立 / 下蹲 参数（相对玩家 origin 的本地值；CS 数值 2026-08-06 照搬）
+@export var stand_capsule_height := 1.83
+@export var crouch_capsule_height := 1.37
+@export var stand_capsule_center_y := 0.0        # 胶囊中心 = 玩家 origin（底部 -0.915）
+@export var crouch_capsule_center_y := -0.23     # 底部固定 -0.915 → 中心 = -0.915+0.685 = -0.23
+@export var stand_head_local_y := 0.715          # 相机全局 1.63（CS 眼位 64u）
+@export var crouch_head_local_y := 0.255         # 相机全局 1.17（CS 下蹲眼位 46u）
+@export var stand_speed := 6.35
+@export var crouch_speed := 2.59
 
 # 过渡速度（每秒插值系数）
 @export var transition_speed := 8.0
@@ -57,7 +57,7 @@ func _physics_process(delta: float) -> void:
 	var target_head_y: float = crouch_head_local_y if target_crouch else stand_head_local_y
 	head.position.y = lerpf(head.position.y, target_head_y, t)
 
-	# 3. 移速（用连续变量避免整数 round 粘滞）
+	# 3. 移速（用连续变量避免整数 round 粘滞；speed 已是 float 类型）
 	var target_speed: float = crouch_speed if target_crouch else stand_speed
 	current_speed = lerpf(current_speed, target_speed, t)
-	controller.speed = int(round(current_speed))
+	controller.speed = current_speed

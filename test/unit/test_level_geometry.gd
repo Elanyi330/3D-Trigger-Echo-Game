@@ -37,7 +37,7 @@ func test_spawn_point_clear_of_colliders() -> void:
             print("  WALL_COLLISION=", collider_name)
     assert_false(wall_hit, "玩家在场地中央不应与任何墙发生滑动碰撞")
 
-    # 4. 玩家 y 应稳定在 ~1.0（胶囊底部贴地，中心 1.0；允许物理微小沉降）
+    # 4. 玩家 y 应稳定在 ~0.915（胶囊 1.83 中心，底部贴地；允许物理微小沉降）
     var y: float = player.global_position.y
     print("PLAYER_Y=", y)
-    assert_between(y, 0.99, 1.01, "玩家高度应稳定在 ~1.0（胶囊中心，底部贴地）")
+    assert_between(y, 0.90, 0.93, "玩家高度应稳定在 ~0.915（胶囊 1.83 中心，底部贴地）")
