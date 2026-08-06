@@ -91,7 +91,7 @@ godot --path .
 godot --headless -s addons/gut/gut_cmdln.gd
 ```
 
-> 注：M0 阶段主场景尚未创建，`godot --path .` 运行会打印场景缺失告警（预期行为，任务 2 后消失）。
+> 注：`godot --path .` 启动 M0 主场景 L_Main.tscn（自建简化测试场景，非正式关卡，见下方开发文档说明）。
 
 ---
 
@@ -100,6 +100,7 @@ godot --headless -s addons/gut/gut_cmdln.gd
 - **[CLAUDE.md](./docs/CLAUDE.md)** — 项目约束（AI 助手每次加载）
 - **[FEATURES.md](./docs/FEATURES.md)** — 完整功能清单
 - **[PROGRESS.md](./docs/PROGRESS.md)** — 开发进度报告
+- **[L_Main.tscn](./Levels/Main/L_Main.tscn)** — M0 自建简化测试场景：FirstPersonStarter 参考副本的对应场景引用的 Geometry/Materials 资源未随副本提供，故按 M0 规格重写（地面+四面墙+灯光+天空），非正式关卡
 - **[2026-08-06-trigger-echo-design.md](./docs/2026-08-06-trigger-echo-design.md)** — 项目企划书（最终设计规格，含参考项目主索引）
 
 ---
