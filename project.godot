@@ -87,6 +87,13 @@ look_right={
 3d_physics/layer_1="Objects"
 3d_physics/layer_2="Player"
 
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1920
+window/size/window_height_override=1080
+
 [rendering]
 
 renderer/rendering_method="mobile"
