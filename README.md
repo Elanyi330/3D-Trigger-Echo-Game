@@ -17,11 +17,11 @@
 
 **最后更新：** 2026-08-06
 
-**当前阶段：** 🟡 企划阶段 — 设计文档（v0.1 草案）已产出，待用户确认后进入开发
+**当前阶段：** 🟡 M0 开发中 — 引擎骨架（项目配置 + 第一人称控制器）搭建中
 
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
-| M0 引擎骨架 | Godot 项目 + 第一人称控制器 | 🔴 待开始 |
+| M0 引擎骨架 | Godot 项目 + 第一人称控制器 | 🟡 开发中 |
 | M1 武器系统 | 资源驱动武器 + 射击判定 + 后坐力 | 🔴 待开始 |
 | M2 地图与模式 | 双地图布局 + 双模式框架 | 🔴 待开始 |
 | M3 AI 基础 | 9 个 bot 寻路 + 感知 + 对枪 | 🔴 待开始 |
@@ -81,11 +81,17 @@
 # 1. 克隆仓库
 git clone git@github.com-trigger-echo:Elanyi330/3D-Trigger-Echo-Game.git
 
-# 2. 用 Godot 4.2+ 打开项目根目录
-# 3. 运行主场景（M0 完成后可体验第一人称移动）
+# 2. 环境检查（需要 Godot 4.7.1）
+bash tools/setup_env.sh
+
+# 3. 运行游戏（M0 后：WASD 移动 / Space 跳 / Shift 下蹲）
+godot --path .
+
+# 4. 运行测试（GUT，headless）
+godot --headless -s addons/gut/gut_cmdln.gd
 ```
 
-> 当前处于企划阶段，尚无可运行场景。
+> 注：`godot --path .` 启动 M0 主场景 L_Main.tscn（自建简化测试场景，非正式关卡，见下方开发文档说明）。
 
 ---
 
@@ -94,6 +100,7 @@ git clone git@github.com-trigger-echo:Elanyi330/3D-Trigger-Echo-Game.git
 - **[CLAUDE.md](./docs/CLAUDE.md)** — 项目约束（AI 助手每次加载）
 - **[FEATURES.md](./docs/FEATURES.md)** — 完整功能清单
 - **[PROGRESS.md](./docs/PROGRESS.md)** — 开发进度报告
+- **[L_Main.tscn](./Levels/Main/L_Main.tscn)** — M0 自建简化测试场景：FirstPersonStarter 参考副本的对应场景引用的 Geometry/Materials 资源未随副本提供，故按 M0 规格重写（地面+四面墙+灯光+天空），非正式关卡
 - **[2026-08-06-trigger-echo-design.md](./docs/2026-08-06-trigger-echo-design.md)** — 项目企划书（最终设计规格，含参考项目主索引）
 
 ---
