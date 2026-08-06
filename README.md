@@ -84,7 +84,7 @@ git clone git@github.com-trigger-echo:Elanyi330/3D-Trigger-Echo-Game.git
 # 2. 环境检查（需要 Godot 4.7.1）
 bash tools/setup_env.sh
 
-# 3. 运行游戏（M0 后：WASD 移动 / Space 跳 / Shift 冲刺）
+# 3. 运行游戏（M0 后：WASD 移动 / Space 跳 / Shift 下蹲）
 godot --path .
 
 # 4. 运行测试（GUT，headless）
