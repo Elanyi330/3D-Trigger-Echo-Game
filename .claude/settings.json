@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/Projects/Trigger-Echo/.claude/hooks/auto-push.sh",
+            "timeout": 30,
+            "statusMessage": "自动推送变更到 GitHub..."
+          }
+        ]
+      }
+    ]
+  }
+}
