@@ -104,17 +104,54 @@ func reload_weapon():
 
 ## 三、可照搬的亮点清单（对我们项目的增量）
 
-| # | 亮点 | 来源 | 照搬方式 | 状态 |
-|---|------|------|---------|------|
-| 1 | **换弹排队**（射击中按 R 排队，射完自动换） | CC0 MultiplayerFPS | 照搬 gun.gd:132-138 逻辑到 WeaponManager | 🔴 待做 |
-| 2 | **空仓自动换弹**（ammo==0 → 自动 reload） | CC0 MultiplayerFPS | 照搬 | 🔴 待做 |
-| 3 | **相机后坐力叠加**（recoil_amount 速率 + 钳制） | CC0 MultiplayerFPS | 对齐我们 Head.add_recoil 接线 | 🟡 已有待完善 |
-| 4 | **枪口闪光粒子**（GPUParticles3D） | CC0 + Dragon20C | 枪口挂粒子 | 🟡 已有（检查） |
-| 5 | **曳光弹线条**（枪口→命中点 0.1s） | CC0 bullet_tracer | 新增 | 🔴 待做 |
-| 6 | **命中标记 hitmarker**（HUD X 闪烁） | CC0 | 新增 HUD | 🔴 待做 |
-| 7 | **动画 RESET 回位**（animation_player.play("RESET")） | CC0 gun.gd:224 | 切枪/换弹后复位 | 🔴 待做 |
-| 8 | **WeaponSway 容器分层**（sway 作用根、动画作用内部） | CC0 结构 | 已对齐 ✅ | 🟢 已有 |
-| 9 | **FPS-Arms-3D 高质量手臂**（MIT rigged） | Ayush-Mohanty | 可替换我们的方块手（可选） | 🔴 可选 |
+### 3.1 xLethargy MultiplayerFPS（CC0 全可照搬）核心模式
+
+**视模型五层结构**（照搬基准）：
+```
+Weapon → WeaponSway(代码 sway 目标) → AllMesh(idle/move 动画) → Elements(shoot 后坐动画) → Gun/Arm(右手)/Arm2(左手)
+```
+- **手模 = 两段式节点旋转**（手掌+手臂 2 mesh，无骨骼无动画控制器，靠父节点旋转做整体动作）——核心结论
+- **后坐力叠加到视模型根**（view.rotation.x + recoil_amount×delta，钳制 90°，0.1s 标志位）——相机不动，枪口上抬
+- **Sway**：`mouse_input = lerp(mouse_input, ZERO, sens_to_sway*delta)` 回中衰减 + 双轴 lerp；横移倾斜 roll
+- **受击 flinch**：伤害分档（≤10→0.1 / ≤20→0.25 / ≤40→0.75 / ≤101→1.5）叠加 view.rotation.x
+- **排队换弹**：shoot 中按 R → `animation_player.queue("reload")`；空仓自动 reload
+- **mag_type 换弹**：Single 整夹一次补满 / Revolver 左轮式一次补 1 自动重播
+- **近战**：60° X 轴下劈（0.6s）+ **动画驱动伤害窗口**（shoot 动画 0 帧开 Hitbox、0.1s 关）+ 2m RayCast + 墙/人音效区分
+- **ADS**：全屏瞄具 UI + 枪居中动画 + FOV 20 + 减速；非瞄准散布 = 射线目标点随机偏移
+- **双 AnimationPlayer**：战斗动画（shoot/reload）+ 呼吸动画（idle/move）分离互不打断
+- **move 动画内嵌 footstep 方法轨道**：编辑器动画最佳实践
+
+**换弹关键帧数值**（devloglogan + xLethargy）：
+- 手枪 shoot：0.4s，位置 y -0.25→-0.186 + 旋转 x 0.454rad(26°)→0
+- 手枪 reload：2.0s 两拍式：Gun rotation.x 0→-0.611rad(-35°枪口下沉)→+0.262rad(+15°过冲)→0
+- 近战挥击：0.6s，rotation.x 1.0472rad(60°)→0（X 轴下劈）
+
+### 3.2 GDQuest 弹孔/命中粒子（可照搬）
+
+- 弹孔：ShotImpact（Sprite3D scorchmark 贴图 shaded）+ 命中粒子，`look_at_from_position` 沿法线偏移 0.001 防 Z-fighting
+- 相机 screen_kick：一次性随机后坐 `rotate_local(Vector2(rand_range(-i,i), rand_range(-i,i)))`（0.01, 0.2s）
+- 音效 pitch_scale 随机化（1.0 + randf()/20）
+
+### 3.3 simplefps 投掷（可照搬）
+
+- 投掷方向 `basis.z * -1`（沿视线）；手持物线性速度牵引（`vector * 20`）Source 式
+
+### 3.4 对 M1 的增量应用清单（合并组 1 后定稿）
+
+| # | 亮点 | 来源 | 状态 |
+|---|------|------|------|
+| 1 | **换弹排队 + 空仓自动换弹** | CC0 gun.gd | 🔴 待做 |
+| 2 | **视模型五层结构**（Sway/AllMesh/Elements/Gun/手臂分层） | CC0 | 🟡 已有需对齐 |
+| 3 | **后坐力叠加视模型**（相机不动枪口抬） | CC0 | 🟡 已有需对齐 |
+| 4 | **两拍式换弹动画关键帧**（-35°→+15°→0） | devloglogan+CC0 | 🔴 待做（当前线性） |
+| 5 | **近战 60° X 下劈 + 动画驱动伤害窗口** | CC0 stake | 🟡 已 X 斜挥需对齐 |
+| 6 | **曳光弹线条**（枪口→命中点） | CC0 bullet_tracer | 🔴 待做 |
+| 7 | **命中标记 hitmarker**（HUD X 闪烁） | CC0 | 🔴 待做 |
+| 8 | **受击 flinch 分档** | CC0 | 🔴 待做 |
+| 9 | **双 AnimationPlayer**（战斗+呼吸分离） | CC0 | 🔴 待做 |
+| 10 | **move 动画 footstep 方法轨道** | CC0 | 🔴 待做 |
+| 11 | **ADS 全屏瞄具 + FOV 20 + 减速** | CC0 DBSniper | 🟡 已有机瞄需对齐 |
+| 12 | **FPS-Arms-3D 高质量手臂**（MIT rigged） | Ayush-Mohanty | 🔴 可选 |
 
 ---
 
