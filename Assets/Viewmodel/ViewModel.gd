@@ -22,12 +22,12 @@ extends Node3D
 @export var shoulder_left := Vector3(-0.24, -0.52, 0.02)
 
 ## 每件武器的取景（CS 手感）：offset=相机空间握把位 / scale=视图缩放 / rot=持握欧拉角(度)。
-## 刀 rot.x=-68 = 竖持（刀尖朝上前方）；手枪/手雷放大避免"太小看不见"。
+## CS 对比校准（agent 评估）：手枪长≈2.3×拳宽、雷体≈屏宽12-18%上移入画、刀上移抬头25-30°。
 const WEAPON_FRAME := {
 	"AK47_Echo": {"offset": Vector3(0.28, -0.33, -0.55), "scale": 1.0, "rot": Vector3(0, 0, 0)},
-	"Glock18_Echo": {"offset": Vector3(0.22, -0.27, -0.40), "scale": 1.5, "rot": Vector3(0, 0, 0)},
-	"Knife_Echo": {"offset": Vector3(0.24, -0.20, -0.38), "scale": 1.3, "rot": Vector3(-30.0, 40.0, 15.0)},
-	"Grenade_M67_Echo": {"offset": Vector3(0.20, -0.30, -0.38), "scale": 1.7, "rot": Vector3(-15.0, 0, 0)},
+	"Glock18_Echo": {"offset": Vector3(0.20, -0.25, -0.46), "scale": 2.0, "rot": Vector3(0, 0, 0)},
+	"Knife_Echo": {"offset": Vector3(0.20, -0.20, -0.40), "scale": 1.5, "rot": Vector3(25.0, 30.0, 0.0)},
+	"Grenade_M67_Echo": {"offset": Vector3(0.10, -0.18, -0.38), "scale": 2.2, "rot": Vector3(-18.0, 0, 0)},
 }
 
 var weapon_mount: Node3D

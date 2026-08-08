@@ -24,14 +24,15 @@ const ViewModel := preload("res://Assets/Viewmodel/ViewModel.gd")
 @export var bob_freq := 1.0
 @export var bob_amp := 0.012
 @export var bob_speed := 1.4
-# ---- reload（换弹下沉+内倾，CS 多相位；以内倾为主、下沉为辅，原地侧倾不甩手臂）----
-@export var reload_drop := 0.07
-@export var reload_tilt := 0.12
-@export var reload_cant := 0.55
-# ---- swing（近战挥击，CS 风格）----
-@export var swing_sweep := 0.16
-@export var swing_roll := 0.6
-@export var swing_stab_push := 0.14
+# ---- reload（换弹下沉+内倾，CS 多相位；内倾+偏航展示弹匣侧，姿态可读）----
+@export var reload_drop := 0.09
+@export var reload_tilt := 0.15
+@export var reload_cant := 0.7
+@export var reload_yaw := 0.45
+# ---- swing（近战挥击，CS 风格；幅度大——中段刀刃横扫过画面中心）----
+@export var swing_sweep := 0.24
+@export var swing_roll := 0.85
+@export var swing_stab_push := 0.16
 # ---- throw（手雷后拉）----
 @export var throw_pull := 0.5
 
@@ -286,8 +287,8 @@ func _apply() -> void:
 		var t := clampf(_reload_t / _reload_dur, 0.0, 1.0)
 		var env := _reload_env(t)
 		var rack := _reload_rack_env(t)
-		wpos += Vector3(0.02 * env, -reload_drop * env, 0.02 * env + rack * 0.03)
-		wrot += Vector3(reload_tilt * env, 0.25 * env, -reload_cant * env)
+		wpos += Vector3(0.03 * env, -reload_drop * env, 0.03 * env + rack * 0.04)
+		wrot += Vector3(reload_tilt * env, reload_yaw * env, -reload_cant * env)
 	# swing：CS 近战（轻击斜挥 / 重刺前送），时序取自 .tres melee_*_time
 	if _swing_t >= 0.0 and _swing_dur > 0.0:
 		var t := clampf(_swing_t / _swing_dur, 0.0, 1.0)
@@ -297,10 +298,11 @@ func _apply() -> void:
 			wpos += Vector3(0.03 * windup, 0.01 * windup, 0.07 * windup - swing_stab_push * thrust)
 			wrot += Vector3(-0.25 * windup + 0.2 * thrust, 0.1 * windup, 0.0)
 		else:
+			# 轻击斜挥：右上蓄(0-0.25) → 横扫左下过中心(0.25-0.5) → 回位(0.5-1.0)
 			var windup := _smoothstep(clampf(t / 0.25, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.25) / 0.05, 0.0, 1.0)))
 			var slash := _smoothstep(clampf((t - 0.25) / 0.25, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.5) / 0.5, 0.0, 1.0)))
-			wpos += Vector3(0.08 * windup - swing_sweep * slash, -0.02 * windup - 0.05 * slash, -0.03 * slash)
-			wrot += Vector3(0.0, 0.15 * windup + 0.3 * slash, 0.4 * windup - swing_roll * slash)
+			wpos += Vector3(0.10 * windup - swing_sweep * slash, 0.04 * windup - 0.02 * slash, -0.04 * slash)
+			wrot += Vector3(-0.15 * slash, 0.2 * windup + 0.4 * slash, 0.5 * windup - swing_roll * slash)
 	# throw：后拉蓄力（保持）
 	if _throw_t >= 0.0:
 		var t := clampf(_throw_t / throw_pull, 0.0, 1.0)
