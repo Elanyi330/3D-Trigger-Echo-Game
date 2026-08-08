@@ -136,26 +136,89 @@ Weapon → WeaponSway(代码 sway 目标) → AllMesh(idle/move 动画) → Elem
 
 - 投掷方向 `basis.z * -1`（沿视线）；手持物线性速度牵引（`vector * 20`）Source 式
 
-### 3.4 对 M1 的增量应用清单（合并组 1 后定稿）
+### 3.4 Jeh3no 相机后坐力（双层 lerp，22 行直接照搬）
+
+```gdscript
+func _process(delta):
+    target_rotation = lerp(target_rotation, Vector3.ZERO, base_rotation_speed * delta)   # 回摆
+    current_rotation = lerp(current_rotation, target_rotation, target_rotation_speed * delta) # 追击
+    rotation = current_rotation
+
+func add_recoil(recoil_value : Vector3) -> void:
+    target_rotation += Vector3(recoil_value.x,
+        randf_range(-recoil_value.y, recoil_value.y),
+        randf_range(-recoil_value.z, recoil_value.z))
+```
+**机理**：开火时 target_rotation 瞬间抬升（如手枪 (0.06, 0.02, 0.02)），base_rotation_speed（5.0）回摆归零，current_rotation 以 target_rotation_speed（12.0）追击——**快抬-慢回+抖动**，永不突变。施加点 CameraRecoilHolder 与鼠标视角解耦。
+
+### 3.5 Jeh3no sway 精确归零（防漂移关键）
+
+```gdscript
+# 鼠标输入 < 阈值 4.0 时用 move_toward(…, 0, back_to_origin_pos_speed*delta) 精确归零
+# 避免 lerp 永远回不到原点导致的漂移（注释明说——本项目最值得抄的细节）
+```
+
+### 3.6 换弹分阶段结算（Jeh3no）+ 动画信号驱动（OpenFPS）
+
+- Jeh3no：`reload_follow(delta)` 每段播 ReloadAnim + 计时归零 `one_part_reload_calculus()`（整匣）或 `multi_part_reload_calculus()`（霰弹逐发）
+- OpenFPS：**用 AnimationPlayer started/finished 信号驱动状态**（reload_started → reload_finished = false；finished → true），动画时长在编辑器调，代码零改动
+- 换弹关键帧（Jeh3no 可抄）：手枪 1.09s position z 0→-0.006 下沉 + rotation Y 0→1.396rad(80°)→0
+
+### 3.7 两段式切枪（Jeh3no 照搬）
+
+```gdscript
+func exit_weapon(next_weapon):
+    can_change_weapons = false; can_use_weapon = false
+    # 打断射击/换弹 → 播 UnequipAnim → await unequip_time → model.hide()
+    await enter_weapon(next_weapon)
+func enter_weapon(next_weapon):
+    current_weapon.model.show()  # 播 EquipAnim → await equip_time → can_use_weapon = true
+```
+- 所有武器**常驻** WeaponContainer，切换只动 visible + 动画（EquipAnimPistol 0.19s：z -0.006→0 + Y 1.396rad→0 甩入）
+
+### 3.8 FPS-Arms-3D 骨骼手模/动画（MIT，商用级参考）
+
+- 骨架规范：手臂 3 段 + 每段 3 扭曲骨 + 手指 10 骨 + IK 控制骨 + 相机对齐骨
+- 动画：AK_Idle/Draw/Walk/Run/Shot/**Reload/Reload_var2/Reload_full**（战术/空仓）
+- ADS：独立 AnimationPlayer `play()/play_backwards()`（0.3s 枪滑向视线中心）
+- 枪口闪光：amount 23、lifetime 0.01s、one_shot + OmniLight3D（energy 0.84）
+
+### 3.9 GarbajYT 近战挥击数值（可抄）
+
+- **Attack：0.02s 绕 X 下挥 70°（(-70,0,0)）极快出手**
+- **Return：0.1s 慢速回位（5 倍时长）**
+- 命中判定窗口 = Attack 动画播放期；血粒子即时生成+自清理
+- 弹孔（godot-bullet-decals）：**挂 collider 下**（随物体动）+ `look_at(点+法线)` 贴平——比挂世界根更稳
+
+### 3.10 投射物（GarbajYT projectile + 投掷照搬）
+
+- `set_as_toplevel(true)` 脱离枪口 + `look_at` 瞄准点定方向（Godot 4: RigidBody3D.set_as_toplevel + linear_velocity）
+
+---
+
+## 四、对 M1 的增量应用清单（定稿）
 
 | # | 亮点 | 来源 | 状态 |
 |---|------|------|------|
 | 1 | **换弹排队 + 空仓自动换弹** | CC0 gun.gd | 🔴 待做 |
-| 2 | **视模型五层结构**（Sway/AllMesh/Elements/Gun/手臂分层） | CC0 | 🟡 已有需对齐 |
-| 3 | **后坐力叠加视模型**（相机不动枪口抬） | CC0 | 🟡 已有需对齐 |
-| 4 | **两拍式换弹动画关键帧**（-35°→+15°→0） | devloglogan+CC0 | 🔴 待做（当前线性） |
-| 5 | **近战 60° X 下劈 + 动画驱动伤害窗口** | CC0 stake | 🟡 已 X 斜挥需对齐 |
-| 6 | **曳光弹线条**（枪口→命中点） | CC0 bullet_tracer | 🔴 待做 |
-| 7 | **命中标记 hitmarker**（HUD X 闪烁） | CC0 | 🔴 待做 |
-| 8 | **受击 flinch 分档** | CC0 | 🔴 待做 |
-| 9 | **双 AnimationPlayer**（战斗+呼吸分离） | CC0 | 🔴 待做 |
-| 10 | **move 动画 footstep 方法轨道** | CC0 | 🔴 待做 |
-| 11 | **ADS 全屏瞄具 + FOV 20 + 减速** | CC0 DBSniper | 🟡 已有机瞄需对齐 |
-| 12 | **FPS-Arms-3D 高质量手臂**（MIT rigged） | Ayush-Mohanty | 🔴 可选 |
+| 2 | **视模型分层结构**（Sway/AllMesh/Elements/Gun/手臂） | CC0 + fps-arms | 🟡 已有需对齐 |
+| 3 | **双层 lerp 相机后坐力**（target/current 两层追击） | Jeh3no | 🔴 待做（替换现 Head recoil） |
+| 4 | **sway move_toward 精确归零**（防漂移） | Jeh3no | 🔴 待做 |
+| 5 | **两拍式换弹动画**（-35°→+15°→0 或 80° 横转） | devloglogan+Jeh3no | 🔴 待做（当前线性） |
+| 6 | **动画信号驱动状态**（started/finished 替代计时器） | OpenFPS | 🟡 需对齐 |
+| 7 | **近战 0.02s 快下挥 70° + 0.1s 慢回位** | GarbajYT | 🟡 已 X 斜挥需对齐节奏 |
+| 8 | **曳光弹线条**（枪口→命中点） | CC0 bullet_tracer | 🔴 待做 |
+| 9 | **命中标记 hitmarker**（HUD X 闪烁） | CC0 | 🔴 待做 |
+| 10 | **受击 flinch 分档** | CC0 | 🔴 待做 |
+| 11 | **弹孔挂 collider 下**（随物体动） | GarbajYT decals | 🔴 改（现挂世界根） |
+| 12 | **双 AnimationPlayer**（战斗+呼吸分离） | CC0 + fps-arms | 🔴 待做 |
+| 13 | **ADS 正反播 + 全屏瞄具** | fps-arms + OpenFPS | 🟡 已有机瞄需对齐 |
+| 14 | **枪口闪光数值**（amount 23/0.01s/点光） | fps-arms | 🟡 已有需对齐 |
+| 15 | **FPS-Arms-3D 骨骼手模/动画**（AK_Reload_full 等） | Ayush MIT | 🔴 可选（286MB 大） |
 
 ---
 
-## 四、应用计划（M1 深度优化增量）
+## 五、应用计划（M1 深度优化增量）
 
 1. **换弹排队 + 空仓自动换弹**（亮点 1+2）——CS 式体验核心
 2. **相机后坐力对齐**（亮点 3）——recoil_amount 速率模型
