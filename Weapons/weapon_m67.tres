@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Weapons/Weapon_Resource.gd" id="1_m67"]
+
+[resource]
+script = ExtResource("1_m67")
+weapon_name = "M67「轰鸣」"
+damage = 98.0
+rpm = 0
+magazine = 1
+max_ammo = 1
+reload_time = 0.0
+mobility = 245.0
+deploy_time = 0.5
+fire_mode = 3
+fuse_time = 1.5
+blast_radius = 6.0
+blast_falloff = PackedFloat32Array(98, 60, 30)
+ads_multiplier = 1.0

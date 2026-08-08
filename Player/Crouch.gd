@@ -46,6 +46,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	var target_crouch: bool = Input.is_action_pressed(&"sprint")
 	is_crouching = target_crouch
+	# 联动 MovementController（M1 任务3）：下蹲时加速目标用 crouch_speed 固定（豁免 speed_modifier）
+	controller.is_crouching = target_crouch
 
 	var t := clampf(transition_speed * delta, 0.0, 1.0)
 

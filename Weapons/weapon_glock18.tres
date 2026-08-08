@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="WeaponResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Weapons/Weapon_Resource.gd" id="1_glock"]
+
+[resource]
+script = ExtResource("1_glock")
+weapon_name = "Glock-18「迅捷」"
+damage = 30.0
+headshot_multiplier = 4.0
+limb_multiplier = 0.8
+rpm = 400
+magazine = 20
+max_ammo = 80
+reload_time = 2.3
+effective_range = 15.0
+max_range = 30.0
+falloff_curve = PackedFloat32Array(1, 0.9, 0.85)
+mobility = 240.0
+deploy_time = 0.3
+fire_mode = 1
+recoil_pattern = 1
+recoil_amount = 0.5
+recoil_variance = 0.3
+recovery_speed = 14.0
+recoil_val = Vector3(0.04, 0.015, 0.015)
+first_shot_spread = 0.15
+move_spread_multiplier = 1.5
+crouch_spread_multiplier = 0.7
+ads_multiplier = 1.0

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="WeaponResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Weapons/Weapon_Resource.gd" id="1_knife"]
+
+[resource]
+script = ExtResource("1_knife")
+weapon_name = "战术匕首「回声」"
+damage = 40.0
+rpm = 0
+magazine = 0
+max_ammo = 0
+reload_time = 0.0
+mobility = 250.0
+deploy_time = 0.3
+fire_mode = 2
+ads_multiplier = 1.0
+melee_primary_damage = 40.0
+melee_secondary_damage = 25.0
+melee_stab_damage = 65.0
+melee_backstab_damage = 180.0
+melee_light_time = 0.4
+melee_heavy_time = 1.0
+melee_range = 1.5
+melee_angle = 60.0
+melee_backstab_angle = 150.0

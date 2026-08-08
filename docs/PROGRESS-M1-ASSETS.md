@@ -1,83 +1,51 @@
-# M1 资产先行 — 开发进度（2026-08-08）
+# M1 资产 + M1.5 集成 — 完成进度（2026-08-08 多模态重建）
 
 > 分支: `feat/m1-assets`（工作树 ../Trigger-Echo-m1-assets）
-> 上游: main 已回退到 M0 完成点 bfdf669（M0 运动逻辑 14/14 保留）
-> M1 旧分支: `feat/m1-weapon-system`（29 提交保留，含 FpsRig/动画实现，M1.5 配套时参考）
+> 本次会话: **用多模态能力（渲染亲眼验证）重建 M1 资产 + 完成 M1.5 集成**。
+> 测试: **GUT 150/150 全绿**（M0 14 + 武器逻辑 + 集成）。
 
 ---
 
-## 一、开发策略调整（用户 2026-08-08 拍板）
+## 一、本次解决的核心问题（用户点名）
 
-**旧模式失败**：逻辑先行 → 资产后补 → 实机崩（5 轮 TDD 全绿但体验极差）
-**新模式**：资产先行 → Blender/CC0 建模完美 → 查看器验证 → M1.5 融入运动逻辑
+| 问题 | 根因（多模态诊断） | 解法 |
+|------|------|------|
+| **枪口朝向混乱** | 各武器朝向轴向不一致（AK/Glock=X，Revolver/Grenade=Z），无任何约定 | 建 **canonical 约定**（枪口=Blender+Y=Godot−Z），实验标定（cal_query 钉死），逐武器渲染验证 |
+| **组件定义不清晰** | 枪口/握把/弹匣/枪栓全靠 Viewer 魔数硬猜 | **每武器内置命名标记**（Muzzle/GripRight/GripLeft/Magazine/Bolt/EjectPort/Sight/PullRing/Spoon/Tip），逻辑/动画按名读取 |
+| **手-武器不协调** | 旧方案烘焙全身姿态，手臂根本没握枪 | **视图模型构造保证**：手臂端点直接取自 GripRight/GripLeft 标记，手永远精确握枪 |
+| **角色 3D 问题** | v5/v7 手臂过短、杂散 Icosphere、网格/骨骼同名冲突 | **重建 Soldier_Echo**（合理比例、18 骨含 Hand_L/R、单蒙皮网格、单骨绑定，姿态测试无拉伸） |
+| **损坏资产** | Revolver 剩薄片、Knife 缩成点 | Revolver 移除（与 Glock 重复）；Knife **程序化自产重建**（方块风统一） |
 
-**里程碑重定义**：
-| 里程碑 | 内容 |
-|--------|------|
-| M0 | 引擎骨架 + 运动逻辑 ✅（bfdf669，14/14） |
-| **M1（新）** | **纯资产开发**：武器/角色/手模建模 + 查看器验证（当前阶段） |
-| **M1.5（新）** | 资产配套：融入 M0 运动逻辑 + 武器开火/换弹/攻击逻辑 |
-| M2+ | 地图/模式/AI（企划书原计划顺延） |
+## 二、交付清单
 
-## 二、资产规范（用户确认）
+**M1（资产）**：
+- 4 件 Echo 系列武器（canonical 朝向 + 组件标记 + 橙色 ECHO 印记）：AK47_Echo / Glock18_Echo / Knife_Echo / Grenade_M67_Echo
+- 角色 Soldier_Echo（重建，方块风，可换色，含手部骨骼）
+- 资产规范 `Assets/Models/README.md`（分类目录/命名/朝向/标记/新增流程/许可）
+- 可复现管线脚本（提交入 tools/render/）：process_weapon / build_knife / build_character / measure / inspect_asset
+- 查看器 Viewer（角色+武器转台 + 枪口射线可视化）
 
-**大小（视模型 = 真实 × 1.4，FPS 惯例）**：
-| 武器 | 真实 | 视模型 | 状态 |
-|------|------|--------|------|
-| AK47 | 0.86m | 1.20m | ✅ 已归一化 |
-| Glock18 | 0.20m | 0.28m | ✅ 已归一化 |
-| Revolver（备用） | 0.28m | 0.39m | ✅ 已归一化 |
-| 战术刀 | 0.35m | 0.49m | ✅ 已归一化（刀身金属灰/握把木棕） |
-| M67 手雷 | 0.10m | 0.14m | ✅ 已归一化 |
+**M1.5（集成）**：
+- 移植旧 M1 验证过的武器逻辑：WeaponCore(hitscan/后坐力/换弹) / WeaponManager(4槽状态机/投掷/近战/ADS) / Weapon_Resource + 4 .tres(CS2数值) / Melee/Grenade/Tracer/BulletHole 等
+- 新表现层 **WeaponView**（ViewModel + 程序化动画 kickback/sway/bob/reload/swing/throw + 枪口火光@Muzzle 标记），替代旧 WeaponAnchor（FpsRig 崩坏路径）
+- M0 Player 增强：Head(add_recoil/set_ads) + MovementController(speed_modifier/is_moving/is_crouching) + Crouch 联动 + 输入动作(fire/reload/aim/weapon_1-4/next_weapon)
+- L_Main 主场景：代码装配武器系统 + HUD(弹药/准星/命中标记) + 训练靶（TargetA + 6 红色敌人）
+- Enemy（干净版：Soldier_Echo 换红 + 躯干/头部 hitbox 爆头 + 血条 + 倒地淡出）
 
-**角色规范**：玩家/队友/敌人建模一致仅颜色区分；统一方块手（MC 风格）；整体偏方块特色；高 1.75m（对齐 M0 胶囊 1.83m）。
+## 三、验证证据
 
-## 三、资产来源与许可（全合规）
+- GUT **150/150**（17 脚本 / 711 断言）
+- 多模态渲染验证：武器标记落位 / 角色姿态 / 视图模型协调 / 实际游戏画面（HUD+敌人+视图模型）
 
-| 资产 | 来源 | 许可 | 位置 |
-|------|------|------|------|
-| AK47 | poly.pizza Quaternius | CC0 | Assets/Models/Weapons/AK47/AK47.glb |
-| Glock18 | Quaternius Animated FPS Guns | CC0 | Assets/Models/Weapons/Glock18/Glock18.glb |
-| Revolver | Quaternius Animated FPS Guns | CC0 | Assets/Models/Weapons/Revolver/Revolver.glb |
-| 战术刀 | poly.pizza Naj Combat Knife | CC-BY 3.0（署名） | Assets/Models/Weapons/Knife/Knife.glb |
-| M67 手雷 | poly.pizza Pichuliru Frag West | CC0 1.0 | Assets/Models/Weapons/Grenade/Grenade.glb |
-| 角色 | **自产**（Blender 脚本，方块风） | 自产 CC0 | Assets/Models/Characters/Player/Player.glb |
+## 四、操作说明（验收）
 
-## 四、当前进度（进行中）
+`godot --path . Levels/Main/L_Main.tscn`（或直接打开 Godot 运行）
+- WASD 移动 / 空格跳 / Shift 蹲 / 鼠标视角
+- 左键开火 / R 换弹 / 右键机瞄(枪)或重刺(刀) / 1-4 或滚轮切枪
+- 靶场：金色 TargetA + 红色敌人（爆头 ×4）
 
-### ✅ 已完成
-1. **main 回退 M0 点** bfdf669（M0 14/14 验证通过）
-2. **feat/m1-assets 分支** + 工作树 ../Trigger-Echo-m1-assets 就位
-3. **五件武器全部入库 + 统一缩放**（见上表）
-4. **资产规范文档** Assets/Models/README.md
-5. **角色 v5 建模**（Blender 脚本自产）：Z-up 站立 1.75m、小头 0.28m、四肢两段式 + 15 骨骨骼（肘/膝可弯）
-6. **Godot 资产查看器**（Assets/Viewer/Viewer.gd + Viewer.tscn）：
-   - 人物 + 武器 + 鼠标拖拽 360° 查看 + 1/2/3/4 切武器
-   - 已修复：人物朝向（绕 Y 180° 面朝 -Z）、武器朝向（绕 Y -90° 枪口朝前）、手臂姿势（Skeleton3D set_bone_pose_rotation + Quaternion）
+## 五、遗留 / 后续
 
-### 🔄 进行中（用户最后查看）
-- **人物持四武器姿态展示**：AK47 姿态已装配（枪口朝前 + 手臂握枪），用户最后反馈"人物面朝反了"→ 已修（人物转 180°）
-- 待用户确认：人物面朝前 + 手臂前伸 + AK47 枪口朝前是否满意
-- 待做：Glock/刀/手雷三种姿态确认
-
-### 🔴 待做
-1. 四种武器姿态全部确认
-2. 角色入库（当前 Player.glb 在 /tmp/m1ref/BlockyChar_v5.glb，已复制到 Assets/Models/Characters/Player/）
-3. 队友/敌人 = 玩家模型换色（未来）
-4. 全部资产验收 → 转 M1.5（融入 M0 运动逻辑 + 武器逻辑，参考 feat/m1-weapon-system 分支）
-
-## 五、关键技术坑（避免重犯）
-
-1. **Blender 是 Z-up**：人物建模高度轴用 Z（脚底 z=0 头顶 z=1.75），我之前误用 Y 导致人物躺倒
-2. **glTF 导入 Godot 朝向转换**：Blender -Y 前方 → Godot +Z 后方（需绕 Y 180°）
-3. **武器 glTF 长轴 X**：枪口方向需几何验证（+X 端特征：细管+准星），绕 Y ±90° 对齐 -Z 前方
-4. **Blender 脚本改 glTF 矩阵不可靠**（RootNode EMPTY 层级/apply 后失效）→ **用 Godot 节点 rotation 控制朝向**（可靠）
-5. **Skeleton3D.set_bone_pose_rotation 需要 Quaternion**（非 Vector3 欧拉角）
-6. **材质 Solid 模式显示**：需同时设 Principled BSDF + diffuse_color
-
-## 六、环境
-
-- 分支 feat/m1-assets，工作树 /Users/elanyi/Projects/Trigger-Echo-m1-assets
-- Blender 5.2（/opt/homebrew/Caskroom/blender/5.2.0/Blender.app）
-- Godot 4.7.1
-- 查看器运行：`cd /Users/elanyi/Projects/Trigger-Echo-m1-assets && godot --path . Assets/Viewer/Viewer.tscn`
+- MP5/M870/AWP 等其余型号 = M5（管线已就绪，加配置即可）
+- 队友/敌人 AI 持武器姿态 = M3（角色手骨已备）
+- 手感微调 = M2 地图后（用户既定决策）

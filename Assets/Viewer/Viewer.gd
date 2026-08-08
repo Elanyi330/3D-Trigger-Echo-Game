@@ -1,106 +1,97 @@
 extends Node3D
+# M1 资产验收查看器（重写）：角色 + 武器 转台检视，标记驱动（无魔数）。
+#   鼠标拖拽旋转视角 | 滚轮缩放 | 1/2/3/4 切换武器 | 角色恒显
+# 武器按 canonical 约定摆放（枪口 -Z 前），并在 Muzzle 标记处画前向射线验证枪口朝向。
 
-# 资产查看器：人物 + 四种武器持枪姿态（Godot 代码控制朝向，绕开 Blender 矩阵坑）
+const ViewModel := preload("res://Assets/Viewmodel/ViewModel.gd")
 
-var character_scene = preload("res://Assets/Models/Characters/Player/Player.glb")
-var weapon_scenes = {
-	"AK47": preload("res://Assets/Models/Weapons/AK47/AK47.glb"),
-	"Glock18": preload("res://Assets/Models/Weapons/Glock18/Glock18.glb"),
-	"Knife": preload("res://Assets/Models/Weapons/Knife/Knife.glb"),
-	"Grenade": preload("res://Assets/Models/Weapons/Grenade/Grenade.glb"),
-}
-var current_weapon := 0
-var weapon_names := ["AK47", "Glock18", "Knife", "Grenade"]
+const CHARACTER := preload("res://Assets/Models/Characters/Soldier_Echo/Soldier_Echo.glb")
+const WEAPONS := [
+	["AK47_Echo", preload("res://Assets/Models/Weapons/Rifle/AK47_Echo/AK47_Echo.glb")],
+	["Glock18_Echo", preload("res://Assets/Models/Weapons/Pistol/Glock18_Echo/Glock18_Echo.glb")],
+	["Knife_Echo", preload("res://Assets/Models/Weapons/Melee/Knife_Echo/Knife_Echo.glb")],
+	["Grenade_M67_Echo", preload("res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb")],
+]
 
-# 相机旋转（鼠标拖拽查看）
-var cam_yaw := 0.0
-var cam_pitch := 0.3
-var cam_distance := 4.0
+var _idx := 0
+var _weapon: Node3D
+var _muzzle_line: MeshInstance3D
+var _yaw := 0.6
+var _pitch := 0.25
+var _dist := 3.2
 
-@onready var camera: Camera3D = $Camera
-@onready var char_instance: Node3D = $Character
-@onready var weapon_root: Node3D = $WeaponRoot
-@onready var label: Label = $HUD/Label
+@onready var _cam: Camera3D = $Camera
+@onready var _char_root: Node3D = $Character
+@onready var _weapon_root: Node3D = $WeaponRoot
+@onready var _label: Label = $HUD/Label
 
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	# 人物实例
-	var char_inst: Node3D = character_scene.instantiate()
-	char_instance.add_child(char_inst)
-	# 人物朝向修正：Blender 面朝 -Y → Godot glTF 导入后面朝 +Z（后方），转 180° 面朝 -Z 前方
-	char_instance.rotation.y = PI
-	# 初始武器
-	equip_weapon(0)
-	label.text = "武器: AK47（1/2/3/4 切换）| 鼠标拖拽旋转 | 滚轮缩放"
+	# 角色（左）
+	var ch := CHARACTER.instantiate()
+	ch.position = Vector3(-0.7, 0, 0)
+	_char_root.add_child(ch)
+	# 武器（右，抬高到便于观察的高度）
+	_weapon_root.position = Vector3(0.9, 1.2, 0)
+	_equip(0)
+
+
+func _equip(i: int) -> void:
+	_idx = i
+	if _weapon:
+		_weapon.queue_free()
+	_weapon = WEAPONS[i][1].instantiate()
+	_weapon_root.add_child(_weapon)
+	_draw_muzzle()
+	_label.text = "武器: %s（1/2/3/4 切换）| 拖拽旋转 | 滚轮缩放" % WEAPONS[i][0]
+
+
+func _draw_muzzle() -> void:
+	if _muzzle_line:
+		_muzzle_line.queue_free()
+	_muzzle_line = null
+	var muzzle := ViewModel.find_marker(_weapon, "_Muzzle")
+	if muzzle == null:
+		return
+	# 从 Muzzle 沿武器前向（-Z）画一条红色射线 = 子弹出膛方向
+	var im := ImmediateMesh.new()
+	var from := muzzle.position
+	var to := from + Vector3(0, 0, -1.0)  # canonical: 枪口朝 -Z
+	im.surface_begin(Mesh.PRIMITIVE_LINES)
+	im.surface_add_vertex(from)
+	im.surface_add_vertex(to)
+	im.surface_end()
+	_muzzle_line = MeshInstance3D.new()
+	_muzzle_line.mesh = im
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(1, 0.1, 0.1)
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_muzzle_line.material_override = m
+	_weapon.add_child(_muzzle_line)  # 挂武器下，随武器变换
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		cam_yaw -= event.relative.x * 0.01
-		cam_pitch = clamp(cam_pitch - event.relative.y * 0.01, -1.4, 1.4)
+		_yaw -= event.relative.x * 0.01
+		_pitch = clamp(_pitch - event.relative.y * 0.01, -1.4, 1.4)
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			cam_distance = max(1.5, cam_distance - 0.5)
+			_dist = max(1.2, _dist - 0.3)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			cam_distance = min(10.0, cam_distance + 0.5)
-		elif event.pressed and event.button_index >= MOUSE_BUTTON_LEFT and event.button_index <= 4:
-			var idx = int(event.button_index) - 1
-			if idx < 4:
-				equip_weapon(idx)
+			_dist = min(8.0, _dist + 0.3)
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_1: _equip(0)
+			KEY_2: _equip(1)
+			KEY_3: _equip(2)
+			KEY_4: _equip(3)
 
 
-func _process(delta: float) -> void:
-	camera.position = Vector3(sin(cam_yaw) * cam_distance, 1.3 + sin(cam_pitch) * cam_distance * 0.6, cos(cam_yaw) * cam_distance)
-	camera.look_at(Vector3.ZERO, Vector3.UP)
-
-
-func equip_weapon(idx: int) -> void:
-	# 清除旧武器
-	for child in weapon_root.get_children():
-		child.queue_free()
-	# 实例化新武器
-	var weapon: Node3D = weapon_scenes[weapon_names[idx]].instantiate()
-	weapon_root.add_child(weapon)
-	# 朝向控制（枪口朝前 -Z）：绕 Y 转 -90°（枪口 +X → -Z 前方）
-	weapon.rotation = Vector3(0, -1.5708, 0)
-	# 位置：胸前双手位
-	weapon.position = Vector3(0.3, 1.25, -0.4)
-	current_weapon = idx
-	# 调整人物手臂骨骼：双手前伸握枪（肘部弯曲）
-	_pose_arms()
-	label.text = "武器: %s（1/2/3/4 切换）| 鼠标拖拽旋转 | 滚轮缩放" % weapon_names[idx]
-
-
-func _pose_arms() -> void:
-	# 找到人物骨骼，摆出握枪姿势（肩前转 + 肘弯）
-	var armature := _find_armature(char_instance)
-	if armature == null:
-		print("未找到人物骨骼，跳过手臂姿势")
-		return
-	var skeleton: Skeleton3D = armature
-	# 用骨骼 pose 摆姿势（右手握扳机、左手托护木）
-	var bone_names := ["ShoulderR", "ElbowR", "ShoulderL", "ElbowL"]
-	var rotations := {
-		"ShoulderR": Vector3(1.2, 0, -0.3),
-		"ElbowR": Vector3(0.8, 0, 0.3),
-		"ShoulderL": Vector3(1.2, 0, 0.3),
-		"ElbowL": Vector3(0.8, 0, -0.3),
-	}
-	for bone_name in bone_names:
-		var bone_idx := skeleton.find_bone(bone_name)
-		if bone_idx != -1:
-			# Vector3 欧拉角 → Quaternion
-			var quat := Quaternion.from_euler(rotations[bone_name])
-			skeleton.set_bone_pose_rotation(bone_idx, quat)
-	print("手臂姿势已设置")
-
-
-func _find_armature(node: Node) -> Skeleton3D:
-	for child in node.get_children():
-		if child is Skeleton3D:
-			return child
-		var found := _find_armature(child)
-		if found != null:
-			return found
-	return null
+func _process(_delta: float) -> void:
+	# 武器缓慢自转（便于看 ECHO 印记与枪口）
+	if _weapon:
+		_weapon.rotation.y += 0.4 * _delta
+	var target := Vector3(0.1, 0.9, 0)
+	_cam.position = target + Vector3(sin(_yaw) * cos(_pitch), sin(_pitch), cos(_yaw) * cos(_pitch)) * _dist
+	_cam.look_at(target, Vector3.UP)

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="WeaponResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Weapons/Weapon_Resource.gd" id="1_ak47"]
+
+[resource]
+script = ExtResource("1_ak47")
+weapon_name = "AK-47「铁幕」"
+damage = 36.0
+headshot_multiplier = 4.0
+limb_multiplier = 0.8
+rpm = 600
+magazine = 30
+max_ammo = 120
+reload_time = 2.4
+effective_range = 40.0
+max_range = 60.0
+falloff_curve = PackedFloat32Array(1, 0.98, 0.96)
+mobility = 215.0
+deploy_time = 0.3
+fire_mode = 0
+recoil_pattern = 0
+pattern_offsets = PackedVector2Array(0, 0, 0.9, 0, 1.8, 0, 2.6, 0, 3.2, 0, -0.4, 0.15, 0.4, -0.1, -0.4, 0.1, 0.4, -0.15)
+recovery_speed = 8.0
+recoil_val = Vector3(0.06, 0.02, 0.02)
+first_shot_spread = 0.1
+move_spread_multiplier = 3.0
+crouch_spread_multiplier = 0.7
+ads_multiplier = 1.5

@@ -10,3 +10,6 @@ export_presets.cfg
 # Editor
 *.swp
 *.swo
+
+# render debug output (regenerable)
+tools/render/out/
