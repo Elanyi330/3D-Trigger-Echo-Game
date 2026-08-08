@@ -55,6 +55,7 @@ func _fire_n(n: int) -> void:
 func _build_manager() -> WeaponManager:
 	var m := WeaponManager.new()
 	add_child_autofree(m)
+	m.auto_switch_after_throw = false  # 机制单测隔离投掷流程（连续投掷不切枪）
 	m.setup([ak, glock, knife, m67], movement)
 	return m
 

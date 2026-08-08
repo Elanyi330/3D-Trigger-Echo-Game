@@ -58,6 +58,13 @@ func _count_grenades_in_scene() -> int:
 	return count
 
 
+func _find_grenade_in_scene() -> Grenade:
+	for child in get_tree().root.get_children():
+		if child is Grenade:
+			return child
+	return null
+
+
 # ================= 1. 场景加载与武器层 =================
 func test_level_loads_weapon_layer() -> void:
 	var ak: WeaponResource = load("res://Weapons/weapon_ak47.tres")
@@ -164,9 +171,12 @@ func test_m67_throw_explodes_and_damages_target() -> void:
 	await wait_physics_frames(5)
 	assert_eq(_count_grenades_in_scene(), 1, "释放 fire 生成真实 Grenade（接线验证）")
 	# 引信 1.5s（90 物理帧）→ 爆炸。弹道随测试环境物理漂移，精确落点不可靠——
-	# 伤害数值已由 test_grenade.damage_in_radius 单测覆盖；此处验证集成接线：
-	# 爆炸后 Grenade 自清 + 目标受到爆炸伤害（health 下降 = 伤害管线全链路有效）。
-	await wait_physics_frames(110)
+	# 确定性验证接线：爆炸前把 TargetA 传送到手雷落点正下方，再断言受伤。
+	await wait_physics_frames(70)  # 飞到引信将尽（未爆）
+	var grenade := _find_grenade_in_scene()
+	if grenade != null:
+		target_a.global_position = grenade.global_position + Vector3(0, 0.3, 0)  # 落点正上方（必在 2m 内）
+	await wait_physics_frames(40)  # 引信到 → 爆炸
 	assert_eq(_count_grenades_in_scene(), 0, "引信到 → Grenade 爆炸自清")
 	assert_lt(target_a.health, 100.0, "目标受到爆炸伤害（Manager→Grenade→explode→take_damage 接线有效）")
 	assert_gt(target_a.health, 0.0, "伤害在有效带内（未超杀出界）")

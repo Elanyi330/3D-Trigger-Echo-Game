@@ -24,11 +24,14 @@ const ViewModel := preload("res://Assets/Viewmodel/ViewModel.gd")
 @export var bob_freq := 1.0
 @export var bob_amp := 0.012
 @export var bob_speed := 1.4
-# ---- reload（换弹下沉+倾斜）----
-@export var reload_drop := 0.10
-@export var reload_tilt := 0.5
-# ---- swing（近战挥击）----
-@export var swing_pitch := 1.1
+# ---- reload（换弹下沉+内倾，CS 多相位；以内倾为主、下沉为辅，原地侧倾不甩手臂）----
+@export var reload_drop := 0.07
+@export var reload_tilt := 0.12
+@export var reload_cant := 0.55
+# ---- swing（近战挥击，CS 风格）----
+@export var swing_sweep := 0.16
+@export var swing_roll := 0.6
+@export var swing_stab_push := 0.14
 # ---- throw（手雷后拉）----
 @export var throw_pull := 0.5
 
@@ -46,6 +49,7 @@ var _reload_t := -1.0   # <0 = 不在换弹
 var _reload_dur := 0.0
 var _swing_t := -1.0
 var _swing_dur := 0.0
+var _swing_heavy := false
 var _throw_t := -1.0
 var _deploy_t := 0.0
 var _mouse := Vector2.ZERO
@@ -72,6 +76,44 @@ func setup(manager: WeaponManager, move: MovementController) -> void:
 	manager.throw_primed.connect(_on_throw_primed)
 	manager.throw_released.connect(_on_throw_released)
 	_mount(manager.get_current_slot())
+	_build_body()  # 下半身自见（低头可见自己身体——相机挂在角色眼睛上）
+
+
+# 下半身自见：与 Soldier_Echo 同比例的骨盆/双腿/双脚，挂玩家（随 yaw、不随俯仰）。
+# 低头时看到自己的身体——第一人称与角色建模一致、不割裂。
+func _build_body() -> void:
+	if movement == null:
+		return
+	var body := Node3D.new()
+	body.name = "FirstPersonBody"
+	body.position = Vector3(0, -0.915, 0)  # 玩家 origin（胶囊中心）→ 脚底贴地
+	# 与角色同色（玩家绿）
+	var uniform := _body_mat(Color(0.35, 0.48, 0.32))
+	var uniform_dark := _body_mat(Color(0.245, 0.336, 0.224))
+	var boot := _body_mat(Color(0.15, 0.13, 0.12))
+	# 双腿（±X）+ 双脚（脚尖朝 -Z 前方）；不含骨盆/上躯干（贴相机太近会像堵墙）
+	for sx in [0.11, -0.11]:
+		_body_box(body, Vector3(sx, 0.67, 0), Vector3(0.16, 0.38, 0.18), uniform_dark)  # 大腿
+		_body_box(body, Vector3(sx, 0.28, 0), Vector3(0.14, 0.40, 0.16), uniform)       # 小腿
+		_body_box(body, Vector3(sx, 0.04, -0.04), Vector3(0.14, 0.08, 0.26), boot)      # 脚（尖朝前）
+	movement.add_child(body)
+
+
+func _body_box(parent: Node3D, center: Vector3, size: Vector3, mat: Material) -> void:
+	var bm := BoxMesh.new()
+	bm.size = size
+	var mi := MeshInstance3D.new()
+	mi.mesh = bm
+	mi.material_override = mat
+	mi.position = center
+	parent.add_child(mi)
+
+
+func _body_mat(c: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = 0.8
+	return m
 
 
 func _on_switched(slot: int) -> void:
@@ -127,7 +169,12 @@ func _on_reload_started() -> void:
 
 
 func _on_melee_swung(heavy: bool) -> void:
-	_swing_dur = 0.3 if heavy else 0.12
+	_swing_heavy = heavy
+	var res := _manager.get_resource(_manager.get_current_slot())
+	if heavy:
+		_swing_dur = res.melee_heavy_time if res and res.melee_heavy_time > 0.0 else 1.0
+	else:
+		_swing_dur = res.melee_light_time if res and res.melee_light_time > 0.0 else 0.4
 	_swing_t = 0.0
 
 
@@ -220,28 +267,69 @@ func _tick_flash(d: float) -> void:
 
 
 func _apply() -> void:
+	# —— 相机锁定的微妙通道（作用于整个 view_model：武器+手臂一起微动）——
 	var pos := _kick + _sway + _bob
 	var rot := _kick_rot + _sway_rot
-	# reload 下沉+倾斜（前半下沉，后半回位）
-	if _reload_t >= 0.0 and _reload_dur > 0.0:
-		var t := _reload_t / _reload_dur
-		var env := sin(t * PI)  # 0→1→0
-		pos += Vector3(0, -reload_drop * env, 0)
-		rot += Vector3(reload_tilt * env, 0, 0)
-	# swing 下挥
-	if _swing_t >= 0.0 and _swing_dur > 0.0:
-		var t := _swing_t / _swing_dur
-		var env := sin(t * PI)
-		rot += Vector3(-swing_pitch * env, 0, 0)
-	# throw 后拉（保持）+ 释放回位
-	if _throw_t >= 0.0:
-		var t := clampf(_throw_t / throw_pull, 0.0, 1.0)
-		rot += Vector3(-0.5 * t, 0, 0)
-		pos += Vector3(0, 0, 0.05 * t)
-	# deploy 滑入
+	# deploy 滑入（整体）
 	if _deploy_t > 0.0:
 		var t := _deploy_t / 0.18
 		pos += Vector3(0, -0.10 * t * t, 0)
 		rot += Vector3(-0.3 * t * t, 0, 0)
 	view_model.position = pos
 	view_model.rotation = rot
+
+	# —— 武器动作通道（只作用于 weapon_mount；手臂每帧动态追踪握把，肩部不入镜）——
+	var wpos := Vector3.ZERO
+	var wrot := Vector3.ZERO
+	# reload：CS 风格（下沉+内倾，多相位；含后段拉枪栓小动作）
+	if _reload_t >= 0.0 and _reload_dur > 0.0:
+		var t := clampf(_reload_t / _reload_dur, 0.0, 1.0)
+		var env := _reload_env(t)
+		var rack := _reload_rack_env(t)
+		wpos += Vector3(0.02 * env, -reload_drop * env, 0.02 * env + rack * 0.03)
+		wrot += Vector3(reload_tilt * env, 0.25 * env, -reload_cant * env)
+	# swing：CS 近战（轻击斜挥 / 重刺前送），时序取自 .tres melee_*_time
+	if _swing_t >= 0.0 and _swing_dur > 0.0:
+		var t := clampf(_swing_t / _swing_dur, 0.0, 1.0)
+		if _swing_heavy:
+			var windup := _smoothstep(clampf(t / 0.3, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.3) / 0.1, 0.0, 1.0)))
+			var thrust := _smoothstep(clampf((t - 0.3) / 0.25, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.55) / 0.45, 0.0, 1.0)))
+			wpos += Vector3(0.03 * windup, 0.01 * windup, 0.07 * windup - swing_stab_push * thrust)
+			wrot += Vector3(-0.25 * windup + 0.2 * thrust, 0.1 * windup, 0.0)
+		else:
+			var windup := _smoothstep(clampf(t / 0.25, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.25) / 0.05, 0.0, 1.0)))
+			var slash := _smoothstep(clampf((t - 0.25) / 0.25, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.5) / 0.5, 0.0, 1.0)))
+			wpos += Vector3(0.08 * windup - swing_sweep * slash, -0.02 * windup - 0.05 * slash, -0.03 * slash)
+			wrot += Vector3(0.0, 0.15 * windup + 0.3 * slash, 0.4 * windup - swing_roll * slash)
+	# throw：后拉蓄力（保持）
+	if _throw_t >= 0.0:
+		var t := clampf(_throw_t / throw_pull, 0.0, 1.0)
+		wrot += Vector3(-0.5 * t, 0, 0)
+		wpos += Vector3(0, 0, 0.05 * t)
+	# 叠加到基础取景（equip 设定的 offset/rotation），不覆盖
+	view_model.weapon_mount.position = view_model.base_offset + wpos
+	view_model.weapon_mount.rotation = view_model.base_rotation + wrot
+
+
+# ---- 动画包络辅助（CS 多相位） ----
+
+func _smoothstep(x: float) -> float:
+	var v := clampf(x, 0.0, 1.0)
+	return v * v * (3.0 - 2.0 * v)
+
+
+func _reload_env(t: float) -> float:
+	# 快降(0-0.22) → 低位保持(0.22-0.68) → 回升(0.68-1.0)，全程平滑
+	if t < 0.22:
+		return _smoothstep(t / 0.22)
+	if t < 0.68:
+		return 1.0
+	return 1.0 - _smoothstep((t - 0.68) / 0.32)
+
+
+func _reload_rack_env(t: float) -> float:
+	# 拉枪栓小动作：仅在 0.68-0.85 段快速后拉-回位（换弹尾声的上膛感）
+	if t < 0.68 or t > 0.9:
+		return 0.0
+	var u := (t - 0.68) / 0.22  # 0→1
+	return sin(u * PI)  # 0→1→0 后拉再回

@@ -41,6 +41,9 @@ var _rng := RandomNumberGenerator.new()
 # 换弹瞬时满（立即补满 + reload_finished，不进入换弹状态）；备弹恒满（无穷）。
 # M67 投出后自动补 1 枚由 WeaponManager._throw_grenade 走 refund_throw 等价路径。
 var infinite_ammo: bool = false
+# M1.5 靶场模式：备弹无限但弹匣有上限（换弹正常进行——CS 靶场手感；区别于 infinite_ammo 的免换弹）。
+# 手雷等投掷物配合 infinite_ammo（refund_throw）实现"无限但投完仍自动切回主武器"。
+var infinite_reserve: bool = false
 
 
 func setup(resource: WeaponResource, camera: Camera3D, movement: Node = null) -> void:
@@ -103,8 +106,8 @@ func start_reload() -> void:
 		_refill_infinite_ammo()
 		reload_finished.emit()
 		return
-	if _mag >= _resource.magazine or _reserve <= 0:
-		return  # 满弹匣或无可换弹药
+	if _mag >= _resource.magazine or (_reserve <= 0 and not infinite_reserve):
+		return  # 满弹匣或无可换弹药（infinite_reserve 备弹无限，不因 reserve=0 拦截）
 	_reloading = true
 	_reload_old_mag = _mag
 	_reload_remaining = _resource.reload_time
@@ -323,9 +326,14 @@ func _finish_reload() -> void:
 	# CS2 2026-03 丢弃弹匣剩余：弹匣 = magazine，备弹 -= (magazine - 换弹前弹匣值)
 	# 备弹不足：弹匣 = min(magazine, 备弹 + 旧弹匣剩余)
 	var needed := _resource.magazine - _reload_old_mag
-	var take := mini(needed, _reserve)
-	_mag = _reload_old_mag + take
-	_reserve -= take
+	if infinite_reserve:
+		# 靶场模式：备弹无限——弹匣补满，备弹数额不减少（HUD 备弹恒满）
+		_mag = _reload_old_mag + needed
+		_reserve = _resource.max_ammo
+	else:
+		var take := mini(needed, _reserve)
+		_mag = _reload_old_mag + take
+		_reserve -= take
 	reload_finished.emit()
 
 

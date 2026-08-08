@@ -170,17 +170,20 @@ def add_echo_mark(pos, size):
     t.name = "%s_EchoMark" % KEY
     t.data.body = "ECHO"
     t.data.size = size
-    t.data.extrude = 0.0012
+    t.data.extrude = 0.0003   # 贴纸质感：近乎压平（0.3mm），不突兀
+    t.data.space_character = 1.1
     t.data.align_x = 'CENTER'
     t.data.align_y = 'CENTER'
     # face -X (weapon left / player-visible), read along -Y, up +Z
     t.rotation_euler = (math.radians(90), 0, math.radians(-90))
     m = bpy.data.materials.new("EchoMark")
-    m.diffuse_color = (1.0, 0.45, 0.05, 1.0)   # accent orange
+    # 印刷贴纸色：暖白底橘字（哑光，贴合表面像印刷/贴纸，非凸起3D）
+    m.diffuse_color = (0.95, 0.55, 0.15, 1.0)
     m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (1.0, 0.45, 0.05, 1.0)
-    b.inputs["Roughness"].default_value = 0.4
+    b.inputs["Base Color"].default_value = (0.95, 0.55, 0.15, 1.0)
+    b.inputs["Roughness"].default_value = 0.65
+    b.inputs["Metallic"].default_value = 0.0
     t.data.materials.append(m)
     # convert to mesh so it exports cleanly
     bpy.ops.object.convert(target='MESH')

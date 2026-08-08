@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_knife")
-weapon_name = "战术匕首「回声」"
+weapon_name = "战术匕首【回声】"
 damage = 40.0
 rpm = 0
 magazine = 0

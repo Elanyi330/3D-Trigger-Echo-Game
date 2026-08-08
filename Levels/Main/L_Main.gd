@@ -9,7 +9,8 @@ extends Node3D
 # 输入：fire 由 WeaponManager._physics_process 每物理帧轮询（半自动契约）；reload/aim/切枪在此路由。
 
 @export var fast_close := true
-@export var cheats := false  # 测试版无限弹药开关（正式/验收 false = 真实弹药/换弹）
+@export var cheats := false  # 无限弹药作弊（免换弹；正式/验收 false）
+@export var range_mode := true  # 靶场模式：枪械备弹无限（弹匣有限需换弹）+ 手雷无限（投完自动切回主武器）
 
 const WEAPON_RES := [
 	preload("res://Weapons/weapon_ak47.tres"),
@@ -34,6 +35,11 @@ var _weapon_label: Label
 var _hitmarker: Label
 var _photo_path := ""
 var _photo_frames := -1  # >=0 = 拍照模式（N 帧后截图退出）
+var _burst := 0  # >0 = 拍照前连发 N 帧（复现弹孔/后坐力）
+# 靶场敌人按批刷新
+var _active_enemies: Array[Enemy] = []
+var _respawn_timer := -1.0  # <0 = 无计时
+var _respawn_delay := 1.0
 
 
 func _ready() -> void:
@@ -55,13 +61,32 @@ func _ready() -> void:
 			_photo_frames = 50
 		elif a.begins_with("--frames="):
 			_photo_frames = int(a.split("=")[1])
+		elif a.begins_with("--burst="):
+			_burst = int(a.split("=")[1])
+		elif a.begins_with("--pz="):
+			_movement.position = Vector3(0, 1, float(a.split("=")[1]))  # 拍照前传送玩家
+		elif a.begins_with("--pitch="):
+			_head.rot.x = deg_to_rad(float(a.split("=")[1]))  # 俯仰视角（低头看身体）
 
 
 func _process(_delta: float) -> void:
+	# 靶场敌人按批刷新倒计时
+	if _respawn_timer > 0.0:
+		_respawn_timer -= _delta
+		if _respawn_timer <= 0.0:
+			_respawn_timer = -1.0
+			_spawn_wave()
 	if _photo_frames < 0:
 		return
 	_photo_frames -= 1
+	# 连发阶段（复现弹孔/后坐力）：按住 fire
+	if _burst > 0 and _photo_frames > 10:
+		Input.action_press("fire")
+		_burst -= 1
+		if _burst <= 0:
+			Input.action_release("fire")
 	if _photo_frames <= 0:
+		Input.action_release("fire")
 		var img := get_viewport().get_texture().get_image()
 		img.save_png(ProjectSettings.globalize_path(_photo_path))
 		print("GAME PHOTO SAVED ", ProjectSettings.globalize_path(_photo_path))
@@ -88,6 +113,17 @@ func _setup_weapons() -> void:
 			var core := _manager.get_core(i)
 			if core:
 				core.infinite_ammo = true
+	if range_mode:
+		# 靶场模式：枪械（0步枪/1手枪）备弹无限但弹匣有限（正常换弹）；手雷（3）无限（refund_throw）
+		for i in slots.size():
+			var core := _manager.get_core(i)
+			if core == null:
+				continue
+			var res := _manager.get_resource(i)
+			if res.fire_mode == WeaponResource.FireMode.THROWABLE:
+				core.infinite_ammo = true  # 手雷无限（投出后 refund 回 1 枚）
+			elif res.fire_mode != WeaponResource.FireMode.MELEE:
+				core.infinite_reserve = true  # 枪械备弹无限、弹匣有限
 	# 开火即刷新弹药 HUD（WeaponManager 不在逐发时发 ammo 信号）
 	for i in slots.size():
 		var c := _manager.get_core(i)
@@ -158,36 +194,90 @@ func _spawn_targets() -> void:
 	var targets := Node3D.new()
 	targets.name = "Targets"
 	add_child(targets)
-	# TargetA：正前方可见躯干靶（纯 torso，命中判定/爆炸结收集成测试基准）
+	# TargetA：圆形金色标靶（正对玩家，测准度看弹孔；也是集成测试命中/爆炸基准）
+	_spawn_accuracy_target(targets)
+	# 敌人按批刷新（全灭后 1s 自动刷新一批）
+	_respawn_delay = 1.0
+	_spawn_wave()
+
+
+# 圆形金色标靶：薄板（圆环靶面贴图，透明角），正对玩家，弹孔落点可读准度。
+func _spawn_accuracy_target(parent: Node) -> void:
 	var target_a := Target.new()
 	target_a.name = "TargetA"
-	target_a.position = Vector3(0, 0, -9.5)
+	target_a.position = Vector3(0, 1.5, -9.8)
+	# 碰撞：薄竖板（命中判定 + 弹孔投射面）
 	var a_col := CollisionShape3D.new()
 	var a_box := BoxShape3D.new()
-	a_box.size = Vector3(0.6, 1.8, 0.4)
+	a_box.size = Vector3(1.7, 1.7, 0.08)
 	a_col.shape = a_box
-	a_col.position = Vector3(0, 0.9, 0)
 	target_a.add_child(a_col)
+	# 靶面：PlaneMesh 正对玩家（+Z），圆形靶环贴图（透明角）
 	var a_mesh := MeshInstance3D.new()
-	var a_bm := BoxMesh.new()
-	a_bm.size = Vector3(0.6, 1.8, 0.4)
-	a_mesh.mesh = a_bm
-	a_mesh.position = Vector3(0, 0.9, 0)
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1.7, 1.7)
+	a_mesh.mesh = plane
+	# PlaneMesh 默认面朝 +Y（水平），旋转竖立面朝 +Z（朝玩家）
+	a_mesh.rotation_degrees = Vector3(90, 0, 0)
 	var a_mat := StandardMaterial3D.new()
-	a_mat.albedo_color = Color(0.75, 0.6, 0.2)
+	a_mat.albedo_texture = _make_bullseye_texture()
+	a_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA  # 透明角（只显示圆靶）
+	a_mat.roughness = 0.85
 	a_mesh.material_override = a_mat
+	a_mesh.position = Vector3(0, 0, 0.05)  # 靶面微出碰撞板（弹孔投在板上，靶面可见）
 	target_a.add_child(a_mesh)
-	targets.add_child(target_a)
-	# 敌人（红色方块人，排两侧/后方，不挡 TargetA 正前方射线）
-	var enemy_positions := [
-		Vector3(3.5, 0, -7), Vector3(-3.5, 0, -7),
-		Vector3(5.5, 0, -4), Vector3(-5.5, 0, -4),
-		Vector3(2.5, 0, -9), Vector3(-2.5, 0, -9),
+	parent.add_child(target_a)
+
+
+# 程序化同心环靶面（金/红/白靶心，圆外透明），供弹孔判读准度
+func _make_bullseye_texture() -> ImageTexture:
+	var S := 256
+	var img := Image.create(S, S, false, Image.FORMAT_RGBA8)
+	var center := Vector2(S, S) * 0.5
+	# 由外向内：金底 → 白环 → 红环 → 白环 → 金心（靶心）
+	var bands := [
+		[1.00, Color(0.85, 0.65, 0.15)],   # 外金底
+		[0.78, Color(0.92, 0.92, 0.92)],   # 白环
+		[0.58, Color(0.80, 0.20, 0.15)],   # 红环
+		[0.36, Color(0.92, 0.92, 0.92)],   # 白环
+		[0.18, Color(0.85, 0.30, 0.12)],   # 红心（靶心）
 	]
-	for pos in enemy_positions:
+	for y in S:
+		for x in S:
+			var d := Vector2(x, y).distance_to(center) / (S * 0.5)
+			if d > 1.0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))  # 圆外透明
+				continue
+			# 从靶心向外匹配：半径最小的包含带胜出（内→外遍历 + 命中即停）
+			var col: Color = bands[0][1]  # 默认最外金底
+			for i in range(bands.size() - 1, 0, -1):  # 内→外（bands 末位=靶心）
+				if d <= bands[i][0]:
+					col = bands[i][1]
+					break
+			img.set_pixel(x, y, col)
+	return ImageTexture.create_from_image(img)
+
+
+# ---- 敌人按批刷新 ----
+func _spawn_wave() -> void:
+	_active_enemies.clear()
+	# 一批 4 个，分布在正前方两侧（中央 x≈0 通道留空——TargetA 测准度/集成测试不被挡）
+	var positions := [
+		Vector3(-2.5, 0, -6), Vector3(1.8, 0, -7), Vector3(3.5, 0, -6), Vector3(-4.0, 0, -8),
+	]
+	for pos in positions:
 		var e := Enemy.new()
 		e.position = pos
-		targets.add_child(e)
+		e.rotation.y = PI  # 面向玩家（角色默认朝 -Z，转 180° 朝 +Z 玩家侧）
+		e.died.connect(_on_enemy_died.bind(e))
+		add_child(e)
+		_active_enemies.append(e)
+
+
+func _on_enemy_died(e: Enemy) -> void:
+	_active_enemies.erase(e)
+	if _active_enemies.is_empty():
+		_respawn_timer = _respawn_delay  # 全灭 → 1s 后刷新一批
 
 
 func _input(event: InputEvent) -> void:

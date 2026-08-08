@@ -48,6 +48,7 @@ func after_each() -> void:
 func _build_manager(slots: Array[WeaponResource]) -> WeaponManager:
 	var m := WeaponManager.new()
 	add_child_autofree(m)
+	m.auto_switch_after_throw = false  # 机制单测隔离投掷流程（自动切回由专门测试覆盖）
 	m.setup(slots, movement)
 	watch_signals(m)
 	return m
@@ -418,6 +419,24 @@ func test_throw_infinite_hold_no_timeout() -> void:
 	Input.action_release("fire")
 
 
+# ================= 6.5 M1.5：投掷后自动切回主武器 =================
+func test_throw_auto_switches_to_primary() -> void:
+	# 用户拍板：投掷出手后自动切回主武器（槽位 0），CS 式。
+	manager = _build_manager([ak, glock, knife, m67])
+	manager.auto_switch_after_throw = true  # 开启（游戏默认；机制测试默认关闭隔离）
+	await _deploy_m67()
+	assert_eq(manager.get_current_slot(), 3, "前置：持 M67")
+	Input.action_press("fire")
+	await wait_physics_frames(2)
+	assert_eq(manager.get_state(), WeaponManager.State.THROWING, "引信 THROWING")
+	Input.action_release("fire")  # 出手
+	await wait_physics_frames(2)
+	assert_eq(manager.get_current_slot(), 0, "投掷后自动切回主武器（槽位 0）")
+	assert_eq(manager.get_state(), WeaponManager.State.DEPLOYING, "切回主武器 → DEPLOYING")
+	await wait_physics_frames(_deploy_frames(ak))
+	assert_eq(manager.get_state(), WeaponManager.State.ACTIVE, "主武器 deploy 完成回 ACTIVE")
+
+
 # ================= 7. M1 任务8：弹孔系统（命中点 decal，200 上限淘汰最旧） =================
 func test_hit_landed_spawns_bullet_hole_at_hit_point() -> void:
 	manager = _build_manager([ak, glock, knife, m67])
@@ -428,8 +447,9 @@ func test_hit_landed_spawns_bullet_hole_at_hit_point() -> void:
 		if child is BulletHole:
 			holes.append(child)
 	assert_eq(holes.size(), 1, "命中生成 1 个弹孔")
+	# M1.5：弹孔沿法线外移 0.02（防嵌入）——y = 命中点 2 + 法线 UP*0.02
 	assert_almost_eq(holes[0].global_position.x, 1.0, 0.001, "弹孔 x = 实际命中点")
-	assert_almost_eq(holes[0].global_position.y, 2.0, 0.001, "弹孔 y = 实际命中点")
+	assert_almost_eq(holes[0].global_position.y, 2.02, 0.001, "弹孔 y = 命中点沿法线外移 0.02")
 	assert_almost_eq(holes[0].global_position.z, 3.0, 0.001, "弹孔 z = 实际命中点")
 
 

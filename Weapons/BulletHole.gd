@@ -21,18 +21,18 @@ const TEXTURE_RADIUS_RATIO := 0.45  # 弹孔圆形半径（贴图边长比例）
 func init(position: Vector3, normal: Vector3, parent: Node3D = null) -> void:
 	if parent != null and parent != get_parent():
 		reparent(parent)  # 保持 global 变换迁移到 collider 下
-	global_position = position
 	var dir := normal.normalized()
-	# 贴合表面：局部 -Z 指向法线（Decal 沿 -Z 投影到墙面）；
-	# 法线平行 UP（地面/天花板）时 up 退化 → 回退 FORWARD 防 look_at 报错。
+	# Decal 沿 -Z 投影：-Z 必须指向墙内（命中点方向）才投得上。
+	# 先沿法线外移 2cm（防嵌入/深度冲突），再 look_at 命中点 → -Z 朝向表面。
+	global_position = position + dir * 0.02
 	var up := Vector3.UP
 	if absf(dir.dot(Vector3.UP)) > 0.99:
 		up = Vector3.FORWARD
-	look_at(position + dir, up)
+	look_at(position, up)
 	var decal := Decal.new()
 	decal.name = "Decal"
-	decal.size = Vector3(0.1, 0.1, 0.08)
-	decal.modulate = Color(0.1, 0.1, 0.1, 0.9)
+	decal.size = Vector3(0.2, 0.2, 0.12)
+	decal.modulate = Color(0.05, 0.05, 0.05, 1.0)
 	# M1 任务14 可见性修复：Decal 无贴图不可见——程序化生成圆形黑色焦痕贴图（运行时，无外部资产）
 	decal.texture_albedo = _make_bullet_hole_texture()
 	add_child(decal)

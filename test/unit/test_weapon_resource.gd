@@ -24,7 +24,7 @@ func test_four_tres_all_load() -> void:
 
 # ---- AK-47「铁幕」（CS2：36 / ×4.0 / 600RPM / 30+120 / 2.4s / 215u） ----
 func test_ak47_cs2_values() -> void:
-    assert_eq(ak.weapon_name, "AK-47「铁幕」", "名称")
+    assert_eq(ak.weapon_name, "AK47【回声】", "名称")
     assert_almost_eq(ak.damage, 36.0, 0.001, "伤害 36")
     assert_almost_eq(ak.headshot_multiplier, 4.0, 0.001, "爆头 ×4.0")
     assert_almost_eq(ak.limb_multiplier, 0.8, 0.001, "四肢 ×0.8")
@@ -53,7 +53,7 @@ func test_ak47_cs2_values() -> void:
 
 # ---- Glock-18「迅捷」（CS2：30 / 400RPM / 20+80 / 2.3s / 240u / 半自动随机） ----
 func test_glock18_cs2_values() -> void:
-    assert_eq(glock.weapon_name, "Glock-18「迅捷」", "名称")
+    assert_eq(glock.weapon_name, "Glock18【回声】", "名称")
     assert_almost_eq(glock.damage, 30.0, 0.001, "伤害 30")
     assert_almost_eq(glock.headshot_multiplier, 4.0, 0.001, "爆头 ×4.0")
     assert_eq(glock.rpm, 400, "400 RPM")
@@ -77,7 +77,7 @@ func test_glock18_cs2_values() -> void:
 
 # ---- 战术匕首「回声」（CS2：40/25/65/背刺180/0.4s+1.0s/250u） ----
 func test_knife_melee_values() -> void:
-    assert_eq(knife.weapon_name, "战术匕首「回声」", "名称")
+    assert_eq(knife.weapon_name, "战术匕首【回声】", "名称")
     assert_eq(knife.fire_mode, WeaponResource.FireMode.MELEE, "近战")
     assert_almost_eq(knife.mobility, 250.0, 0.001, "移速 250u (100%)")
     assert_almost_eq(knife.damage, 40.0, 0.001, "基础伤害 40（正面首击）")
@@ -100,7 +100,7 @@ func test_knife_melee_values() -> void:
 
 # ---- M67「轰鸣」（CS2：98 / 引信1.5s / 半径6m / 245u） ----
 func test_m67_throwable_values() -> void:
-    assert_eq(m67.weapon_name, "M67「轰鸣」", "名称")
+    assert_eq(m67.weapon_name, "M67【回声】", "名称")
     assert_eq(m67.fire_mode, WeaponResource.FireMode.THROWABLE, "投掷物")
     assert_almost_eq(m67.damage, 98.0, 0.001, "中心伤害 98")
     assert_almost_eq(m67.fuse_time, 1.5, 0.001, "引信 1.5s")

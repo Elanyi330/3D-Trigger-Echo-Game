@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_ak47")
-weapon_name = "AK-47「铁幕」"
+weapon_name = "AK47【回声】"
 damage = 36.0
 headshot_multiplier = 4.0
 limb_multiplier = 0.8

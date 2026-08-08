@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_m67")
-weapon_name = "M67「轰鸣」"
+weapon_name = "M67【回声】"
 damage = 98.0
 rpm = 0
 magazine = 1

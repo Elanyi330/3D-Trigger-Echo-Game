@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_glock")
-weapon_name = "Glock-18「迅捷」"
+weapon_name = "Glock18【回声】"
 damage = 30.0
 headshot_multiplier = 4.0
 limb_multiplier = 0.8

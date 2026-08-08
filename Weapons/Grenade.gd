@@ -16,6 +16,7 @@ var resource: WeaponResource
 
 var _fuse_remaining: float = 0.0  # 引信倒计时（秒）；0 = 未投掷
 var _exploded: bool = false
+var _visual: Node3D = null  # 投掷物视觉（M67 弹体模型）
 
 
 func init(origin: Vector3, direction: Vector3, strength: float) -> void:
@@ -23,6 +24,22 @@ func init(origin: Vector3, direction: Vector3, strength: float) -> void:
 	linear_velocity = direction.normalized() * strength
 	if resource != null:
 		_fuse_remaining = resource.fuse_time
+	_attach_visual()
+
+
+func _attach_visual() -> void:
+	# M1.5：投掷物可视化——挂手雷模型（Grenade_M67_Echo），可见抛物线飞行/落地。
+	# 模型原点 = 弹体中心；清掉标记子节点（投影无需握把/拉环标记）。
+	if _visual != null:
+		return
+	var model: PackedScene = load("res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb")
+	_visual = model.instantiate()
+	for c in _visual.get_children():
+		if not c is MeshInstance3D:
+			c.queue_free()  # 移除 Marker 节点（PullRing/Spoon/GripRight），只留弹体网格
+	add_child(_visual)
+	# 飞行旋转（翻滚感）
+	angular_velocity = Vector3(randf_range(-6, 6), randf_range(-6, 6), randf_range(-6, 6))
 
 
 func explode() -> void:

@@ -25,6 +25,8 @@ signal enemy_hit
 @export var view_models: Array[PackedScene] = []
 # 投掷出手速度（m/s，M67 出手速度；参数化导出避免硬编码散值——非 .tres 字段，调参走此导出）
 @export var throw_strength: float = 15.0
+# M1.5：投掷出手后自动切回主武器（CS 式；用户拍板）。默认开启；机制单测可关闭以隔离流程。
+@export var auto_switch_after_throw: bool = true
 # 弹孔上限（spec §9.2：200 个防刷屏，超出淘汰最旧）
 const MAX_BULLET_HOLES := 200
 
@@ -289,6 +291,7 @@ func _throw_grenade() -> void:
 		var ammo := core.get_ammo()
 		weapon_ammo_updated.emit(_current_slot, int(ammo.x), int(ammo.y))
 	if _camera == null:
+		_auto_switch_to_primary()  # M1.5：投掷后自动切回主武器（测试路径同样切换）
 		return  # 无相机（单元测试环境）：不生成投掷物，仅状态流转
 	var res := _resources[_current_slot]
 	if res == null:
@@ -303,6 +306,16 @@ func _throw_grenade() -> void:
 	else:
 		add_child(grenade)
 	grenade.init(_camera.global_position, -_camera.global_transform.basis.z, throw_strength)
+	# M1.5：投掷出手后自动切回主武器（CS 式——投完即回步枪；用户拍板）
+	_auto_switch_to_primary()
+
+
+func _auto_switch_to_primary() -> void:
+	# 投掷后自动切回主武器（槽位 0）。主武器槽位有效才切换（switch_to 内部走 DEPLOYING）。
+	if not auto_switch_after_throw:
+		return
+	if _cores.size() > 0 and _resources[0] != null and _current_slot != 0:
+		switch_to(0)
 
 
 func _cancel_throw() -> void:

@@ -17,13 +17,14 @@ func _spawn_hole(position: Vector3, normal: Vector3) -> BulletHole:
 # ================= 1. 命中点与表面贴合 =================
 func test_init_position_and_surface_alignment() -> void:
 	var hole := _spawn_hole(Vector3(0, 1, -8), Vector3(0, 0, 1))
-	assert_almost_eq(hole.global_position.x, 0.0, 0.001, "位置 x = 实际射线命中点")
-	assert_almost_eq(hole.global_position.y, 1.0, 0.001, "位置 y = 实际射线命中点")
-	assert_almost_eq(hole.global_position.z, -8.0, 0.001, "位置 z = 实际射线命中点")
+	# M1.5 修复：弹孔沿法线外移 0.02（防嵌入/深度冲突），Decal -Z 朝墙内（命中点方向）才投得上
+	assert_almost_eq(hole.global_position.x, 0.0, 0.001, "位置 x = 命中点")
+	assert_almost_eq(hole.global_position.y, 1.0, 0.001, "位置 y = 命中点")
+	assert_almost_eq(hole.global_position.z, -7.98, 0.001, "位置 z = 命中点沿法线外移 0.02")
 	var z := hole.global_transform.basis.z
-	assert_almost_eq(z.x, 0.0, 0.001, "贴合 -Z x 分量")
-	assert_almost_eq(z.y, 0.0, 0.001, "贴合 -Z y 分量")
-	assert_almost_eq(z.z, -1.0, 0.001, "局部 -Z 指向表面法线（decal 贴合墙面）")
+	assert_almost_eq(z.x, 0.0, 0.001, "贴合 basis.z x 分量")
+	assert_almost_eq(z.y, 0.0, 0.001, "贴合 basis.z y 分量")
+	assert_almost_eq(z.z, 1.0, 0.001, "basis.z 朝外（= 投影 -Z 朝墙内，decal 贴合墙面）")
 	var decal := hole.get_node_or_null("Decal") as Decal
 	assert_not_null(decal, "生成 Decal 子节点")
 	if decal != null:
@@ -36,9 +37,9 @@ func test_normal_parallel_to_up_fallback_no_error() -> void:
 	# 地面/天花板（法线 = ±UP）：look_at 的 up 向量退化为平行 → 回退 up 防退化
 	var hole := _spawn_hole(Vector3(0, 1, 0), Vector3.UP)
 	var z := hole.global_transform.basis.z
-	assert_almost_eq(z.x, 0.0, 0.001, "贴地面 -Z x 分量")
-	assert_almost_eq(z.y, -1.0, 0.001, "贴地面：-Z 朝上（法线）")
-	assert_almost_eq(z.z, 0.0, 0.001, "贴地面 -Z z 分量")
+	assert_almost_eq(z.x, 0.0, 0.001, "贴地面 basis.z x 分量")
+	assert_almost_eq(z.y, 1.0, 0.001, "贴地面：basis.z 朝上（= 投影 -Z 朝下入地面）")
+	assert_almost_eq(z.z, 0.0, 0.001, "贴地面 basis.z z 分量")
 
 
 # ================= 1.5 M1 任务15：挂被击中 collider 下（随物体动，GarbajYT decals） =================
@@ -55,19 +56,19 @@ func test_attaches_under_collider_and_follows_it() -> void:
 	add_child_autofree(hole)
 	hole.init(Vector3(0, 1, -5), Vector3(0, 0, 1), body)
 	assert_eq(hole.get_parent(), body, "弹孔父节点 = 被击中 collider")
-	assert_almost_eq(hole.global_position.x, 0.0, 0.001, "位置 = 命中点（父级变换正确换算）")
+	assert_almost_eq(hole.global_position.x, 0.0, 0.001, "位置 x = 命中点（父级变换正确换算）")
 	assert_almost_eq(hole.global_position.y, 1.0, 0.001, "位置 y = 命中点")
-	assert_almost_eq(hole.global_position.z, -5.0, 0.001, "位置 z = 命中点")
+	assert_almost_eq(hole.global_position.z, -4.98, 0.001, "位置 z = 命中点沿法线外移 0.02")
 	var z := hole.global_transform.basis.z
-	assert_almost_eq(z.x, 0.0, 0.001, "贴合法线 -Z x 分量")
-	assert_almost_eq(z.y, 0.0, 0.001, "贴合法线 -Z y 分量")
-	assert_almost_eq(z.z, -1.0, 0.001, "局部 -Z 指向表面法线（贴平）")
+	assert_almost_eq(z.x, 0.0, 0.001, "贴合法线 basis.z x 分量")
+	assert_almost_eq(z.y, 0.0, 0.001, "贴合法线 basis.z y 分量")
+	assert_almost_eq(z.z, 1.0, 0.001, "basis.z 朝外（= 投影 -Z 朝墙内，贴平）")
 	# 随物体动：collider 平移 → 弹孔 global 位置跟随（body 从 (0,1,-5) → (2,1,-8)，y 不变）
 	body.global_position = Vector3(2, 1, -8)
 	await wait_physics_frames(1)
 	assert_almost_eq(hole.global_position.x, 2.0, 0.001, "collider 移动 → 弹孔随动（x）")
 	assert_almost_eq(hole.global_position.y, 1.0, 0.001, "collider 移动 → 弹孔随动（y）")
-	assert_almost_eq(hole.global_position.z, -8.0, 0.001, "collider 移动 → 弹孔随动（z）")
+	assert_almost_eq(hole.global_position.z, -7.98, 0.001, "collider 移动 → 弹孔随动（z，含 0.02 偏移）")
 
 
 # ================= 2. 30s 生命周期 =================

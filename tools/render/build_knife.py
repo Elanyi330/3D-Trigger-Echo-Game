@@ -100,12 +100,13 @@ MARKERS = {
 bpy.ops.object.text_add(location=(-0.005, 0.10, 0.018))
 _t = bpy.context.active_object
 _t.name = MODEL + "_EchoMark"
-_t.data.body = "ECHO"; _t.data.size = 0.020; _t.data.extrude = 0.0008
+_t.data.body = "ECHO"; _t.data.size = 0.020; _t.data.extrude = 0.0003  # 贴纸质感：压平
 _t.data.align_x = 'CENTER'; _t.data.align_y = 'CENTER'
 _t.rotation_euler = (1.5708, 0, -1.5708)  # face -X, read along blade, up +Z
-_mm = bpy.data.materials.new("EchoMark"); _mm.diffuse_color = (1.0, 0.45, 0.05, 1.0)
+_mm = bpy.data.materials.new("EchoMark"); _mm.diffuse_color = (0.95, 0.55, 0.15, 1.0)
 _mm.use_nodes = True
-_mm.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (1.0, 0.45, 0.05, 1.0)
+_mm.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.95, 0.55, 0.15, 1.0)
+_mm.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.65
 _t.data.materials.append(_mm)
 bpy.ops.object.convert(target='MESH')
 

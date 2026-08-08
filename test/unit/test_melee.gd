@@ -209,25 +209,31 @@ func test_light_swing_dips_viewmodel_and_returns() -> void:
 	var view := _build_view_with_models()
 	manager.switch_to(2)
 	await wait_physics_frames(_deploy_frames())
-	var vm: Node3D = view.view_model
-	assert_not_null(vm.current_weapon, "刀视图模型已挂载")
-	var base_x: float = vm.rotation.x
+	var wm: Node3D = view.view_model.weapon_mount  # M1.5：挥砍作用于 weapon_mount（手臂动态追踪握把）
+	assert_not_null(view.view_model.current_weapon, "刀视图模型已挂载")
+	var base_pos: Vector3 = wm.position
+	var base_rot: Vector3 = wm.rotation
 	manager.try_fire()  # 轻击
-	await wait_physics_frames(2)  # 下挥中（swing 0.12s）
-	assert_lt(vm.rotation.x, base_x - 0.05, "轻击：视图模型下挥（绕 X 负向）")
-	await _await_cooldown(knife.melee_light_time + 0.2)
-	assert_almost_eq(vm.rotation.x, base_x, 0.01, "挥击结束回位")
+	await wait_physics_frames(2)  # 挥砍蓄力/挥出中
+	var dev := (wm.position - base_pos).length() + (wm.rotation - base_rot).length()
+	assert_gt(dev, 0.02, "轻击：武器产生挥砍位移/旋转（CS 斜挥）")
+	await _await_cooldown(knife.melee_light_time + 0.3)
+	var after := (wm.position - base_pos).length() + (wm.rotation - base_rot).length()
+	assert_lt(after, 0.01, "挥击结束回位")
 
 
 func test_heavy_swing_dips_viewmodel_and_returns() -> void:
 	var view := _build_view_with_models()
 	manager.switch_to(2)
 	await wait_physics_frames(_deploy_frames())
-	var vm: Node3D = view.view_model
-	var base_x: float = vm.rotation.x
+	var wm: Node3D = view.view_model.weapon_mount
+	var base_pos: Vector3 = wm.position
+	var base_rot: Vector3 = wm.rotation
 	manager.set_aim(true)  # 重刺
-	await wait_physics_frames(2)  # 下刺中（swing 0.3s）
-	assert_lt(vm.rotation.x, base_x - 0.05, "重刺：视图模型下刺（绕 X 负向）")
+	await wait_physics_frames(2)  # 回拉/前刺中
+	var dev := (wm.position - base_pos).length() + (wm.rotation - base_rot).length()
+	assert_gt(dev, 0.02, "重刺：武器产生前刺位移/旋转")
 	await _await_cooldown(knife.melee_heavy_time + 0.3)
-	assert_almost_eq(vm.rotation.x, base_x, 0.01, "重刺结束回位")
+	var after := (wm.position - base_pos).length() + (wm.rotation - base_rot).length()
+	assert_lt(after, 0.01, "重刺结束回位")
 
