@@ -30,8 +30,8 @@ const ViewModel := preload("res://Assets/Viewmodel/ViewModel.gd")
 @export var reload_cant := 0.7
 @export var reload_yaw := 0.45
 # ---- swing（近战挥击，CS 风格；幅度大——中段刀刃横扫过画面中心）----
-@export var swing_sweep := 0.24
-@export var swing_roll := 0.85
+@export var swing_sweep := 0.26
+@export var swing_roll := 1.15
 @export var swing_stab_push := 0.16
 # ---- throw（手雷后拉）----
 @export var throw_pull := 0.5

@@ -60,8 +60,14 @@ func _ready() -> void:
 
 func _physics_process(_d: float) -> void:
 	_frames += 1
-	# deploy takes deploy_time; act after ~20 frames
-	if _frames == 20 and not _action_fired:
+	# 换弹需先打几发（满弹匣 start_reload 会被守卫拦截）
+	if action == "reload" and _frames == 18:
+		Input.action_press("fire")
+	if action == "reload" and _frames == 24:
+		Input.action_release("fire")
+	# deploy takes deploy_time; act after ~20 frames (reload: fire first, then reload at frame 30)
+	var trig := 20 if action != "reload" else 30
+	if _frames == trig and not _action_fired:
 		_action_fired = true
 		match action:
 			"reload": _mgr.start_reload()
@@ -70,7 +76,7 @@ func _physics_process(_d: float) -> void:
 			"fire": _mgr.try_fire()
 	# capture at the 'at' fraction of the action
 	var total := _total_frames()
-	if _frames == 20 + int(total * at):
+	if _frames == trig + int(total * at):
 		_capture()
 
 func _total_frames() -> int:

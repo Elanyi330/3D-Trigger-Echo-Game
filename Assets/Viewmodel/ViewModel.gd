@@ -25,7 +25,7 @@ extends Node3D
 ## CS 对比校准（agent 评估）：手枪长≈2.3×拳宽、雷体≈屏宽12-18%上移入画、刀上移抬头25-30°。
 const WEAPON_FRAME := {
 	"AK47_Echo": {"offset": Vector3(0.28, -0.33, -0.55), "scale": 1.0, "rot": Vector3(0, 0, 0)},
-	"Glock18_Echo": {"offset": Vector3(0.20, -0.25, -0.46), "scale": 2.0, "rot": Vector3(0, 0, 0)},
+	"Glock18_Echo": {"offset": Vector3(0.20, -0.24, -0.46), "scale": 2.0, "rot": Vector3(-7.0, 0, 0)},
 	"Knife_Echo": {"offset": Vector3(0.20, -0.20, -0.40), "scale": 1.5, "rot": Vector3(25.0, 30.0, 0.0)},
 	"Grenade_M67_Echo": {"offset": Vector3(0.10, -0.18, -0.38), "scale": 2.2, "rot": Vector3(-18.0, 0, 0)},
 }
