@@ -82,8 +82,8 @@ func _physics_process(_d: float) -> void:
 func _total_frames() -> int:
 	match action:
 		"reload": return int(RES[weapon_idx].reload_time * 60)
-		"swing": return int(0.12 * 60)
-		"heavyswing": return int(0.3 * 60)
+		"swing": return int(RES[weapon_idx].melee_light_time * 60)  # 取实际轻击时长
+		"heavyswing": return int(RES[weapon_idx].melee_heavy_time * 60)
 	return 30
 
 func _capture() -> void:
