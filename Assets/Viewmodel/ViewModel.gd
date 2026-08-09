@@ -30,12 +30,20 @@ const WEAPON_FRAME := {
 	"Grenade_M67_Echo": {"offset": Vector3(0.10, -0.18, -0.38), "scale": 2.2, "rot": Vector3(-18.0, 0, 0)},
 }
 
+## ADS 开镜时瞄具在相机空间的目标位（屏幕中心、前方舒适距离）——equip 据此反推握把取镜位。
+## 调参：x=0 居中；y≈0 瞄具对齐准星线；z 越近枪越大（需配合 ads_multiplier 的 FOV 缩放校准）。
+const ADS_SIGHT_POS := Vector3(0.0, -0.03, -0.42)
+
 var weapon_mount: Node3D
 var arms_root: Node3D
 var current_weapon: Node3D = null
 # 基础取景（equip 设定），动画在此基础上叠加（WeaponView 读取）
 var base_offset := Vector3.ZERO
 var base_rotation := Vector3.ZERO
+# ADS 开镜取镜位（equip 时按 _Sight 标记推算——举枪使瞄具移到屏幕中心、眼看瞄具，CS 式；
+# 狙击枪未来套用同一模板：给该枪配 _Sight 标记 + ads_multiplier 即可）。WeaponView 读取做开镜动画。
+var base_ads_offset := Vector3.ZERO
+var base_ads_rotation := Vector3.ZERO
 
 # 动态手臂（每帧追踪握把标记）：肩部固定屏外，手部始终贴在武器握把上——
 # 换弹/挥砍/后坐力动武器时，手不脱把、肩不入镜。
@@ -88,6 +96,15 @@ func equip(weapon_scene: PackedScene) -> Node3D:
 	weapon_mount.scale = Vector3.ONE * scl
 	base_offset = off
 	base_rotation = Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))
+	# ADS 取镜位：令 _Sight 标记落在屏幕中心（ADS_SIGHT_POS），反推握把在相机空间位置。
+	# 推导：开镜时武器摆正（mount 无旋转），sight_cam = mount_pos + scl*sight.position = ADS_SIGHT_POS
+	#   → mount_pos = ADS_SIGHT_POS - scl*sight.position。无 _Sight 标记则退化为原点居中。
+	var sight := find_marker(current_weapon, "_Sight")
+	if sight:
+		base_ads_offset = ADS_SIGHT_POS - sight.position * scl
+	else:
+		base_ads_offset = ADS_SIGHT_POS
+	base_ads_rotation = Vector3.ZERO  # 开镜时武器摆正（枪口正对 -Z，无倾斜/无下压）
 	_build_arms()
 	return current_weapon
 

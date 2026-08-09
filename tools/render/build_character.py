@@ -41,11 +41,15 @@ BOOT = mat((0.15, 0.13, 0.12))            # feet
 ACCENT = mat((0.12, 0.12, 0.14))          # belt/pads
 
 # ---------------------------------------------------------------- mesh boxes
+# CS 人物身高照搬（用户：比例/身高/判定全对标 CS）：CS 站立 72u × 0.0254 = 1.8288m。
+# 本构建头顶 z=1.78m → 统一数据级缩放因子 S（几何/骨骼同步缩放，非 object 变换——避免骨骼绑定双缩放坑）。
+S = 1.8288 / 1.78   # ≈1.0274
+
 def box(name, center, size, material):
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=center)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(center[0]*S, center[1]*S, center[2]*S))
     o = bpy.context.active_object
     o.name = name
-    o.scale = size   # size=1 cube -> dimension == scale
+    o.scale = (size[0]*S, size[1]*S, size[2]*S)   # size=1 cube -> dimension == scale
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)  # bake to world space
     o.data.materials.append(material)
     return o
@@ -111,7 +115,10 @@ PARENT = {"Spine":"Root","Neck":"Spine","Head":"Neck",
 eb = arm.edit_bones
 name2bone = {}
 for nm, (h, t) in BONES.items():
-    b = eb.new(nm); b.head = h; b.tail = t; name2bone[nm] = b
+    b = eb.new(nm)
+    b.head = (h[0]*S, h[1]*S, h[2]*S)  # 骨骼同步 CS 身高缩放
+    b.tail = (t[0]*S, t[1]*S, t[2]*S)
+    name2bone[nm] = b
 for nm, par in PARENT.items():
     name2bone[nm].parent = name2bone[par]
 bpy.ops.object.mode_set(mode='OBJECT')

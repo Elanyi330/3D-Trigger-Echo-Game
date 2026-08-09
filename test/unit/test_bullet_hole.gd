@@ -1,6 +1,6 @@
 # test/unit/test_bullet_hole.gd
 # M1 任务8：BulletHole 弹孔测试（TDD RED 先行）
-# 行为（brief §9.2）：命中点生成 decal、贴合表面法线（局部 -Z 朝外）、
+# 行为（brief §9.2）：命中点生成弹孔面片（M1.5：quad 替代 Decal）、贴合表面法线（局部 -Z 朝外）、
 #   30s 自动消失（Timer 一次性）、超时发 expired 信号供管理方计数清理。
 # 全局约束：30s 生命周期不真实等待——查 Timer 配置 + 缩短重启验证实际消失；
 #   Vector3 断言按分量比较（GUT assert_almost_eq 不支持 Vector3 操作数）。
@@ -17,7 +17,7 @@ func _spawn_hole(position: Vector3, normal: Vector3) -> BulletHole:
 # ================= 1. 命中点与表面贴合 =================
 func test_init_position_and_surface_alignment() -> void:
 	var hole := _spawn_hole(Vector3(0, 1, -8), Vector3(0, 0, 1))
-	# M1.5 修复：弹孔沿法线外移 0.02（防嵌入/深度冲突），Decal -Z 朝墙内（命中点方向）才投得上
+	# M1.5 修复：弹孔沿法线外移 0.02（防嵌入/深度冲突），-Z 朝墙内、+Z(quad 正面)朝外
 	assert_almost_eq(hole.global_position.x, 0.0, 0.001, "位置 x = 命中点")
 	assert_almost_eq(hole.global_position.y, 1.0, 0.001, "位置 y = 命中点")
 	assert_almost_eq(hole.global_position.z, -7.98, 0.001, "位置 z = 命中点沿法线外移 0.02")
@@ -25,12 +25,15 @@ func test_init_position_and_surface_alignment() -> void:
 	assert_almost_eq(z.x, 0.0, 0.001, "贴合 basis.z x 分量")
 	assert_almost_eq(z.y, 0.0, 0.001, "贴合 basis.z y 分量")
 	assert_almost_eq(z.z, 1.0, 0.001, "basis.z 朝外（= 投影 -Z 朝墙内，decal 贴合墙面）")
-	var decal := hole.get_node_or_null("Decal") as Decal
-	assert_not_null(decal, "生成 Decal 子节点")
-	if decal != null:
-		assert_not_null(decal.texture_albedo, "M1 任务14：Decal 有贴图（无贴图不可见——可见性修复）")
-		if decal.texture_albedo != null:
-			assert_eq(decal.texture_albedo.get_width(), 64, "程序化圆形黑色贴图 64×64")
+	var quad := hole.get_node_or_null("HoleQuad") as MeshInstance3D
+	assert_not_null(quad, "生成 HoleQuad 弹孔面片（M1.5：quad 替代 Decal——Mobile 渲染器 decal 簇上限会丢弃超出弹孔）")
+	if quad != null:
+		var mat := quad.material_override as StandardMaterial3D
+		assert_not_null(mat, "弹孔面片有材质")
+		if mat != null:
+			assert_not_null(mat.albedo_texture, "M1 任务14：弹孔有贴图（无贴图不可见——可见性修复）")
+			if mat.albedo_texture != null:
+				assert_eq(mat.albedo_texture.get_width(), 64, "程序化圆形焦痕贴图 64×64")
 
 
 func test_normal_parallel_to_up_fallback_no_error() -> void:

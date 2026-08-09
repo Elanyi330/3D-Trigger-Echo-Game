@@ -113,23 +113,25 @@ func test_switch_updates_speed_modifier() -> void:
 # ================= 4. 弹药 HUD =================
 func test_hud_label_shows_ammo_and_updates_on_shot() -> void:
 	var ak: WeaponResource = load("res://Weapons/weapon_ak47.tres")
-	assert_eq(ammo_label.text, "%d / %d" % [ak.magazine, ak.max_ammo], "初始 HUD：30 / 120")
+	assert_eq(ammo_label.text, "%d / %d" % [ak.magazine, ak.max_ammo], "初始 HUD：30 / 90")
 	Input.action_press("fire")
 	await wait_physics_frames(2)
 	Input.action_release("fire")
-	assert_eq(ammo_label.text, "%d / %d" % [ak.magazine - 1, ak.max_ammo], "开火 1 发 → 29 / 120")
+	assert_eq(ammo_label.text, "%d / %d" % [ak.magazine - 1, ak.max_ammo], "开火 1 发 → 29 / 90")
 
 
-# ================= 5. 机瞄接线（Head FOV） =================
+# ================= 5. 机瞄接线（Head FOV，M1.5 平滑插值） =================
 func test_aim_wires_head_fov_zoom() -> void:
 	var ak: WeaponResource = load("res://Weapons/weapon_ak47.tres")
 	var head: Node3D = player.get_node("Head")
 	var cam: Camera3D = head.get_node("Camera")
 	var base_fov: float = cam.fov
 	manager.set_aim(true)
-	assert_almost_eq(cam.fov, base_fov / ak.ads_multiplier, 0.001, "AK 机瞄 FOV ÷1.5（.tres 数值）")
+	await wait_physics_frames(40)  # M1.5 平滑开镜：等 FOV 插值到位（ads_zoom_speed 14 → ~0.1s）
+	assert_almost_eq(cam.fov, base_fov / ak.ads_multiplier, 0.01, "AK 机瞄 FOV ÷1.5（平滑到位，.tres 数值）")
 	manager.set_aim(false)
-	assert_almost_eq(cam.fov, base_fov, 0.001, "关镜恢复 FOV")
+	await wait_physics_frames(40)  # 关镜插值恢复
+	assert_almost_eq(cam.fov, base_fov, 0.01, "关镜平滑恢复 FOV")
 
 
 # ================= 6. M67 右键取消投掷 =================

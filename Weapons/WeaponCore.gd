@@ -258,10 +258,13 @@ func _ballistic_direction(shot_index: int) -> Vector3:
 
 func _get_ballistic_deviation(shot_index: int) -> Vector2:
 	if shot_index == 0:
-		# 首发精度：综合稳定性因素（spec §9.3）——基础散布 × 移动惩罚 × 下蹲收窄 ÷ 开镜
+		# 首发精度：综合稳定性因素（spec §9.3）——基础散布 × 移动惩罚 × 下蹲收窄 × 开镜收窄
 		var s := _get_first_shot_spread()
 		return Vector2(_rng.randf_range(-s, s), _rng.randf_range(-s, s))
-	return _get_shot_offset(shot_index)  # 后续：pattern/random 偏移
+	var dev := _get_shot_offset(shot_index)  # 后续：pattern/random 偏移
+	if _ads_active:
+		dev *= _resource.ads_spread_multiplier  # 开镜时连射弹道同样收窄（M1.5 准度差异）
+	return dev
 
 
 # 首发散布角（度，综合因素后）：叠加顺序 base × move × crouch ÷ ads。
@@ -272,8 +275,8 @@ func _get_first_shot_spread() -> float:
 		s *= _resource.move_spread_multiplier  # 移动惩罚（AK 3.0：CS2 running inaccuracy）
 	if _movement != null and bool(_movement.get("is_crouching")):
 		s *= _resource.crouch_spread_multiplier  # 下蹲收窄（0.7：CS2 crouch tighter）
-	if _ads_active and _resource.ads_multiplier > 0.0:
-		s /= _resource.ads_multiplier  # 开镜收窄（开镜时移动惩罚保留——CS2 开镜移动仍有精度损失）
+	if _ads_active:
+		s *= _resource.ads_spread_multiplier  # 开镜收窄（M1.5：开镜 vs 腰射准度差异，CS 式）
 	return s
 
 
@@ -323,8 +326,8 @@ func finish_reload() -> void:
 
 func _finish_reload() -> void:
 	_reloading = false
-	# CS2 2026-03 丢弃弹匣剩余：弹匣 = magazine，备弹 -= (magazine - 换弹前弹匣值)
-	# 备弹不足：弹匣 = min(magazine, 备弹 + 旧弹匣剩余)
+	# 换弹余弹保留（总携弹守恒，CS 一贯行为）：弹匣补满至 magazine，备弹 -= (magazine - 换弹前弹匣余量)
+	# ——旧弹匣余弹等效保留（如 10/90 → 30/70，总量不变）。备弹不足时弹匣 = 旧余量 + 全部备弹。
 	var needed := _resource.magazine - _reload_old_mag
 	if infinite_reserve:
 		# 靶场模式：备弹无限——弹匣补满，备弹数额不减少（HUD 备弹恒满）

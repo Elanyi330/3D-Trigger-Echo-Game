@@ -9,6 +9,8 @@
 #     ShapeCast3D 思路，纯逻辑实现）；候选目标注入（测试/集成）或物理球扫掠（集成自动收集）
 #   - 背刺：目标朝向（-basis.z）与"目标→攻击者"方向夹角 > melee_backstab_angle（150°）
 #     → melee_backstab_damage（180 秒杀）
+#   - 延迟命中（M1.5）：挥击动画立即开始，伤害延迟到动画接触帧结算（melee_light/heavy_hit_delay，
+#     修复"重刺秒出伤"——重击以蓄力动作换高伤害，判定与动画同步）；切枪 cancel_pending 取消未结算挥击
 #   - 伤害结算：直接调用目标 take_damage（Target.gd 已实现）；melee_hit(target, damage)
 #     信号供反馈消费（spec §9.5 推荐信号，M1 暂无 HUD 消费，预留）
 # 全局约束（计划 §4）：数值唯一来源 WeaponResource（weapon_*.tres，禁止硬编码散值）；
@@ -25,6 +27,10 @@ var targets: Array[Node] = []  # 扇形候选目标（测试/集成注入；空 
 var _resource: WeaponResource  # 最近一次挥击的资源（数值唯一来源 .tres）
 var _cooldown: float = 0.0  # 挥击冷却（s；轻 0.4 / 重 1.0，自 .tres）
 var _combo_secondary: bool = false  # 连击交替：false=首击 → true=连击 → 交替
+# M1.5：延迟命中（修复"重刺秒出伤"）——挥击动画立即开始（melee_swung），伤害延迟到动画接触帧结算。
+var _pending_hit: bool = false  # 有待结算命中
+var _pending_damage: float = 0.0  # 待结算伤害（挥击开始时捕获，接触帧结算）
+var _pending_timer: float = 0.0  # 距接触帧剩余时间（s，自 melee_*_hit_delay）
 
 
 func try_swing(light: bool, resource: WeaponResource) -> void:
@@ -35,8 +41,17 @@ func try_swing(light: bool, resource: WeaponResource) -> void:
 		return
 	_cooldown = _resource.melee_light_time if light else _resource.melee_heavy_time
 	var damage := _light_damage() if light else _resource.melee_stab_damage
-	melee_swung.emit(not light)
-	_resolve_swing(damage)
+	melee_swung.emit(not light)  # 挥击动画立即开始（蓄力/挥出）
+	# 伤害延迟到动画接触帧结算（重刺以蓄力换高伤，不再秒出伤；轻击亦有短接触延迟对齐斜挥）。
+	_pending_hit = true
+	_pending_damage = damage
+	_pending_timer = _resource.melee_light_hit_delay if light else _resource.melee_heavy_hit_delay
+
+
+func cancel_pending() -> void:
+	# 切枪取消未结算挥击（WeaponManager.switch_to 调用）——CS 式切枪取消攻击，
+	# 防延迟伤害在换持武器后空发（M1.5 延迟命中引入的边界，配套取消）。
+	_pending_hit = false
 
 
 func _light_damage() -> float:
@@ -63,23 +78,36 @@ func _resolve_swing(base_damage: float) -> void:
 
 
 func _in_cone(target_pos: Vector3, origin_pos: Vector3, facing: Vector3) -> bool:
-	# 扇形过滤：距离 ≤ melee_range 且 夹角 ≤ melee_angle/2（60° 扇形 = 半角 30°）
+	# M1.5：水平面（XZ）判定——修复"攻击距离过短/打不到"。根因：敌人原点（StaticBody3D）在脚部
+	# （y=0），而攻击原点在相机眼位（y≈1.63m），3D 中心距的垂直分量（≥1.6m）直接超出旧 melee_range，
+	# 且"指向脚部"的 3D 夹角在平视时恒 > 半角 → 平视永远打不到。改为水平面投影（等效 CS 刀的眼位视线触及）：
+	# 距离与夹角都只看 XZ——相机高度/目标原点高低不再影响，面向目标即判定。
 	var to_target := target_pos - origin_pos
-	var dist := to_target.length()
+	var flat := Vector3(to_target.x, 0.0, to_target.z)
+	var dist := flat.length()
 	if dist > _resource.melee_range:
 		return false
 	if dist <= 0.0001:
-		return true  # 原点重合防御（normalized 除零）
-	var angle_deg := rad_to_deg(to_target.normalized().angle_to(facing))
+		return true  # 贴身（同一水平位置）防御
+	var flat_facing := Vector3(facing.x, 0.0, facing.z)
+	if flat_facing.length() <= 0.0001:
+		return true  # 视线近乎竖直（正上/正下）：水平朝向不可靠，距离已过即判中
+	var angle_deg := rad_to_deg(flat.normalized().angle_to(flat_facing.normalized()))
 	return angle_deg <= _resource.melee_angle * 0.5
 
 
 func _is_backstab(target: Node, attacker_pos: Vector3) -> bool:
-	# 背刺：目标朝向（-basis.z，Godot 前向）与"目标→攻击者"方向夹角 > melee_backstab_angle（150°）
+	# 背刺：目标朝向与"目标→攻击者"方向夹角 > melee_backstab_angle（150°）→ 背刺（180 秒杀）。
+	# M1.5：身前/身后判定用**水平面(XZ)投影**——相机眼位(y≈1.63)与敌人脚部原点(y=0)的垂直差
+	# 会稀释 3D 点积（垂直分量拉大 to_attacker 长度），导致正背后也判不出背刺；投影到水平面后严格准确。
 	# target 参数为 Node（候选数组元素类型）：Node 无 global_transform 静态成员 → 显式类型注解
-	var target_forward: Vector3 = -target.global_transform.basis.z
-	var to_attacker: Vector3 = (attacker_pos - target.global_position).normalized()
-	return target_forward.dot(to_attacker) < cos(deg_to_rad(_resource.melee_backstab_angle))
+	var tf3: Vector3 = -target.global_transform.basis.z
+	var ta3: Vector3 = attacker_pos - target.global_position
+	var target_forward := Vector3(tf3.x, 0.0, tf3.z)
+	var to_attacker := Vector3(ta3.x, 0.0, ta3.z)
+	if target_forward.length() < 0.001 or to_attacker.length() < 0.001:
+		return false  # 退化（目标竖直朝向 / 同一水平位置）：不判背刺
+	return target_forward.normalized().dot(to_attacker.normalized()) < cos(deg_to_rad(_resource.melee_backstab_angle))
 
 
 func _candidate_targets() -> Array[Node]:
@@ -122,3 +150,9 @@ func _facing_dir() -> Vector3:
 func _physics_process(delta: float) -> void:
 	if _cooldown > 0.0:
 		_cooldown = maxf(0.0, _cooldown - delta)
+	# M1.5：延迟命中——到接触帧才结算扇形伤害（动画与判定同步）
+	if _pending_hit:
+		_pending_timer -= delta
+		if _pending_timer <= 0.0:
+			_pending_hit = false
+			_resolve_swing(_pending_damage)

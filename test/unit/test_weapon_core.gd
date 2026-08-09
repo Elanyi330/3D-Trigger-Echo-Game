@@ -242,7 +242,7 @@ func test_first_shot_spread_bounds_deviation() -> void:
 
 # ================= 3. 换弹（CS2 2026-03 丢弃剩余规则） =================
 func test_reload_fills_mag_and_drains_reserve() -> void:
-	# 弹匣剩 10 → 换弹后 30，备弹减 20（丢弃弹匣剩余）
+	# 弹匣剩 10 → 换弹后 30，备弹减 20（余弹保留，总携弹守恒）
 	var res := _fast_ak()
 	core.setup(res, null)
 	await _fire_n_times(20)
@@ -254,7 +254,7 @@ func test_reload_fills_mag_and_drains_reserve() -> void:
 	assert_signal_emit_count(core, "reload_finished", 1, "发 reload_finished")
 	assert_false(core.is_reloading(), "换弹完成")
 	assert_eq(core.get_ammo(), Vector2(res.magazine, res.max_ammo - 20),
-			"弹匣满 30、备弹 120-20=100（丢弃剩余）")
+			"弹匣满 30、备弹 90-20=70（余弹保留，守恒）")
 
 func test_reload_insufficient_reserve_fills_what_it_can() -> void:
 	var res := _fast_ak()
@@ -275,25 +275,25 @@ func test_fire_during_reload_is_noop() -> void:
 	core.start_reload()
 	core.try_fire()
 	assert_eq(get_signal_emit_count(core, "shot_fired"), fired_before, "换弹中开火无效")
-	assert_eq(core.get_ammo(), Vector2(10, 120), "弹药不变")
+	assert_eq(core.get_ammo(), Vector2(10, res.max_ammo), "弹药不变")
 	assert_true(core.is_reloading(), "换弹未被取消")
 	await wait_physics_frames(40)  # 0.667s > 0.5s
-	assert_eq(core.get_ammo(), Vector2(30, 100), "换弹仍正常完成")
+	assert_eq(core.get_ammo(), Vector2(res.magazine, res.max_ammo - 20), "换弹仍正常完成")
 
 func test_reload_interrupt_keeps_ammo() -> void:
 	var res := _fast_ak()
 	core.setup(res, null)
 	await _fire_n_times(20)
-	assert_eq(core.get_ammo(), Vector2(10, 120))
+	assert_eq(core.get_ammo(), Vector2(10, res.max_ammo))
 	core.start_reload()
 	await wait_physics_frames(2)
 	core.interrupt_reload()
 	assert_false(core.is_reloading(), "打断后不在换弹")
 	assert_signal_emit_count(core, "reload_finished", 0, "打断不发 reload_finished")
-	assert_eq(core.get_ammo(), Vector2(10, 120), "弹药保持换弹前状态（不返还）")
+	assert_eq(core.get_ammo(), Vector2(10, res.max_ammo), "弹药保持换弹前状态（不返还）")
 	core.start_reload()  # 打断后可再次换弹
 	await wait_physics_frames(4)
-	assert_eq(core.get_ammo(), Vector2(30, 100), "再次换弹正常完成")
+	assert_eq(core.get_ammo(), Vector2(res.magazine, res.max_ammo - 20), "再次换弹正常完成")
 
 func test_reload_skipped_when_mag_full() -> void:
 	core.start_reload()
@@ -390,23 +390,23 @@ func test_full_auto_fires_while_held() -> void:
 
 # ================= 6. 弹药 =================
 func test_get_ammo_returns_mag_and_reserve() -> void:
-	assert_eq(core.get_ammo(), Vector2(ak.magazine, ak.max_ammo), "初始 30+120")
+	assert_eq(core.get_ammo(), Vector2(ak.magazine, ak.max_ammo), "初始 30+90")
 	core.try_fire()
-	assert_eq(core.get_ammo(), Vector2(ak.magazine - 1, ak.max_ammo), "开火后 (29, 120)")
+	assert_eq(core.get_ammo(), Vector2(ak.magazine - 1, ak.max_ammo), "开火后 (29, 90)")
 
 func test_add_ammo_caps_at_max() -> void:
 	core.add_ammo(50)
-	assert_almost_eq(core.get_ammo().y, float(ak.max_ammo), 0.001, "满备弹补给封顶 120")
+	assert_almost_eq(core.get_ammo().y, float(ak.max_ammo), 0.001, "满备弹补给封顶 90")
 	var res := _fast_ak()
 	core.setup(res, null)
 	await _fire_n_times(20)
 	core.start_reload()
 	await wait_physics_frames(4)
-	assert_eq(core.get_ammo(), Vector2(30, 100))
+	assert_eq(core.get_ammo(), Vector2(res.magazine, res.max_ammo - 20))
 	core.add_ammo(10)
-	assert_almost_eq(core.get_ammo().y, 110.0, 0.001, "补给 10 生效")
+	assert_almost_eq(core.get_ammo().y, float(res.max_ammo - 10), 0.001, "补给 10 生效")
 	core.add_ammo(50)
-	assert_almost_eq(core.get_ammo().y, float(ak.max_ammo), 0.001, "超过 max_ammo 封顶")
+	assert_almost_eq(core.get_ammo().y, float(res.max_ammo), 0.001, "超过 max_ammo 封顶")
 
 
 # ================= 7. 精度稳定性模型（M1 任务8：base × move × crouch ÷ ads） =================
@@ -454,8 +454,18 @@ func test_spread_moving_and_crouch_stack() -> void:
 			0.001, "叠加：base × move × crouch")
 
 
+func test_ads_narrows_spread() -> void:
+	# M1.5：开镜散布收窄（开镜 vs 腰射准度差异，CS 式——首发按 ads_spread_multiplier 收窄）
+	var res := _fast_ak()
+	core.setup(res, null, _with_movement())
+	core.set_ads(true)
+	assert_almost_eq(core._get_first_shot_spread(),
+			res.first_shot_spread * res.ads_spread_multiplier, 0.001,
+			"开镜首发散布 = base × ads_spread_multiplier（.tres 数值，CS 开镜更准）")
+
+
 func test_spread_ads_keeps_moving_penalty() -> void:
-	# 叠加顺序 base×move×crouch÷ads：开镜保留移动惩罚（CS2 开镜移动仍有精度损失）
+	# 叠加顺序 base×move×crouch×ads_spread：开镜保留移动惩罚（CS2 开镜移动仍有精度损失）
 	var res := _fast_ak()
 	var mv := _with_movement()
 	core.setup(res, null, mv)
@@ -464,5 +474,5 @@ func test_spread_ads_keeps_moving_penalty() -> void:
 	core.set_ads(true)
 	assert_almost_eq(core._get_first_shot_spread(),
 			res.first_shot_spread * res.move_spread_multiplier
-					* res.crouch_spread_multiplier / res.ads_multiplier,
-			0.001, "全因素：base × move × crouch ÷ ads")
+					* res.crouch_spread_multiplier * res.ads_spread_multiplier,
+			0.001, "全因素：base × move × crouch × ads_spread（开镜收窄）")

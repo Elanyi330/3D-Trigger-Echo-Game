@@ -27,8 +27,6 @@ signal enemy_hit
 @export var throw_strength: float = 15.0
 # M1.5：投掷出手后自动切回主武器（CS 式；用户拍板）。默认开启；机制单测可关闭以隔离流程。
 @export var auto_switch_after_throw: bool = true
-# 弹孔上限（spec §9.2：200 个防刷屏，超出淘汰最旧）
-const MAX_BULLET_HOLES := 200
 
 enum State { HOLSTERED, DEPLOYING, ACTIVE, RELOADING, THROWING }
 
@@ -42,11 +40,14 @@ var _state: State = State.HOLSTERED
 var _deploy_remaining: float = 0.0  # 切枪部署倒计时（秒，来自资源 deploy_time）
 var _throw_pending: bool = false  # M67 引信阶段标志（fire 按住 = 手中持雷；松开 = 真实 Grenade 出手）
 var _trajectory: ThrowTrajectory  # 投掷抛物线预览（任务 8：THROWING 显示/取消/投出隐藏）
-var _bullet_holes: Array[BulletHole] = []  # 弹孔计数（按生成顺序，超出上限淘汰最旧）
+var _bullet_holes: Array[BulletHole] = []  # 弹孔跟踪（M1.5 起取消数量上限——30s 生命周期自然约束累积）
 var _melee: MeleeController  # 近战判定控制器（任务 10：MELEE 槽位 fire 分发/右键重刺）
 # M1 任务15：换弹排队（CC0 gun.gd 照搬）——射击中按 R 标记排队，射完自动 start_reload；
 # 队列跟随当前槽位（切枪取消），空仓路径不走排队（立即换）
 var _queued_reload: bool = false
+# M1.5：机瞄状态跟踪（修复"开镜期间换弹/切枪仍保持开镜"bug）——set_aim 写入，
+# 换弹/切枪时经 _exit_ads 自动取消开镜（CS 式：换弹/切枪退出瞄准，FOV/灵敏度恢复）。
+var _ads_active: bool = false
 
 
 func setup(slots: Array[WeaponResource], movement: MovementController) -> void:
@@ -86,6 +87,7 @@ func setup(slots: Array[WeaponResource], movement: MovementController) -> void:
 		_resources.append(slots[i])
 	_current_slot = 0
 	_state = State.ACTIVE  # 出生即持枪（CS 式），初始槽位 0（primary）
+	_ads_active = false  # 机瞄状态复位（M1.5）
 	_apply_speed_modifier()
 
 
@@ -109,6 +111,9 @@ func switch_to(slot: int) -> void:
 	# 中断当前槽位：换弹打断（弹药不返还，WeaponCore.interrupt_reload 语义）；
 	# 开火中断由状态离开 ACTIVE 后轮询门控实现（立即停火）。
 	_queued_reload = false  # M1 任务15：切枪取消换弹排队（队列跟随当前槽位）
+	_exit_ads()  # M1.5：切枪自动取消开镜（CS 式——换武器退出瞄准，FOV 恢复）
+	if _melee != null:
+		_melee.cancel_pending()  # M1.5：切枪取消未结算挥击（防延迟伤害在换持武器后空发）
 	var old_core := _cores[_current_slot]
 	if old_core != null and old_core.is_reloading():
 		old_core.interrupt_reload()
@@ -201,6 +206,7 @@ func start_reload() -> void:
 	core.start_reload()
 	if core.is_reloading():
 		_queued_reload = false  # 换弹真正开始：消费排队
+		_exit_ads()  # M1.5：开镜期间换弹自动取消开镜（CS 式——用户反馈修复）
 		_state = State.RELOADING
 
 
@@ -221,12 +227,28 @@ func set_aim(active: bool) -> void:
 	var core := _cores[_current_slot]
 	if core == null:
 		return
+	_ads_active = active  # M1.5：跟踪机瞄状态（换弹/切枪 _exit_ads 消费）
 	core.set_ads(active)
 	# 机瞄动画正反播接线（任务16）：AimAnim 消费（枪滑向视线中心）；拼装视模型防御跳过
 	aim_toggled.emit(active)
 	# 机瞄 FOV/灵敏度接线（任务 6）：仅 ACTIVE 写入；数值唯一来源 .tres ads_multiplier
 	if _head != null and _head.has_method("set_ads"):
 		_head.set_ads(active, res.ads_multiplier if res != null else 1.0)
+
+
+func _exit_ads() -> void:
+	# M1.5：换弹/切枪自动取消开镜（CS 式）——核心 ADS 标志复位 + 动画反播 + FOV/灵敏度恢复。
+	# 幂等：未开镜时为空操作（不重复发 aim_toggled / 不动 FOV）。Head.set_ads(false) 内部
+	# 用记录的 _base_fov/_base_sensitivity 恢复，第三参数（multiplier）非 active 时忽略，传 1.0。
+	if not _ads_active:
+		return
+	_ads_active = false
+	var core := _cores[_current_slot]
+	if core != null:
+		core.set_ads(false)
+	aim_toggled.emit(false)
+	if _head != null and _head.has_method("set_ads"):
+		_head.set_ads(false, 1.0)
 
 
 func get_speed_modifier() -> float:
@@ -371,7 +393,7 @@ func _apply_speed_modifier() -> void:
 		_movement.speed_modifier = get_speed_modifier()
 
 
-# ---- 弹孔系统（M1 任务8：命中点 decal，30s 生命周期，200 上限淘汰最旧） ----
+# ---- 弹孔系统（M1 任务8：命中点 quad 面片，30s 生命周期；M1.5 起取消数量上限） ----
 
 func _on_tracer_fired(from: Vector3, to: Vector3) -> void:
 	# M1 任务15：曳光弹（CC0 bullet_tracer）——枪口→命中点（或 max_range 端点）短暂线条，
@@ -414,25 +436,13 @@ func _spawn_bullet_hole(position: Vector3, normal: Vector3, parent: Node = null)
 	hole.init(position, normal,
 			parent if (parent is Node3D and is_instance_valid(parent)) else null)
 	_bullet_holes.append(hole)
-	if _bullet_holes.size() > MAX_BULLET_HOLES:
-		_evict_oldest_bullet_hole()
+	# M1.5：取消数量上限（用户拍板——弹孔不设场景最大存在数；由 30s 生命周期自然约束累积）。
 	return hole
 
 
 func _on_bullet_hole_expired(hole: BulletHole) -> void:
 	# 30s 生命周期自然结束：从计数中移除（释放由 BulletHole 自身 queue_free）
 	_bullet_holes.erase(hole)
-
-
-func _evict_oldest_bullet_hole() -> void:
-	# 超上限防刷屏（spec §9.2）：移除最旧（生成顺序 = 数组顺序；自然过期的已由 _on_bullet_hole_expired 移除）
-	var oldest: BulletHole = _bullet_holes.pop_front()  # pop_front 返回 Variant：显式类型（lint 禁 Variant 推断）
-	if oldest != null and is_instance_valid(oldest):
-		# M1 任务15：弹孔可能挂在被击中 collider 下——从实际父节点移除（防 remove_child 错父）
-		var host := oldest.get_parent()
-		if host != null:
-			host.remove_child(oldest)
-		oldest.queue_free()
 
 
 func _find_camera() -> Camera3D:

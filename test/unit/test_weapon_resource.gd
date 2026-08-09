@@ -22,7 +22,7 @@ func test_four_tres_all_load() -> void:
     assert_not_null(knife, "战术匕首 .tres 加载成功")
     assert_not_null(m67, "M67 .tres 加载成功")
 
-# ---- AK-47「铁幕」（CS2：36 / ×4.0 / 600RPM / 30+120 / 2.4s / 215u） ----
+# ---- AK-47「回声」（CS2：36 / ×4.0 / 600RPM / 30+90 / 2.4s / 215u） ----
 func test_ak47_cs2_values() -> void:
     assert_eq(ak.weapon_name, "AK47【回声】", "名称")
     assert_almost_eq(ak.damage, 36.0, 0.001, "伤害 36")
@@ -30,7 +30,7 @@ func test_ak47_cs2_values() -> void:
     assert_almost_eq(ak.limb_multiplier, 0.8, 0.001, "四肢 ×0.8")
     assert_eq(ak.rpm, 600, "600 RPM")
     assert_eq(ak.magazine, 30, "弹匣 30")
-    assert_eq(ak.max_ammo, 120, "备弹 120")
+    assert_eq(ak.max_ammo, 90, "备弹 90（CS2 30/90）")
     assert_almost_eq(ak.reload_time, 2.4, 0.001, "换弹 2.4s")
     assert_almost_eq(ak.effective_range, 40.0, 0.001, "满伤段 40m")
     assert_almost_eq(ak.max_range, 60.0, 0.001, "最大射程 60m")
@@ -51,14 +51,14 @@ func test_ak47_cs2_values() -> void:
     assert_almost_eq(ak.move_spread_multiplier, 3.0, 0.001, "移动散布惩罚 ×3.0（CS2 running inaccuracy）")
     assert_almost_eq(ak.crouch_spread_multiplier, 0.7, 0.001, "下蹲散布收窄 ×0.7")
 
-# ---- Glock-18「迅捷」（CS2：30 / 400RPM / 20+80 / 2.3s / 240u / 半自动随机） ----
+# ---- Glock-18「回声」（CS2：30 / 400RPM / 20+120 / 2.3s / 240u / 半自动随机） ----
 func test_glock18_cs2_values() -> void:
     assert_eq(glock.weapon_name, "Glock18【回声】", "名称")
     assert_almost_eq(glock.damage, 30.0, 0.001, "伤害 30")
     assert_almost_eq(glock.headshot_multiplier, 4.0, 0.001, "爆头 ×4.0")
     assert_eq(glock.rpm, 400, "400 RPM")
     assert_eq(glock.magazine, 20, "弹匣 20")
-    assert_eq(glock.max_ammo, 80, "备弹 80")
+    assert_eq(glock.max_ammo, 60, "备弹 60（CS2 2026-03-19 补丁后 20/60；120 为补丁前旧值）")
     assert_almost_eq(glock.reload_time, 2.3, 0.001, "换弹 2.3s")
     assert_almost_eq(glock.effective_range, 15.0, 0.001, "满伤段 15m")
     assert_almost_eq(glock.max_range, 30.0, 0.001, "最大射程 30m")
@@ -86,15 +86,17 @@ func test_knife_melee_values() -> void:
     assert_eq(knife.max_ammo, 0, "无备弹")
     assert_almost_eq(knife.reload_time, 0.0, 0.001, "无需换弹")
     assert_almost_eq(knife.ads_multiplier, 1.0, 0.001, "无开镜")
-    assert_almost_eq(knife.melee_primary_damage, 40.0, 0.001, "首击 40")
-    assert_almost_eq(knife.melee_secondary_damage, 25.0, 0.001, "连击 25")
-    assert_almost_eq(knife.melee_stab_damage, 65.0, 0.001, "重刺 65")
+    assert_almost_eq(knife.melee_primary_damage, 40.0, 0.001, "斜挥·首挥 40（CS2）")
+    assert_almost_eq(knife.melee_secondary_damage, 25.0, 0.001, "连击 25（CS2 首挥40/连击25，Valve Wiki+Liquipedia+tradeit 三源一致）")
+    assert_almost_eq(knife.melee_stab_damage, 65.0, 0.001, "前刺 65（CS2）")
     assert_almost_eq(knife.melee_backstab_damage, 180.0, 0.001, "背刺 180（秒杀）")
     assert_almost_eq(knife.melee_light_time, 0.4, 0.001, "轻击间隔 0.4s")
-    assert_almost_eq(knife.melee_heavy_time, 1.0, 0.001, "重击间隔 1.0s")
-    assert_almost_eq(knife.melee_range, 1.5, 0.001, "攻击距离 1.5m")
+    assert_almost_eq(knife.melee_heavy_time, 1.0, 0.001, "重击间隔 1.0s（CS：重击 1s 动画，用户拍板）")
+    assert_almost_eq(knife.melee_range, 2.0, 0.001, "攻击距离 2.0m（水平面触及≈CS 刀有效触达；修 1.5 过短 bug）")
     assert_almost_eq(knife.melee_angle, 60.0, 0.001, "攻击扇形 60°")
     assert_almost_eq(knife.melee_backstab_angle, 150.0, 0.001, "背刺判定角 150°")
+    assert_almost_eq(knife.melee_light_hit_delay, 0.15, 0.001, "轻击接触延迟 0.15s（对齐斜挥接触帧）")
+    assert_almost_eq(knife.melee_heavy_hit_delay, 0.5, 0.001, "重刺接触延迟 0.5s（蓄力换高伤，非秒出伤）")
     assert_true(knife.melee_range > 0.0, "攻击距离 > 0")
     assert_true(knife.melee_angle > 0.0, "攻击角度 > 0")
 

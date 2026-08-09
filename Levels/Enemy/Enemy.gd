@@ -30,32 +30,73 @@ func _ready() -> void:
 	collision_layer = 1  # Objects 层（hitscan/近战/爆炸 mask=1 命中）
 	collision_mask = 0
 	add_to_group("torso")
-	# 躯干碰撞（胶囊，对齐 1.8m 角色）
+	# 躯干碰撞（胶囊，对齐 1.83m CS 身高角色：覆盖腿+躯干至颈，CS 比例）
 	var body_shape := CollisionShape3D.new()
 	var caps := CapsuleShape3D.new()
-	caps.radius = 0.30
-	caps.height = 1.5
+	caps.radius = 0.31
+	caps.height = 1.54
 	body_shape.shape = caps
-	body_shape.position = Vector3(0, 0.9, 0)
+	body_shape.position = Vector3(0, 0.92, 0)
 	add_child(body_shape)
-	# 头部 hitbox（独立 body，group "head"，转发伤害到本体 → hitscan 爆头 ×4）
+	# 头部 hitbox（独立 body，group "head"，转发伤害到本体 → hitscan 爆头 ×4；贴合 1.83m 角色头部）
 	var head := HeadHitbox.new()
 	head.enemy = self
-	head.position = Vector3(0, 1.65, 0)
+	head.position = Vector3(0, 1.70, 0)
 	add_child(head)
 	# 视觉：Soldier_Echo 换色
 	var char_scene: PackedScene = load("res://Assets/Models/Characters/Soldier_Echo/Soldier_Echo.glb")
 	_visual = char_scene.instantiate()
 	_tint(_visual)
 	add_child(_visual)
+	_equip_random_weapon()  # M1.5：随机配备一款武器（第三人称持枪姿态，握法与玩家一致）
 	# 血条
 	_label = Label3D.new()
-	_label.position = Vector3(0, 2.05, 0)
+	_label.position = Vector3(0, 2.1, 0)
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.font_size = 64
 	_label.outline_size = 8
 	_update_label()
 	add_child(_label)
+
+
+# M1.5：随机武器配备（用户：查看第三人称角色持枪表现）——真实尺寸 + 真实握把挂接，
+# 与 1.83m（CS 身高）角色比例统一适配。每件武器：右臂前摆 + 武器挂 Hand_R（GripRight=原点即握把）。
+const ENEMY_WEAPONS := [  # 路径 → 武器在手中的 (位移, 欧拉角°)；wrot 翻正枪口朝前、贴右手
+	{"path": "res://Assets/Models/Weapons/Rifle/AK47_Echo/AK47_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
+	{"path": "res://Assets/Models/Weapons/Pistol/Glock18_Echo/Glock18_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
+	{"path": "res://Assets/Models/Weapons/Melee/Knife_Echo/Knife_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
+	{"path": "res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
+]
+const ARM_RAISE_DEG := -50.0  # 右臂前摆角（UpperArm_R 局部 X）
+
+
+func _equip_random_weapon() -> void:
+	var skel := _find_skeleton(_visual)
+	if skel == null:
+		return
+	# 右臂前摆（持枪姿态）
+	var ua := skel.find_bone("UpperArm_R")
+	if ua >= 0:
+		skel.set_bone_pose_rotation(ua, Quaternion.from_euler(Vector3(deg_to_rad(ARM_RAISE_DEG), 0.0, 0.0)))
+	# 随机选一款，挂右手骨（GripRight=武器原点即握把，真实尺寸——与角色比例统一适配）
+	var cfg: Dictionary = ENEMY_WEAPONS[randi() % ENEMY_WEAPONS.size()]
+	var ba := BoneAttachment3D.new()
+	ba.bone_name = "Hand_R"
+	skel.add_child(ba)
+	var w: Node3D = load(cfg["path"]).instantiate()
+	ba.add_child(w)
+	w.position = cfg["pos"]
+	w.rotation = Vector3(deg_to_rad(cfg["rot"].x), deg_to_rad(cfg["rot"].y), deg_to_rad(cfg["rot"].z))
+
+
+func _find_skeleton(n: Node) -> Skeleton3D:
+	if n is Skeleton3D:
+		return n
+	for c in n.get_children():
+		var r := _find_skeleton(c)
+		if r:
+			return r
+	return null
 
 
 func _tint(n: Node) -> void:

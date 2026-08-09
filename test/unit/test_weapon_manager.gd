@@ -209,6 +209,36 @@ func test_reload_finish_emits_ammo_updated_and_active() -> void:
 	assert_almost_eq(ak_core.get_ammo().x, float(fast.magazine), 0.001, "弹匣满 30")
 
 
+# ================= 3b. 开镜自动取消（M1.5 用户反馈修复） =================
+func test_reload_cancels_ads() -> void:
+	# 开镜期间换弹 → 自动取消开镜（CS 式）：换弹开始即退出瞄准（Manager 跟踪 + 核心标志双复位）。
+	var fast := _fast_ak()
+	manager = _build_manager([fast, glock, knife, m67])
+	var ak_core: WeaponCore = manager.get_core(0)
+	Input.action_press("fire")  # 打 1 发让弹匣不满（满弹匣 start_reload 被守卫拦截）
+	await wait_physics_frames(1)
+	Input.action_release("fire")
+	await wait_physics_frames(1)
+	manager.set_aim(true)
+	assert_true(manager._ads_active, "前置：开镜中（读私有字段，同 test_deploy_blocks_reload_and_aim）")
+	assert_true(ak_core._ads_active, "前置：核心 ADS 激活")
+	manager.start_reload()
+	assert_eq(manager.get_state(), WeaponManager.State.RELOADING, "进入换弹")
+	assert_false(manager._ads_active, "换弹开始 → 开镜自动取消（Manager 跟踪）")
+	assert_false(ak_core._ads_active, "换弹开始 → 核心 ADS 复位")
+
+
+func test_switch_cancels_ads() -> void:
+	# 开镜期间切枪 → 自动取消开镜（CS 式：换武器退出瞄准，防 FOV 卡在开镜）。
+	manager = _build_manager([ak, glock, knife, m67])
+	var ak_core: WeaponCore = manager.get_core(0)
+	manager.set_aim(true)
+	assert_true(manager._ads_active, "前置：开镜中")
+	manager.switch_to(1)
+	assert_false(manager._ads_active, "切枪 → 开镜自动取消（Manager 跟踪）")
+	assert_false(ak_core._ads_active, "切枪 → 核心 ADS 复位")
+
+
 # ================= 4. 移速联动 =================
 func test_speed_modifier_tracks_mobility() -> void:
 	manager = _build_manager([ak, glock, knife, m67])
@@ -437,7 +467,7 @@ func test_throw_auto_switches_to_primary() -> void:
 	assert_eq(manager.get_state(), WeaponManager.State.ACTIVE, "主武器 deploy 完成回 ACTIVE")
 
 
-# ================= 7. M1 任务8：弹孔系统（命中点 decal，200 上限淘汰最旧） =================
+# ================= 7. M1 任务8：弹孔系统（命中点 quad 面片，M1.5 起取消数量上限） =================
 func test_hit_landed_spawns_bullet_hole_at_hit_point() -> void:
 	manager = _build_manager([ak, glock, knife, m67])
 	var ak_core: WeaponCore = manager.get_core(0)
@@ -453,15 +483,14 @@ func test_hit_landed_spawns_bullet_hole_at_hit_point() -> void:
 	assert_almost_eq(holes[0].global_position.z, 3.0, 0.001, "弹孔 z = 实际命中点")
 
 
-func test_bullet_hole_cap_evicts_oldest() -> void:
+func test_bullet_hole_no_cap_all_persist() -> void:
+	# M1.5：取消数量上限（用户拍板——弹孔不设场景最大存在数，由 30s 生命周期约束累积）。
+	# 超过旧上限 200 也不淘汰最旧。
 	manager = _build_manager([ak, glock, knife, m67])
-	var spawned: Array[BulletHole] = []
-	for i in WeaponManager.MAX_BULLET_HOLES + 1:
-		spawned.append(manager._spawn_bullet_hole(Vector3(i, 0, 0), Vector3.UP))
-	assert_eq(manager._bullet_holes.size(), 200, "弹孔上限 200")
-	assert_true(spawned[0].is_queued_for_deletion(), "第 201 个生成后最旧被淘汰")
-	assert_true(is_instance_valid(spawned[1]), "第 2 个保留")
-	assert_eq(manager._bullet_holes[0], spawned[1], "数组头 = 新最旧（淘汰顺序正确）")
+	var count := 250
+	for i in count:
+		manager._spawn_bullet_hole(Vector3(i, 0, 0), Vector3.UP)
+	assert_eq(manager._bullet_holes.size(), count, "无上限：250 个弹孔全部保留（不淘汰最旧）")
 
 
 # ================= 8. M1 任务15：换弹排队 + 空仓自动换弹（CC0 gun.gd 照搬） =================
@@ -620,21 +649,20 @@ func test_bullet_hole_parents_under_hit_collider() -> void:
 	assert_almost_eq(hole.global_position.y, 1.0, 0.001, "随动 y 保持命中高度")
 
 
-func test_bullet_hole_cap_evicts_parented_holes() -> void:
-	# 上限淘汰对挂 collider 的弹孔同样生效（从实际父节点移除，不残留）
+func test_bullet_hole_no_cap_parented_persist() -> void:
+	# M1.5：取消数量上限——挂 collider 的弹孔超过旧上限 200 也不淘汰、不从父节点移除
 	manager = _build_manager([ak, glock, knife, m67])
 	var enemy: Enemy = load("res://Levels/Enemy/Enemy.tscn").instantiate()
 	add_child_autofree(enemy)
-	var spawned: Array[BulletHole] = []
-	for i in WeaponManager.MAX_BULLET_HOLES + 1:
-		spawned.append(manager._spawn_bullet_hole(Vector3(i, 0, 0), Vector3.UP, enemy))
-	assert_eq(manager._bullet_holes.size(), 200, "弹孔上限 200")
-	assert_true(spawned[0].is_queued_for_deletion(), "最旧被淘汰（含挂 collider 的）")
+	var count := 250
+	for i in count:
+		manager._spawn_bullet_hole(Vector3(i, 0, 0), Vector3.UP, enemy)
+	assert_eq(manager._bullet_holes.size(), count, "无上限：250 个弹孔全部保留（不淘汰）")
 	var holes_under_enemy := 0
 	for child in enemy.get_children():
 		if child is BulletHole:
 			holes_under_enemy += 1
-	assert_eq(holes_under_enemy, 200, "collider 下剩余 200 个（淘汰已从父节点移除）")
+	assert_eq(holes_under_enemy, count, "collider 下 250 个全部保留（无淘汰移除）")
 	for child in enemy.get_children():
 		if child is BulletHole:
 			child.queue_free()  # 清理：防跨测试残留

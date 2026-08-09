@@ -152,7 +152,7 @@ func test_recoil_val_parameterized_in_tres() -> void:
 
 # ── Head：set_ads（开镜）──
 
-# 用例 8：开镜 FOV ÷multiplier + 灵敏度 ÷multiplier；关镜恢复原值
+# 用例 8：开镜 FOV ÷multiplier + 灵敏度 ÷multiplier；关镜恢复原值（M1.5：平滑插值，需等动画到位）
 func test_set_ads_scales_fov_and_sensitivity() -> void:
 	var head := _build_head()
 	var cam: Camera3D = head.get_node("Camera")
@@ -160,12 +160,14 @@ func test_set_ads_scales_fov_and_sensitivity() -> void:
 	head.set_ads(true, 1.5)
 	assert_true(head.ads_active, "开镜后 ads_active = true")
 	assert_almost_eq(head.ads_multiplier, 1.5, 0.0001, "ads_multiplier 记录 1.5")
-	assert_almost_eq(cam.fov, 75.0 / 1.5, 0.001, "开镜 FOV = fov ÷multiplier（75→50）")
+	await wait_physics_frames(40)  # 平滑开镜插值到位（ads_zoom_speed 14 → ~0.1s 后吸附）
+	assert_almost_eq(cam.fov, 75.0 / 1.5, 0.01, "开镜 FOV = fov ÷multiplier（75→50，平滑到位）")
 	assert_almost_eq(head.mouse_sensitivity, 2.0 / 1000.0 / 1.5, 0.000001,
 			"开镜灵敏度 = base（2.0÷1000）÷ 1.5")
 	head.set_ads(false, 1.5)
 	assert_false(head.ads_active, "关镜后 ads_active = false")
-	assert_almost_eq(cam.fov, 75.0, 0.001, "关镜恢复 FOV 75")
+	await wait_physics_frames(40)  # 关镜插值恢复
+	assert_almost_eq(cam.fov, 75.0, 0.01, "关镜平滑恢复 FOV 75")
 	assert_almost_eq(head.mouse_sensitivity, 2.0 / 1000.0, 0.000001, "关镜恢复灵敏度")
 
 

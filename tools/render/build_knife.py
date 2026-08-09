@@ -96,19 +96,28 @@ MARKERS = {
     "Guard":     (0.0, 0.005, 0.018),
 }
 
-# ECHO series imprint on blade left face (-X), reads along the blade
-bpy.ops.object.text_add(location=(-0.005, 0.10, 0.018))
+# ECHO series imprint on blade left face (-X) — 印花贴纸（贴图平面，非 3D 凸字），与 process_weapon 一致
+_img = bpy.data.images.load(os.path.join(os.getcwd(), "tools/render/sources/echo_decal.png"))
+_mm = bpy.data.materials.new("EchoMark")
+_mm.use_nodes = True
+_nt = _mm.node_tree
+_nt.nodes.clear()
+_out = _nt.nodes.new("ShaderNodeOutputMaterial")
+_bsdf = _nt.nodes.new("ShaderNodeBsdfPrincipled")
+_tex = _nt.nodes.new("ShaderNodeTexImage")
+_tex.image = _img
+_bsdf.inputs["Roughness"].default_value = 0.65
+_nt.links.new(_tex.outputs["Color"], _bsdf.inputs["Base Color"])
+_nt.links.new(_tex.outputs["Alpha"], _bsdf.inputs["Alpha"])
+_nt.links.new(_bsdf.outputs["BSDF"], _out.inputs["Surface"])
+_mm.blend_method = 'BLEND'
+bpy.ops.mesh.primitive_plane_add(size=1.0, location=(-0.0055, 0.10, 0.018))  # 外移0.5mm防深度冲突
 _t = bpy.context.active_object
 _t.name = MODEL + "_EchoMark"
-_t.data.body = "ECHO"; _t.data.size = 0.020; _t.data.extrude = 0.0003  # 贴纸质感：压平
-_t.data.align_x = 'CENTER'; _t.data.align_y = 'CENTER'
-_t.rotation_euler = (1.5708, 0, -1.5708)  # face -X, read along blade, up +Z
-_mm = bpy.data.materials.new("EchoMark"); _mm.diffuse_color = (0.95, 0.55, 0.15, 1.0)
-_mm.use_nodes = True
-_mm.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.95, 0.55, 0.15, 1.0)
-_mm.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.65
+_t.rotation_euler = (1.5708, 0, -1.5708)  # 面朝 -X，文字沿刃端正
+_t.scale = (0.018 * 4.0, 0.018, 1.0)  # 贴图 4:1；高 0.018（刃面窄）
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 _t.data.materials.append(_mm)
-bpy.ops.object.convert(target='MESH')
 
 if DEBUG:
     for k, v in MARKERS.items():

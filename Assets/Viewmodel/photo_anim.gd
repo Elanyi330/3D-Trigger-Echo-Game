@@ -73,6 +73,9 @@ func _physics_process(_d: float) -> void:
 			"reload": _mgr.start_reload()
 			"swing": _mgr.try_fire()
 			"heavyswing": _mgr.set_aim(true)
+			"ads":
+				_mgr.set_aim(true)
+				_cam.fov = 70.0 / RES[weapon_idx].ads_multiplier  # 模拟 Head 开镜 FOV 缩放（校准真实取景）
 			"fire": _mgr.try_fire()
 	# capture at the 'at' fraction of the action
 	var total := _total_frames()
@@ -84,6 +87,7 @@ func _total_frames() -> int:
 		"reload": return int(RES[weapon_idx].reload_time * 60)
 		"swing": return int(RES[weapon_idx].melee_light_time * 60)  # 取实际轻击时长
 		"heavyswing": return int(RES[weapon_idx].melee_heavy_time * 60)
+		"ads": return 15  # 开镜动画窗口 ~0.25s（ads_speed 9 + FOV 插值）
 	return 30
 
 func _capture() -> void:

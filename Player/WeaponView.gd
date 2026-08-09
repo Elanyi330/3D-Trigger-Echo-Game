@@ -35,6 +35,9 @@ const ViewModel := preload("res://Assets/Viewmodel/ViewModel.gd")
 @export var swing_stab_push := 0.16
 # ---- throw（手雷后拉）----
 @export var throw_pull := 0.5
+# ---- ADS 开镜动画（M1.5：平滑举枪到眼前正中 + 眼看瞄具；步枪模板，狙击枪沿用）----
+@export var ads_speed := 9.0  # 开镜位置/旋转插值速率（越大到位越快；CS 开镜干脆利落 ~0.1s）
+@export var ads_sway_reduce := 0.75  # 开镜时 sway/bob 减弱比例（举镜更稳）
 
 var view_model: ViewModel
 var movement: MovementController
@@ -53,6 +56,8 @@ var _swing_dur := 0.0
 var _swing_heavy := false
 var _throw_t := -1.0
 var _deploy_t := 0.0
+var _ads_blend := 0.0  # 开镜进度 0=腰射 1=举镜（M1.5 平滑插值）
+var _ads_target := 0.0
 var _mouse := Vector2.ZERO
 var _muzzle_flash: OmniLight3D
 var _flash_t := 0.0
@@ -76,6 +81,7 @@ func setup(manager: WeaponManager, move: MovementController) -> void:
 	manager.weapon_switched.connect(_on_switched)
 	manager.throw_primed.connect(_on_throw_primed)
 	manager.throw_released.connect(_on_throw_released)
+	manager.aim_toggled.connect(_on_aim_toggled)  # M1.5：开镜动画（举枪到眼前 + FOV 由 Head 平滑）
 	_mount(manager.get_current_slot())
 	_build_body()  # 下半身自见（低头可见自己身体——相机挂在角色眼睛上）
 
@@ -187,6 +193,10 @@ func _on_throw_released() -> void:
 	_throw_t = -1.0
 
 
+func _on_aim_toggled(active: bool) -> void:
+	_ads_target = 1.0 if active else 0.0
+
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_mouse = -event.relative * sway_amount
@@ -201,6 +211,7 @@ func _physics_process(delta: float) -> void:
 	_tick_throw(delta)
 	_tick_deploy(delta)
 	_tick_flash(delta)
+	_tick_ads(delta)
 	_apply()
 
 
@@ -267,10 +278,16 @@ func _tick_flash(d: float) -> void:
 			_muzzle_flash.visible = false
 
 
+func _tick_ads(d: float) -> void:
+	_ads_blend = move_toward(_ads_blend, _ads_target, ads_speed * d)
+
+
 func _apply() -> void:
+	var ads_t := _smoothstep(_ads_blend)  # 缓动开镜进度（0=腰射 1=举镜）
+	var stead := 1.0 - ads_t * ads_sway_reduce  # 开镜时 sway/bob 减弱（举镜更稳）
 	# —— 相机锁定的微妙通道（作用于整个 view_model：武器+手臂一起微动）——
-	var pos := _kick + _sway + _bob
-	var rot := _kick_rot + _sway_rot
+	var pos := _kick + (_sway + _bob) * stead
+	var rot := _kick_rot + _sway_rot * stead
 	# deploy 滑入（整体）
 	if _deploy_t > 0.0:
 		var t := _deploy_t / 0.18
@@ -293,8 +310,10 @@ func _apply() -> void:
 	if _swing_t >= 0.0 and _swing_dur > 0.0:
 		var t := clampf(_swing_t / _swing_dur, 0.0, 1.0)
 		if _swing_heavy:
-			var windup := _smoothstep(clampf(t / 0.3, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.3) / 0.1, 0.0, 1.0)))
-			var thrust := _smoothstep(clampf((t - 0.3) / 0.25, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.55) / 0.45, 0.0, 1.0)))
+			# 重刺：蓄力(0-0.3) → 前刺(0.3-0.5，0.5 相位满伸=接触=伤害帧) → 收势(0.5-1.0)。
+			# 接触相位 0.5 = hit_delay(0.5s)/heavy_time(1.0s)——判定与动画同步（CS：重击 1s 动画，伤害在刀落下时刻）。
+			var windup := _smoothstep(clampf(t / 0.3, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.3) / 0.05, 0.0, 1.0)))
+			var thrust := _smoothstep(clampf((t - 0.3) / 0.2, 0.0, 1.0)) * (1.0 - _smoothstep(clampf((t - 0.5) / 0.5, 0.0, 1.0)))
 			wpos += Vector3(0.03 * windup, 0.01 * windup, 0.07 * windup - swing_stab_push * thrust)
 			wrot += Vector3(-0.25 * windup + 0.2 * thrust, 0.1 * windup, 0.0)
 		else:
@@ -308,9 +327,11 @@ func _apply() -> void:
 		var t := clampf(_throw_t / throw_pull, 0.0, 1.0)
 		wrot += Vector3(-0.5 * t, 0, 0)
 		wpos += Vector3(0, 0, 0.05 * t)
-	# 叠加到基础取景（equip 设定的 offset/rotation），不覆盖
-	view_model.weapon_mount.position = view_model.base_offset + wpos
-	view_model.weapon_mount.rotation = view_model.base_rotation + wrot
+	# 叠加到基础取景（腰射↔开镜按 ads_t 插值；开镜时武器举到眼前正中、眼看瞄具），再叠加动作通道
+	var wbase_pos: Vector3 = view_model.base_offset.lerp(view_model.base_ads_offset, ads_t)
+	var wbase_rot: Vector3 = view_model.base_rotation.lerp(view_model.base_ads_rotation, ads_t)
+	view_model.weapon_mount.position = wbase_pos + wpos
+	view_model.weapon_mount.rotation = wbase_rot + wrot
 
 
 # ---- 动画包络辅助（CS 多相位） ----

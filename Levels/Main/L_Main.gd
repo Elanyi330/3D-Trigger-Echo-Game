@@ -36,6 +36,7 @@ var _hitmarker: Label
 var _photo_path := ""
 var _photo_frames := -1  # >=0 = 拍照模式（N 帧后截图退出）
 var _burst := 0  # >0 = 拍照前连发 N 帧（复现弹孔/后坐力）
+var _ads_photo := false  # true = 拍照前开镜（验证平滑开镜 + 步枪居中看瞄具）
 # 靶场敌人按批刷新
 var _active_enemies: Array[Enemy] = []
 var _respawn_timer := -1.0  # <0 = 无计时
@@ -67,6 +68,8 @@ func _ready() -> void:
 			_movement.position = Vector3(0, 1, float(a.split("=")[1]))  # 拍照前传送玩家
 		elif a.begins_with("--pitch="):
 			_head.rot.x = deg_to_rad(float(a.split("=")[1]))  # 俯仰视角（低头看身体）
+		elif a == "--ads":
+			_ads_photo = true  # 开镜拍照（验证平滑开镜 + 步枪居中看瞄具）
 
 
 func _process(_delta: float) -> void:
@@ -79,6 +82,9 @@ func _process(_delta: float) -> void:
 	if _photo_frames < 0:
 		return
 	_photo_frames -= 1
+	# 开镜拍照：deploy 完成后开镜（平滑举枪到眼前 + FOV 缩放，截图定格开镜态）
+	if _ads_photo and _photo_frames == 20:
+		_manager.set_aim(true)
 	# 连发阶段（复现弹孔/后坐力）：按住 fire
 	if _burst > 0 and _photo_frames > 10:
 		Input.action_press("fire")

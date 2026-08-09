@@ -165,29 +165,34 @@ for o in meshes:
 
 # ---- Step 5b: ECHO series imprint on body side (-X face) ----
 def add_echo_mark(pos, size):
-    bpy.ops.object.text_add(location=pos)
-    t = bpy.context.active_object
-    t.name = "%s_EchoMark" % KEY
-    t.data.body = "ECHO"
-    t.data.size = size
-    t.data.extrude = 0.0003   # 贴纸质感：近乎压平（0.3mm），不突兀
-    t.data.space_character = 1.1
-    t.data.align_x = 'CENTER'
-    t.data.align_y = 'CENTER'
-    # face -X (weapon left / player-visible), read along -Y, up +Z
-    t.rotation_euler = (math.radians(90), 0, math.radians(-90))
+    """印花贴纸（非 3D 凸字）：贴 ECHO 贴图的平面网格，flush 贴合武器 -X 左侧面。
+    贴图 = tools/render/sources/echo_decal.png（透明底橘色 ECHO，make_echo_decal.py 生成）。
+    alpha 混合 → 透明处露出武器本体，橘字像印刷/贴纸融入表面。未来皮肤只换这张贴图即可。"""
+    img = bpy.data.images.load(os.path.join(ROOT, "tools/render/sources/echo_decal.png"))
     m = bpy.data.materials.new("EchoMark")
-    # 印刷贴纸色：暖白底橘字（哑光，贴合表面像印刷/贴纸，非凸起3D）
-    m.diffuse_color = (0.95, 0.55, 0.15, 1.0)
     m.use_nodes = True
-    b = m.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (0.95, 0.55, 0.15, 1.0)
-    b.inputs["Roughness"].default_value = 0.65
-    b.inputs["Metallic"].default_value = 0.0
-    t.data.materials.append(m)
-    # convert to mesh so it exports cleanly
-    bpy.ops.object.convert(target='MESH')
-    return t
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    bsdf.inputs["Roughness"].default_value = 0.65
+    bsdf.inputs["Metallic"].default_value = 0.0
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
+    nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    m.blend_method = 'BLEND'  # 透明底混合
+    # 平面贴合 -X 面：沿法线外移 0.5mm 防深度冲突（视觉 flush，像印刷贴纸）
+    bpy.ops.mesh.primitive_plane_add(size=1.0, location=(pos[0] - 0.0005, pos[1], pos[2]))
+    p = bpy.context.active_object
+    p.name = "%s_EchoMark" % KEY
+    p.rotation_euler = (math.radians(90), 0, math.radians(-90))  # 面朝 -X，文字端正
+    # 贴图 4:1（宽:高）；plane size=1 → 尺寸 = scale。高=size、宽=size*4
+    p.scale = (size * 4.0, size, 1.0)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    p.data.materials.append(m)
+    return p
 
 if "mark" in CFG:
     mk = CFG["mark"]
