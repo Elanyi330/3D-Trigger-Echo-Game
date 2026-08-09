@@ -15,14 +15,18 @@
 
 ## 项目状态
 
-**最后更新：** 2026-08-06
+**最后更新：** 2026-08-09
 
-**当前阶段：** 🟡 M0 开发中 — 引擎骨架（项目配置 + 第一人称控制器）搭建中
+**当前阶段：** 🟢 M0 + M1 + M1.5 已完成并通过验收 → 🔴 **M1.75 优化打磨**（对 M1.5 内容进一步优化）
+
+> 🤖 **新对话的 AI 请先读 [`docs/HANDOFF.md`](./docs/HANDOFF.md)** —— 一页抓住项目重点与 M1.75 大方向。
 
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
-| M0 引擎骨架 | Godot 项目 + 第一人称控制器 | 🟡 开发中 |
-| M1 武器系统 | 资源驱动武器 + 射击判定 + 后坐力 | 🔴 待开始 |
+| M0 引擎骨架 | Godot 项目 + 第一人称控制器 | 🟢 完成（2026-08-06） |
+| M1 武器资产 | 武器/角色建模 + 组件标记 | 🟢 完成（2026-08-08） |
+| M1.5 武器集成 | 射击/换弹/近战/投掷 + 视图模型 + 训练场 | 🟢 完成（2026-08-09，验收 PASS） |
+| **M1.75 M1.5 优化打磨** | **对 M1.5 内容进一步优化（不进新功能）** | 🔴 待开始 |
 | M2 地图与模式 | 双地图布局 + 双模式框架 | 🔴 待开始 |
 | M3 AI 基础 | 9 个 bot 寻路 + 感知 + 对枪 | 🔴 待开始 |
 | M4 AI 进阶 | 团队协同 + 拟人化瞄准 + 三档难度 | 🔴 待开始 |
@@ -97,9 +101,13 @@ godot --headless -s addons/gut/gut_cmdln.gd
 
 ## 开发文档
 
+- **[HANDOFF.md](./docs/HANDOFF.md)** — 🤖 **新 AI 快速上手**（一页抓住项目重点 + 当前 M1.75 方向 + 文档/资产地图）
 - **[CLAUDE.md](./docs/CLAUDE.md)** — 项目约束（AI 助手每次加载）
 - **[FEATURES.md](./docs/FEATURES.md)** — 完整功能清单
 - **[PROGRESS.md](./docs/PROGRESS.md)** — 开发进度报告
+- **[PROGRESS-M1-ASSETS.md](./docs/PROGRESS-M1-ASSETS.md)** — M1/M1.5 详细进度 + M1.75 优化清单
+- **[COMPONENTS.md](./Assets/Models/README.md)** — 武器/角色组件精确坐标/标记/骨骼总表（Assets/Models 下）
+- **[cs2-weapon-data.md](./docs/superpowers/reference/cs2-weapon-data.md)** — CS 数据 + 比例权威表（数值对齐唯一参照）
 - **[L_Main.tscn](./Levels/Main/L_Main.tscn)** — M0 自建简化测试场景：FirstPersonStarter 参考副本的对应场景引用的 Geometry/Materials 资源未随副本提供，故按 M0 规格重写（地面+四面墙+灯光+天空），非正式关卡
 - **[2026-08-06-trigger-echo-design.md](./docs/2026-08-06-trigger-echo-design.md)** — 项目企划书（最终设计规格，含参考项目主索引）
 
