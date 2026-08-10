@@ -100,13 +100,13 @@ func test_knife_melee_values() -> void:
     assert_true(knife.melee_range > 0.0, "攻击距离 > 0")
     assert_true(knife.melee_angle > 0.0, "攻击角度 > 0")
 
-# ---- M67「轰鸣」（CS2：98 / 引信1.5s / 半径6m / 245u） ----
+# ---- M67「轰鸣」（CS2：98 / 引信1.5s / 半径~350u≈8.89m / 245u） ----
 func test_m67_throwable_values() -> void:
     assert_eq(m67.weapon_name, "M67【回声】", "名称")
     assert_eq(m67.fire_mode, WeaponResource.FireMode.THROWABLE, "投掷物")
     assert_almost_eq(m67.damage, 98.0, 0.001, "中心伤害 98")
     assert_almost_eq(m67.fuse_time, 1.5, 0.001, "引信 1.5s")
-    assert_almost_eq(m67.blast_radius, 6.0, 0.001, "爆炸半径 6m")
+    assert_almost_eq(m67.blast_radius, 8.89, 0.001, "爆炸半径 8.89m（CS ~350u）")
     assert_eq(m67.magazine, 1, "携带 1 枚")
     assert_eq(m67.max_ammo, 1, "备弹 1 枚")
     assert_eq(m67.rpm, 0, "投掷物无视 RPM")

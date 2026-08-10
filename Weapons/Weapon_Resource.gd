@@ -39,8 +39,7 @@ enum RecoilPattern { SET_PATTERN, RANDOM }
 # 作用于全部射击（首发 + 连射弹道偏移）；<1 越低开镜越准。1.0 = 无差异。
 @export var ads_spread_multiplier: float = 0.5
 @export var fuse_time: float = 0.0  # 投掷物引信（M67 用）
-@export var blast_radius: float = 0.0  # 爆炸半径（M67 用）
-@export var blast_falloff: PackedFloat32Array = []  # 爆炸距离衰减表（绝对伤害值，按 blast_radius 等距分带；M67 [98, 60, 30]，CS2 HE；首段须与 damage 一致，测试锁定）
+@export var blast_radius: float = 0.0  # 爆炸半径（M67 用；CS HE ≈350u=8.89m，线性衰减 dmg=damage×(1−d/radius)）
 @export var attachments: Array = []  # 配件槽位（预留，M1 默认空）
 
 # ---- 近战附加字段（战术匕首「回声」，CS2：40/25/65/背刺180/0.4s+1.0s/250u） ----

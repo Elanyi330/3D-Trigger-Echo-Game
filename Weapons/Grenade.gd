@@ -11,7 +11,7 @@ extends RigidBody3D
 
 signal exploded(center: Vector3)
 
-# 武器数据（fuse_time/blast_radius/damage/blast_falloff）；须在 init() 前赋值（WeaponManager 任务 6 接线）
+# 武器数据（fuse_time/blast_radius/damage）；须在 init() 前赋值（WeaponManager 任务 6 接线）
 var resource: WeaponResource
 
 var _fuse_remaining: float = 0.0  # 引信倒计时（秒）；0 = 未投掷
@@ -54,17 +54,15 @@ func explode() -> void:
 	queue_free()
 
 
-# 爆炸范围伤害（纯逻辑可单测）：blast_radius 内按中心距离阶梯衰减，数值取自 .tres 衰减表；
-# 无部位倍率（范围伤害）。分带：0~1/3 半径满伤、1/3~2/3 中段、2/3~半径末段（M67：2m/4m/6m）。
+# 爆炸范围伤害（纯逻辑可单测）：CS 同款**线性衰减** dmg = damage × (1 − d/blast_radius)；
+# 无部位倍率（范围伤害）。中心 = 满伤（M67 98），随距离线性降，半径边缘（8.89m）归 0。
+# 公式学习自 Source RadiusDamage 机制（自研实现，非复制代码，CLAUDE.md 合规红线）。
 func damage_in_radius(distance: float) -> float:
-	if resource == null or resource.blast_falloff.is_empty():
+	if resource == null or resource.blast_radius <= 0.0:
 		return 0.0
-	if distance < 0.0 or distance > resource.blast_radius:
-		return 0.0  # 半径外不伤害（6m 边缘仍在半径内）
-	var bands := resource.blast_falloff.size()
-	var band_width := resource.blast_radius / float(bands)
-	var idx := mini(int(distance / band_width), bands - 1)
-	return resource.blast_falloff[idx]
+	if distance < 0.0 or distance >= resource.blast_radius:
+		return 0.0  # 半径外不伤害；半径边缘恰归 0
+	return clampf(resource.damage * (1.0 - distance / resource.blast_radius), 0.0, resource.damage)
 
 
 func _physics_process(delta: float) -> void:
@@ -91,8 +89,9 @@ func _apply_blast_damage() -> void:
 		return
 	# 爆炸瞬间形状查询 blast_radius 内 Objects 层碰撞体（确定性，无需 Area3D 监测延迟）；
 	# 结算参考 bullet.gd：目标实现 take_damage 则调用（无方法 = 不可伤，如地形）。
-	# 去重：intersect_shape 对同一 collider 的每个相交形状各返回一条结果，按 collider_id 判重
-	# （否则多碰撞形状目标如敌人躯干+头部会被重复结算双倍伤害）
+	# 去重：intersect_shape 对同一 collider 的每个相交形状各返回一条结果，按 collider_id 判重。
+	# 跳过 group "head"（CS：爆炸无部位倍率）——头 hitbox 是独立 collider 且转发本体，
+	# collider_id 判重拦不住"本体+头"组合，不跳过会双结算（98×2=196 脚下秒杀）。
 	var sphere := SphereShape3D.new()
 	sphere.radius = resource.blast_radius
 	var query := PhysicsShapeQueryParameters3D.new()
@@ -107,6 +106,8 @@ func _apply_blast_damage() -> void:
 			continue
 		if seen.has(hit["collider_id"]):
 			continue
+		if target.is_in_group("head"):
+			continue  # 头部 hitbox 转发本体 → 爆炸无头部倍率，跳过防双结算
 		seen[hit["collider_id"]] = true
 		var dmg := damage_in_radius(global_position.distance_to(target.global_position))
 		if dmg > 0.0 and target.has_method("take_damage"):

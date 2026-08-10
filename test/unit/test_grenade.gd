@@ -4,11 +4,11 @@
 #   - 投掷：init(origin, direction, strength) 位置 + linear_velocity = direction.normalized() × strength
 #     （重力抛体自然下落）
 #   - 引信 fuse_time（M67 1.5s）计时 → 自动 explode → exploded 信号 + queue_free
-#   - 爆炸：blast_radius 内 Objects 层目标（形状查询，无部位倍率），中心距离阶梯衰减
-#     （blast_falloff 表，数值来源 .tres：1m→98 / 3m→60 / 5m→30 / >6m 不伤害）；
-#     目标实现 take_damage（参考 m1-src bullet.gd 的 has_method 结算）
+#   - 爆炸：blast_radius 内 Objects 层目标（形状查询，无部位倍率），**CS 线性衰减**
+#     dmg = damage × (1 − d/blast_radius)（数值来源 .tres：M67 damage 98 / blast_radius 8.89m）；
+#     中心满伤 98 不秒杀 100HP，随距离线性降 0；目标实现 take_damage（参考 m1-src bullet.gd）
 #   - 手动 explode() → 爆炸 + 释放 + 幂等（不重复结算）
-# 全局约束（计划 §4）：数值唯一来源 weapon_*.tres（期望值引用 m67.blast_falloff，不硬编码散值）；
+# 全局约束（计划 §4）：数值唯一来源 weapon_*.tres（期望值引用 m67.damage/blast_radius，不硬编码散值）；
 # 目标 100HP 单位（企划书：所有单位统一 100 HP）。
 extends GutTest
 
@@ -17,6 +17,11 @@ var m67: WeaponResource
 
 func before_each() -> void:
 	m67 = load("res://Weapons/weapon_m67.tres")
+
+
+# CS 线性衰近期望值（派生自 .tres，不硬编码）：dmg = damage×(1−d/radius)，夹取 [0, damage]
+func _linear(d: float) -> float:
+	return clampf(m67.damage * (1.0 - d / m67.blast_radius), 0.0, m67.damage)
 
 
 # ---- 夹具 ----
@@ -108,35 +113,37 @@ func test_fuse_explodes_after_fuse_time() -> void:
 	assert_true(not is_instance_valid(g) or g.is_queued_for_deletion(), "爆炸后已释放（queue_free）")
 
 
-# ================= 2. 爆炸伤害衰减（100HP 单位场景） =================
-func test_explosion_damage_98_at_1m() -> void:
-	# 中心 98 不秒杀（企划书 §4.2.3⑦：100 → 2 HP）
-	var dummy := await _explode_over_dummy(1.0)
-	assert_eq(dummy.taken, [m67.blast_falloff[0]], "1m 距离 = 满伤 98（blast_falloff 首段）")
-	assert_almost_eq(dummy.hp, 100.0 - m67.blast_falloff[0], 0.001, "100 → 2 HP")
+# ================= 2. 爆炸伤害衰减（CS 线性，100HP 单位场景） =================
+func test_explosion_damage_center_max_no_instakill() -> void:
+	# 脚下/中心爆炸 = 满伤 98，100 → 2 HP 不秒杀（用户要求：CS 手雷最高 98 无法直接秒杀）
+	var dummy := await _explode_over_dummy(0.0)
+	assert_almost_eq(dummy.taken[0], m67.damage, 0.001, "0m = 满伤 98（damage 字段）")
+	assert_almost_eq(dummy.hp, 100.0 - m67.damage, 0.001, "100 → 2 HP")
+	assert_gt(dummy.hp, 0.0, "最高 98 不秒杀满血")
 
 
-func test_explosion_damage_60_at_3m() -> void:
-	var dummy := await _explode_over_dummy(3.0)
-	assert_eq(dummy.taken, [m67.blast_falloff[1]], "3m 距离 = 中段 60（blast_falloff[1]）")
-	assert_almost_eq(dummy.hp, 100.0 - m67.blast_falloff[1], 0.001, "100 → 40 HP")
+func test_explosion_damage_linear_half_radius() -> void:
+	var dist := m67.blast_radius * 0.5
+	var dummy := await _explode_over_dummy(dist)
+	assert_almost_eq(dummy.taken[0], _linear(dist), 0.001, "半径中点 = 50% 伤害（线性）")
+	assert_almost_eq(dummy.hp, 100.0 - _linear(dist), 0.001, "HP = 100 − 线性伤害")
 
 
-func test_explosion_damage_30_at_5m() -> void:
-	var dummy := await _explode_over_dummy(5.0)
-	assert_eq(dummy.taken, [m67.blast_falloff[2]], "5m 距离 = 末段 30（blast_falloff[2]）")
-	assert_almost_eq(dummy.hp, 100.0 - m67.blast_falloff[2], 0.001, "100 → 70 HP")
+func test_explosion_damage_linear_far() -> void:
+	var dist := m67.blast_radius * 0.8
+	var dummy := await _explode_over_dummy(dist)
+	assert_almost_eq(dummy.taken[0], _linear(dist), 0.001, "0.8 半径 = 20% 伤害（线性）")
 
 
 func test_explosion_outside_radius_no_damage() -> void:
-	# 爆炸半径外（>6m）不伤害
-	var dummy := await _explode_over_dummy(7.0)
+	# 爆炸半径外不伤害
+	var dummy := await _explode_over_dummy(m67.blast_radius + 1.0)
 	assert_eq(dummy.taken.size(), 0, "半径外目标不受伤害")
 	assert_almost_eq(dummy.hp, 100.0, 0.001, "HP 保持 100")
 
 
 func test_explosion_deduplicates_multi_shape_target() -> void:
-	# 多碰撞形状目标（同父节点 2 个碰撞体）只结算一次伤害（98 而非 196）——
+	# 多碰撞形状目标（同父节点 2 个碰撞体）只结算一次伤害——
 	# intersect_shape 对同一 collider 的每个相交形状各返回一条结果，须按 collider 去重
 	var dummy := MultiShapeDummy.new()
 	add_child_autofree(dummy)
@@ -144,7 +151,7 @@ func test_explosion_deduplicates_multi_shape_target() -> void:
 	await wait_physics_frames(2)  # 靶子注册进物理空间
 	var g := _spawn_grenade(Vector3.ZERO, Vector3(0, 0, -1), 20.0)
 	g.explode()
-	assert_eq(dummy.taken, [m67.blast_falloff[0]], "多形状目标只结算一次满伤 98（非 [98, 98]）")
+	assert_eq(dummy.taken, [_linear(1.0)], "多形状目标只结算一次 1m 线性伤害（非两次）")
 
 
 # ================= 3. 手动爆炸 =================
@@ -159,29 +166,25 @@ func test_manual_explode_emits_and_frees() -> void:
 	assert_eq(exploded_events.size(), 1, "重复 explode 只爆一次")
 
 
-# ================= 4. damage_in_radius 纯逻辑（数值派生自 .tres） =================
+# ================= 4. damage_in_radius 纯逻辑（CS 线性衰减） =================
 func test_damage_in_radius_center_equals_damage_field() -> void:
-	# 中心满伤 == damage 字段（blast_falloff 首段与基础伤害自洽，企划书 §4.2.5 数值唯一来源）
+	# 中心满伤 == damage 字段（企划书 §4.2.5 数值唯一来源 .tres）
 	var g := _spawn_grenade(Vector3.ZERO, Vector3(0, 0, -1), 20.0)
-	assert_eq(m67.blast_falloff.size(), 3, "衰减表 3 段（98/60/30，.tres 数值）")
-	assert_almost_eq(g.damage_in_radius(0.0), m67.damage, 0.001, "0m = 基础伤害 98")
+	assert_almost_eq(g.damage_in_radius(0.0), m67.damage, 0.001, "0m = 满伤 98（damage 字段）")
 
 
-func test_damage_in_radius_full_band() -> void:
+func test_damage_in_radius_linear_falloff() -> void:
+	# CS 同款线性：每 1/4 半径损失 25% 伤害
 	var g := _spawn_grenade(Vector3.ZERO, Vector3(0, 0, -1), 20.0)
-	assert_almost_eq(g.damage_in_radius(1.0), m67.blast_falloff[0], 0.001, "1m（2m 内）= 98")
-	assert_almost_eq(g.damage_in_radius(2.0), m67.blast_falloff[1], 0.001, "2m 边界进中段 = 60")
+	var r := m67.blast_radius
+	assert_almost_eq(g.damage_in_radius(r * 0.25), m67.damage * 0.75, 0.001, "1/4 半径 = 75% 伤害")
+	assert_almost_eq(g.damage_in_radius(r * 0.5), m67.damage * 0.5, 0.001, "1/2 半径 = 50% 伤害")
+	assert_almost_eq(g.damage_in_radius(r * 0.75), m67.damage * 0.25, 0.001, "3/4 半径 = 25% 伤害")
 
 
-func test_damage_in_radius_mid_and_edge_bands() -> void:
+func test_damage_in_radius_at_and_beyond_radius_zero() -> void:
 	var g := _spawn_grenade(Vector3.ZERO, Vector3(0, 0, -1), 20.0)
-	assert_almost_eq(g.damage_in_radius(3.0), m67.blast_falloff[1], 0.001, "3m（4m 内）= 60")
-	assert_almost_eq(g.damage_in_radius(4.0), m67.blast_falloff[2], 0.001, "4m 边界进末段 = 30")
-	assert_almost_eq(g.damage_in_radius(5.0), m67.blast_falloff[2], 0.001, "5m（6m 内）= 30")
-
-
-func test_damage_in_radius_beyond_radius_zero() -> void:
-	var g := _spawn_grenade(Vector3.ZERO, Vector3(0, 0, -1), 20.0)
-	assert_almost_eq(g.damage_in_radius(6.0), m67.blast_falloff[2], 0.001, "6m 边缘 = 30（半径内）")
-	assert_eq(g.damage_in_radius(7.0), 0.0, ">6m 不伤害")
+	var r := m67.blast_radius
+	assert_almost_eq(g.damage_in_radius(r), 0.0, 0.001, "半径边缘 = 0（线性衰减到底）")
+	assert_eq(g.damage_in_radius(r + 5.0), 0.0, "半径外不伤害")
 	assert_eq(g.damage_in_radius(-1.0), 0.0, "负距离不伤害")

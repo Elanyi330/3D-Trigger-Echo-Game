@@ -68,6 +68,8 @@ func _resolve_swing(base_damage: float) -> void:
 	for target in _candidate_targets():
 		if not is_instance_valid(target) or not target.has_method("take_damage"):
 			continue
+		if target.is_in_group("head"):
+			continue  # CS：近战无部位倍率。头部 hitbox 转发本体会与躯干双结算 → 跳过
 		if not _in_cone(target.global_position, o, facing):
 			continue
 		var damage := base_damage

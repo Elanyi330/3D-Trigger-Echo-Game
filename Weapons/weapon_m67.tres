@@ -14,6 +14,5 @@ mobility = 245.0
 deploy_time = 0.5
 fire_mode = 3
 fuse_time = 1.5
-blast_radius = 6.0
-blast_falloff = PackedFloat32Array(98, 60, 30)
+blast_radius = 8.89
 ads_multiplier = 1.0
