@@ -17,6 +17,7 @@ const WEAPON_MODELS := [
 	preload("res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb"),
 ]
 const GREYBOX := preload("res://Levels/M2_TDM/map_greybox.gd")
+const VISUALS := preload("res://Levels/M2_TDM/map_visuals.gd")
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 
@@ -36,6 +37,11 @@ func _ready() -> void:
 	gb.name = "Greybox"
 	add_child(gb)
 	gb.build()
+	# 视觉装饰层（Kenney CC0 模型覆盖灰盒表面，问题B）
+	var vis: Node3D = VISUALS.new()
+	vis.name = "Visuals"
+	add_child(vis)
+	vis.build_visuals()
 	# 玩家（Player.tscn：MovementController + Head + Crouch）
 	_player = load("res://Player/Player.tscn").instantiate()
 	_player.name = "Player"

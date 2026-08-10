@@ -99,12 +99,13 @@ const WEST_ROOFS := [
 #   东街走廊 x∈[9.5,13.5]（4m，大厅东口直通）
 #   三级台阶 x∈[13.5,21.5]（每级 2.67m 宽 × 0.83m 高 → 逐级跳上屋顶；灰盒斜坡替代，真斜坡 T4 三角棱柱）
 #   屋顶 x∈[21.5,29.5]（8m 宽，顶面 2.5m，顶到东墙 → 零夹缝）
+#   StepEast3 顶面(2.49) 与 RoofEast 顶面(2.5) 齐平并重叠 0.5m —— 消灭"台阶→屋顶"落差缝卡人
 #   注：台阶每级 0.83m 远小于可跳上限 1.3m ✓
 const EAST_ROOF := {"name": "RoofEast", "kind": "roof", "center": Vector3(25.5, 1.25, 0), "size": Vector3(8, 2.5, 12)}
 const EAST_STEPS := [
 	{"name": "StepEast1", "kind": "roof", "center": Vector3(14.3, 0.415, 0), "size": Vector3(2.67, 0.83, 12)},
 	{"name": "StepEast2", "kind": "roof", "center": Vector3(17.0, 1.245, 0), "size": Vector3(2.67, 0.83, 12)},
-	{"name": "StepEast3", "kind": "roof", "center": Vector3(19.7, 2.075, 0), "size": Vector3(2.67, 0.83, 12)},
+	{"name": "StepEast3", "kind": "roof", "center": Vector3(20.6, 2.075, 0), "size": Vector3(2.67, 0.83, 12)},
 ]
 
 # ---- cover pieces ----

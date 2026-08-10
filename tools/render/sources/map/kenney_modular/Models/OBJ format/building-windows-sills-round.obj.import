@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dab16mss0h5pn"
+path="res://.godot/imported/building-windows-sills-round.obj-d9d05dc32aadd8d86cf150f8bf4a4e5f.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building-windows-sills-round.obj-d9d05dc32aadd8d86cf150f8bf4a4e5f.mesh"]
+
+source_file="res://tools/render/sources/map/kenney_modular/Models/OBJ format/building-windows-sills-round.obj"
+dest_files=["res://.godot/imported/building-windows-sills-round.obj-d9d05dc32aadd8d86cf150f8bf4a4e5f.mesh", "res://.godot/imported/building-windows-sills-round.obj-d9d05dc32aadd8d86cf150f8bf4a4e5f.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

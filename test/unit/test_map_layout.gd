@@ -48,7 +48,12 @@ func test_solids_no_overlap() -> void:
 			# 垂直相接（地面顶==元素底，y 恰好接触）不算重叠
 			if a[0].y >= b[1].y - 0.01 or b[0].y >= a[1].y - 0.01:
 				continue
-			assert_false(_overlaps(a, b), "%s 与 %s 不应重叠" % [solids[i]["name"], solids[j]["name"]])
+			# 台阶-屋顶过渡重叠（结构性，顶面齐平）豁免
+			var an: String = solids[i]["name"]
+			var bn: String = solids[j]["name"]
+			if (an.begins_with("StepEast") and bn == "RoofEast") or (bn.begins_with("StepEast") and an == "RoofEast"):
+				continue
+			assert_false(_overlaps(a, b), "%s 与 %s 不应重叠" % [an, bn])
 
 
 # ---- §11.3: central hall dimensions & doors ----
@@ -82,6 +87,12 @@ func test_jumpable_heights() -> void:
 		prev_top = (s["center"] as Vector3).y + s["size"].y * 0.5
 	# 最后一级顶面 ≥ 屋顶顶面（2.5m）
 	assert_gte(prev_top, 2.5 - 0.1, "台阶顶面 ≥ 屋顶顶面")
+	# 台阶 3 与屋顶必须水平重叠（消灭 0.46m 落差缝）
+	var s3: Dictionary = LAYOUT.EAST_STEPS[2]
+	var s3_c: Vector3 = s3["center"]
+	var roof_c: Vector3 = LAYOUT.EAST_ROOF["center"]
+	var overlap_x: float = (s3_c.x + s3["size"].x * 0.5) - (roof_c.x - LAYOUT.EAST_ROOF["size"].x * 0.5)
+	assert_gt(overlap_x, 0.2, "台阶3与屋顶水平重叠 ≥0.2m（消灭落差缝）")
 
 
 # ---- §11.5: grenade coverage — every 5x5m zone has a ≥1.4m blocker within radius ----

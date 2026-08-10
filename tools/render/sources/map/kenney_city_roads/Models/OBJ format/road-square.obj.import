@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dlutfnjrg74jy"
+path="res://.godot/imported/road-square.obj-9ae4a5cae2a0e6030415b85757eae984.mesh"
+
+[deps]
+
+files=["res://.godot/imported/road-square.obj-9ae4a5cae2a0e6030415b85757eae984.mesh"]
+
+source_file="res://tools/render/sources/map/kenney_city_roads/Models/OBJ format/road-square.obj"
+dest_files=["res://.godot/imported/road-square.obj-9ae4a5cae2a0e6030415b85757eae984.mesh", "res://.godot/imported/road-square.obj-9ae4a5cae2a0e6030415b85757eae984.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
