@@ -1,6 +1,6 @@
 # M1 资产 + M1.5 集成 — 完成进度（2026-08-08 多模态重建）
 
-> 分支: `feat/m1-assets`（工作树 ../Trigger-Echo-m1-assets）
+> 分支: `feat/m1-assets`（单目录 `/Users/elanyi/Projects/Trigger-Echo`，2026-08-10 由 worktree 收敛回单目录）
 > **状态：M1.5 已完成并通过用户验收（2026-08-09，CS 对比 agent 终审 PASS，GUT 158/158 全绿）。**
 > **下一里程碑：M1.75（M1.5 与 M2 之间专设）——对 M1.5 内容做更进一步优化。**
 > 测试: **GUT 158/158 全绿**（M0 14 + 武器逻辑 + 近战/开镜回归 + 集成）。

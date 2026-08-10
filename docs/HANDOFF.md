@@ -20,7 +20,7 @@
 
 ## 三、工作目录 / 验证 / 运行
 
-- **工作树**（在此开发）：`/Users/elanyi/Projects/Trigger-Echo-m1-assets`，分支 `feat/m1-assets`。**勿碰主仓** `Trigger-Echo`。
+- **工作目录**（在此开发，单目录）：`/Users/elanyi/Projects/Trigger-Echo`，分支 `feat/m1-assets`。`main` 保留 M0 基线，M1.75 验收后再合并。（2026-08-10 已把 worktree 收敛回单目录；勿再新建 worktree。）
 - **测试**：`godot --headless --path . -s addons/gut/gut_cmdln.gd`（应 158/158 绿）。
 - **运行游戏**：`godot --path . Levels/Main/L_Main.tscn`（靶场：WASD/空格跳/Shift蹲/左键开火/右键开镜/R换弹/1-4切枪）。
 
@@ -54,4 +54,4 @@
 
 **给用户的开场提示词（复制即用）**：
 
-> 读 `docs/HANDOFF.md` 和 `docs/PROGRESS-M1-ASSETS.md` 末尾的 M1.75 计划，了解 Trigger Echo 当前状态（M1.5 已验收完成）。我们在工作树 `Trigger-Echo-m1-assets`（分支 feat/m1-assets）上做 **M1.75 优化打磨**。本轮我想优化的是：【在此填你的优化点】
+> 读 `docs/HANDOFF.md` 和 `docs/PROGRESS-M1-ASSETS.md` 末尾的 M1.75 计划，了解 Trigger Echo 当前状态（M1.5 已验收完成）。我们在单目录 `/Users/elanyi/Projects/Trigger-Echo`（分支 feat/m1-assets）上做 **M1.75 优化打磨**。本轮我想优化的是：【在此填你的优化点】
