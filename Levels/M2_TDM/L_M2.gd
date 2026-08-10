@@ -47,7 +47,6 @@ func _ready() -> void:
 	# 随机敌人撒点（可踏足位置抽样）
 	_spawn_random_enemies()
 
-
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
 func _setup_weapons() -> void:
 	_manager = WeaponManager.new()
@@ -68,11 +67,18 @@ func _setup_weapons() -> void:
 	_view.setup(_manager, _player)
 
 
-# ---- 准星（简单 HUD，开火提示用）----
+# ---- HUD（弹药/准星/命中标记，移植自 L_Main.gd）----
+var _ammo_label: Label
+var _weapon_label: Label
+var _hitmarker: Label
+
+
 func _setup_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
+	var vp := get_viewport().get_visible_rect().size
+	# 准星（居中）
 	var cross := Label.new()
 	cross.text = "+"
 	cross.add_theme_font_size_override("font_size", 36)
@@ -80,7 +86,75 @@ func _setup_hud() -> void:
 	cross.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	cross.add_theme_constant_override("outline_size", 8)
 	layer.add_child(cross)
-	cross.position = get_viewport().get_visible_rect().size * 0.5 + Vector2(-11, -26)
+	cross.position = vp * 0.5 + Vector2(-11, -26)
+	# 命中标记（准星右下，闪现）
+	_hitmarker = Label.new()
+	_hitmarker.text = "✕"
+	_hitmarker.add_theme_color_override("font_color", Color(1, 0.25, 0.15))
+	_hitmarker.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_hitmarker.add_theme_constant_override("outline_size", 8)
+	_hitmarker.add_theme_font_size_override("font_size", 40)
+	layer.add_child(_hitmarker)
+	_hitmarker.position = vp * 0.5 + Vector2(14, -28)
+	_hitmarker.modulate.a = 0.0
+	# 弹药背板（右下）
+	var panel := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.5)
+	sb.set_corner_radius_all(8)
+	panel.add_theme_stylebox_override("panel", sb)
+	layer.add_child(panel)
+	panel.position = Vector2(vp.x - 300, vp.y - 110)
+	panel.size = Vector2(270, 80)
+	_ammo_label = Label.new()
+	_ammo_label.name = "AmmoLabel"
+	_ammo_label.add_theme_font_size_override("font_size", 46)
+	_ammo_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	layer.add_child(_ammo_label)
+	_ammo_label.position = Vector2(vp.x - 300 + 18, vp.y - 110 + 14)
+	# 武器名（左下）
+	_weapon_label = Label.new()
+	_weapon_label.add_theme_font_size_override("font_size", 28)
+	_weapon_label.add_theme_color_override("font_color", Color(1, 0.85, 0.4))
+	_weapon_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_weapon_label.add_theme_constant_override("outline_size", 8)
+	layer.add_child(_weapon_label)
+	_weapon_label.position = Vector2(30, vp.y - 70)
+	# 弹药/切枪信号刷新
+	_manager.weapon_ammo_updated.connect(_on_ammo_updated)
+	_manager.weapon_switched.connect(_on_weapon_switched)
+	_manager.enemy_hit.connect(_on_enemy_hit)
+	_refresh_hud()
+
+
+func _on_ammo_updated(_slot: int, _mag: int, _reserve: int) -> void:
+	_refresh_hud()
+
+
+func _on_weapon_switched(_slot: int) -> void:
+	_refresh_hud()
+
+
+func _on_enemy_hit() -> void:
+	_hitmarker.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_property(_hitmarker, "modulate:a", 0.0, 0.25)
+
+
+func _refresh_hud() -> void:
+	if _manager == null:
+		return
+	var slot := _manager.get_current_slot()
+	var core := _manager.get_core(slot)
+	var res := _manager.get_resource(slot)
+	if core == null or res == null:
+		return
+	var ammo := core.get_ammo()
+	if res.fire_mode == WeaponResource.FireMode.MELEE:
+		_ammo_label.text = "—"
+	else:
+		_ammo_label.text = "%d / %d" % [int(ammo.x), int(ammo.y)]
+	_weapon_label.text = res.weapon_name
 
 
 # ---- 随机敌人撒点 ----
@@ -90,7 +164,8 @@ func _spawn_random_enemies() -> void:
 		var e := Enemy.new()
 		e.name = "Enemy%d" % i
 		add_child(e)
-		e.global_position = spots[i] + Vector3(0, 1.0, 0)
+		# Enemy 是 StaticBody（原点=地面），直接放地面 y=0；不要加胶囊中心偏移（会悬空）
+		e.global_position = spots[i]
 		e.rotation.y = randf() * TAU
 		_enemies.append(e)
 

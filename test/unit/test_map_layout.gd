@@ -65,16 +65,23 @@ func test_hall_dimensions() -> void:
 		assert_gte(gap, LAYOUT.DOOR_MIN, "%s 门宽 ≥2m" % d["name"])
 
 
-# ---- §11.4: jumpable surfaces ≤1.3m; 1.4m+ requires ramp; gaps ≤4.5m ----
+# ---- §11.4: jumpable surfaces ≤1.3m; 2.5m roof via steps; gaps ≤4.5m ----
 func test_jumpable_heights() -> void:
 	for r0 in LAYOUT.WEST_ROOFS:
 		var r: Dictionary = r0
 		assert_lte(r["size"].y, LAYOUT.JUMPABLE_MAX, "%s 可跳高度 ≤1.3m" % r["name"])
 	var east_roof: Dictionary = LAYOUT.EAST_ROOF
 	assert_eq(east_roof["size"].y, 2.5, "东屋顶 2.5m")
-	var ramp: Dictionary = LAYOUT.EAST_RAMP
-	assert_eq(ramp["kind"], "ramp", "东屋顶必须有斜坡")
-	assert_gte(ramp["size"].x, 3.0, "斜坡宽度 ≥3m")
+	# 台阶替代斜坡（灰盒阶段）：3 级，每级 ≤1.3m 可跳，逐级可达屋顶顶面
+	assert_eq(LAYOUT.EAST_STEPS.size(), 3, "东屋顶台阶 3 级")
+	var prev_top := 0.0
+	for s0 in LAYOUT.EAST_STEPS:
+		var s: Dictionary = s0
+		assert_lte(s["size"].y, LAYOUT.JUMPABLE_MAX, "%s 每级 ≤1.3m 可跳" % s["name"])
+		assert_gte(s["size"].x, 2.5, "%s 台阶宽 ≥2.5m" % s["name"])
+		prev_top = (s["center"] as Vector3).y + s["size"].y * 0.5
+	# 最后一级顶面 ≥ 屋顶顶面（2.5m）
+	assert_gte(prev_top, 2.5 - 0.1, "台阶顶面 ≥ 屋顶顶面")
 
 
 # ---- §11.5: grenade coverage — every 5x5m zone has a ≥1.4m blocker within radius ----
