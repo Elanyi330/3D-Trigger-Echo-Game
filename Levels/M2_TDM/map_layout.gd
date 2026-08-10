@@ -61,20 +61,26 @@ const HALL_DOORS := [
 	{"name": "DoorEast",  "center": Vector3(10.5, 1.5, 0),  "gap_z": 4.0},
 ]
 
-# ---- 大厅柱列（4×3=12 根，0.6m 见方，高 3.0）----
+# ---- 大厅柱列（12 根，0.6m 见方，高 2.2m）----
+# M2 修复：柱列移到大厅四边贴墙（x∈{±9}, z∈{±7} 靠墙排布）——玩家活动区在中央，
+# 柱只做贴墙视线遮挡，玩家不会贴着柱起跳（杜绝胶囊顶柱压跳高卡顿）。
 const HALL_PILLARS := [
-	{"name": "PillarA", "center": Vector3(-6.5, 1.5, -5.0), "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarB", "center": Vector3(-2.5, 1.5, -5.0), "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarC", "center": Vector3(2.5, 1.5, -5.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarD", "center": Vector3(6.5, 1.5, -5.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarE", "center": Vector3(-6.5, 1.5, 0.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarF", "center": Vector3(-2.5, 1.5, 0.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarG", "center": Vector3(2.5, 1.5, 0.0),   "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarH", "center": Vector3(6.5, 1.5, 0.0),   "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarI", "center": Vector3(-6.5, 1.5, 5.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarJ", "center": Vector3(-2.5, 1.5, 5.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarK", "center": Vector3(2.5, 1.5, 5.0),   "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarL", "center": Vector3(6.5, 1.5, 5.0),   "size": Vector3(0.6, 3.0, 0.6)},
+	# 北墙内沿（z=7.5）
+	{"name": "PillarA", "center": Vector3(-6.0, 1.1, 7.5), "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarB", "center": Vector3(-2.0, 1.1, 7.5), "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarC", "center": Vector3(2.0, 1.1, 7.5),  "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarD", "center": Vector3(6.0, 1.1, 7.5),  "size": Vector3(0.6, 2.2, 0.6)},
+	# 南墙内沿（z=-7.5）
+	{"name": "PillarE", "center": Vector3(-6.0, 1.1, -7.5), "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarF", "center": Vector3(-2.0, 1.1, -7.5), "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarG", "center": Vector3(2.0, 1.1, -7.5),  "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarH", "center": Vector3(6.0, 1.1, -7.5),  "size": Vector3(0.6, 2.2, 0.6)},
+	# 西墙内沿（x=-9.5）
+	{"name": "PillarI", "center": Vector3(-9.5, 1.1, -3.0), "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarJ", "center": Vector3(-9.5, 1.1, 3.0),  "size": Vector3(0.6, 2.2, 0.6)},
+	# 东墙内沿（x=9.5）
+	{"name": "PillarK", "center": Vector3(9.5, 1.1, -3.0),  "size": Vector3(0.6, 2.2, 0.6)},
+	{"name": "PillarL", "center": Vector3(9.5, 1.1, 3.0),   "size": Vector3(0.6, 2.2, 0.6)},
 ]
 
 # ---- 大厅内隔断墙（1.4m 高，不可跳跃——室内跳上会被 3m 天花板卡住；分割南北区）----
@@ -83,10 +89,11 @@ const HALL_DIVIDERS := [
 	{"name": "DividerS", "kind": "cover", "center": Vector3(4.0, 0.7, -2.0),  "size": Vector3(7.0, 1.4, 0.5)},
 ]
 
-# ---- 大厅屋顶（3m 高实体感）----
+# ---- 大厅屋顶（4.5m 高——M2 修复：原 3.25m 底面 3.0m 低于玩家跳跃顶 3.22m，跳上被屋顶压住卡顿）----
+# 底面 4.25m > 跳跃顶 3.22m（站高1.83+跳1.39），玩家在大厅任意位置跳跃不撞屋顶
 const HALL_ROOF := [
-	{"name": "HallRoofN", "kind": "roof", "center": Vector3(0, 3.25, 4.0), "size": Vector3(20, 0.5, 6.0)},
-	{"name": "HallRoofS", "kind": "roof", "center": Vector3(0, 3.25, -4.0), "size": Vector3(20, 0.5, 6.0)},
+	{"name": "HallRoofN", "kind": "roof", "center": Vector3(0, 4.25, 4.0), "size": Vector3(20, 0.5, 6.0)},
+	{"name": "HallRoofS", "kind": "roof", "center": Vector3(0, 4.25, -4.0), "size": Vector3(20, 0.5, 6.0)},
 ]
 
 # ---- 大厅门框（门洞两侧框柱，贴墙段内沿，不与墙段重叠；4m 门洞）----
@@ -261,23 +268,28 @@ const SOUTH_MID_FILL := [
 ]
 
 # ---- 出生建筑（用户：双方出生点用封顶建筑围起来，左右两个出口）----
-# 建筑 12×10×3.0m（x∈[-6,6], z∈[19,29] 北 / [-29,-19] 南），贴边界墙（北墙=地图北界），屋顶封顶，东/西墙留 3m 出口。
+# 建筑 12×10×3.0m（x∈[-6,6], z∈[19,29] 北 / [-29,-19] 南），贴边界墙（北墙=地图北界），屋顶封顶。
+# 出口：西墙/东墙中部各留 3m 门洞（z∈[21.5,24.5]，中心 23）——左右两个出口。
 const SPAWN_BUILDINGS := [
 	# ===== 北（T 出生）=====
 	{"name": "SpawnB_N_WallN", "kind": "wall", "center": Vector3(0, 1.5, 28.5), "size": Vector3(12, 3.0, 1)},     # 北墙（贴地图北界，内沿 29）
 	{"name": "SpawnB_N_WallS", "kind": "wall", "center": Vector3(0, 1.5, 19.5), "size": Vector3(12, 3.0, 1)},     # 南墙（面向地图）
-	{"name": "SpawnB_N_WallW_T", "kind": "wall", "center": Vector3(-6.5, 1.5, 25.5), "size": Vector3(1, 3.0, 6)},  # 西墙北段
-	{"name": "SpawnB_N_WallW_B", "kind": "wall", "center": Vector3(-6.5, 1.5, 21.0), "size": Vector3(1, 3.0, 4)},  # 西墙南段（出口 x∈[-8,-2]）
-	{"name": "SpawnB_N_WallE_T", "kind": "wall", "center": Vector3(6.5, 1.5, 25.5), "size": Vector3(1, 3.0, 6)},   # 东墙北段
-	{"name": "SpawnB_N_WallE_B", "kind": "wall", "center": Vector3(6.5, 1.5, 21.0), "size": Vector3(1, 3.0, 4)},   # 东墙南段（出口 x∈[2,8]）
+	# 西墙两段（出口 z∈[21.5,24.5]）：北段 z∈[24.5,28.5]（中心 26.5 深 4）、南段 z∈[19,21.5]（中心 20.25 深 2.5）
+	{"name": "SpawnB_N_WallW_T", "kind": "wall", "center": Vector3(-6.5, 1.5, 26.5), "size": Vector3(1, 3.0, 4)},
+	{"name": "SpawnB_N_WallW_B", "kind": "wall", "center": Vector3(-6.5, 1.5, 20.25), "size": Vector3(1, 3.0, 2.5)},
+	# 东墙两段（出口 z∈[21.5,24.5]）
+	{"name": "SpawnB_N_WallE_T", "kind": "wall", "center": Vector3(6.5, 1.5, 26.5), "size": Vector3(1, 3.0, 4)},
+	{"name": "SpawnB_N_WallE_B", "kind": "wall", "center": Vector3(6.5, 1.5, 20.25), "size": Vector3(1, 3.0, 2.5)},
 	{"name": "SpawnB_N_Roof", "kind": "roof", "center": Vector3(0, 3.0, 24), "size": Vector3(12, 0.5, 10)},       # 封顶
 	# ===== 南（CT 出生）=====
 	{"name": "SpawnB_S_WallN", "kind": "wall", "center": Vector3(0, 1.5, -19.5), "size": Vector3(12, 3.0, 1)},    # 北墙（面向地图）
 	{"name": "SpawnB_S_WallS", "kind": "wall", "center": Vector3(0, 1.5, -28.5), "size": Vector3(12, 3.0, 1)},    # 南墙（贴地图南界，内沿 -29）
-	{"name": "SpawnB_S_WallW_T", "kind": "wall", "center": Vector3(-6.5, 1.5, -21.0), "size": Vector3(1, 3.0, 4)}, # 西墙北段（出口 x∈[-8,-2]）
-	{"name": "SpawnB_S_WallW_B", "kind": "wall", "center": Vector3(-6.5, 1.5, -25.5), "size": Vector3(1, 3.0, 6)}, # 西墙南段
-	{"name": "SpawnB_S_WallE_T", "kind": "wall", "center": Vector3(6.5, 1.5, -21.0), "size": Vector3(1, 3.0, 4)},  # 东墙北段（出口 x∈[2,8]）
-	{"name": "SpawnB_S_WallE_B", "kind": "wall", "center": Vector3(6.5, 1.5, -25.5), "size": Vector3(1, 3.0, 6)},  # 东墙南段
+	# 西墙两段（出口 z∈[-24.5,-21.5]）
+	{"name": "SpawnB_S_WallW_T", "kind": "wall", "center": Vector3(-6.5, 1.5, -20.25), "size": Vector3(1, 3.0, 2.5)},
+	{"name": "SpawnB_S_WallW_B", "kind": "wall", "center": Vector3(-6.5, 1.5, -26.5), "size": Vector3(1, 3.0, 4)},
+	# 东墙两段（出口 z∈[-24.5,-21.5]）
+	{"name": "SpawnB_S_WallE_T", "kind": "wall", "center": Vector3(6.5, 1.5, -20.25), "size": Vector3(1, 3.0, 2.5)},
+	{"name": "SpawnB_S_WallE_B", "kind": "wall", "center": Vector3(6.5, 1.5, -26.5), "size": Vector3(1, 3.0, 4)},
 	{"name": "SpawnB_S_Roof", "kind": "roof", "center": Vector3(0, 3.0, -24), "size": Vector3(12, 0.5, 10)},       # 封顶
 ]
 
