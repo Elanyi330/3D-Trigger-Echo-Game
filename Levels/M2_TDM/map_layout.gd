@@ -77,10 +77,10 @@ const HALL_PILLARS := [
 	{"name": "PillarL", "center": Vector3(6.5, 1.5, 5.0),   "size": Vector3(0.6, 3.0, 0.6)},
 ]
 
-# ---- 大厅内矮墙（分割南北区）----
+# ---- 大厅内隔断墙（1.4m 高，不可跳跃——室内跳上会被 3m 天花板卡住；分割南北区）----
 const HALL_DIVIDERS := [
-	{"name": "DividerN", "kind": "cover", "center": Vector3(-4.0, 0.6, 2.0), "size": Vector3(7.0, 1.2, 0.5)},
-	{"name": "DividerS", "kind": "cover", "center": Vector3(4.0, 0.6, -2.0),  "size": Vector3(7.0, 1.2, 0.5)},
+	{"name": "DividerN", "kind": "cover", "center": Vector3(-4.0, 0.7, 2.0), "size": Vector3(7.0, 1.4, 0.5)},
+	{"name": "DividerS", "kind": "cover", "center": Vector3(4.0, 0.7, -2.0),  "size": Vector3(7.0, 1.4, 0.5)},
 ]
 
 # ---- 大厅屋顶（3m 高实体感）----
@@ -145,7 +145,8 @@ static func _corner_walls() -> Array:
 		out.append({"name": n + "Wall_W", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
 	return out
 
-# ---- 角建筑内部矮墙 + 后半 1.2m 屋顶（屋顶内缩 0.5m 不顶外墙）----
+# ---- 角建筑内部（开放院落，无屋顶——室内 1.2m 屋顶下净高不足 1.83m 会卡玩家）----
+# 内部：两道 1.4m 隔断墙分割 3 个 CQB 区（不可跳）+ 贴墙 0.9m 箱堆（低掩体）
 static func _corner_interiors() -> Array:
 	var out := []
 	var corners := [
@@ -158,22 +159,36 @@ static func _corner_interiors() -> Array:
 		var n: String = c["name"]
 		var cx: float = c["cx"]
 		var cz: float = c["cz"]
-		# 内部矮墙（中央横隔，1.2m）
-		out.append({"name": n + "IntWall", "kind": "cover", "center": Vector3(cx, 0.6, cz - 1.5), "size": Vector3(10.0, 1.2, 0.5)})
-		# 后半 1.2m 屋顶（靠北侧，内缩 0.5m）
-		var roof_z := cz + 3.0
-		out.append({"name": n + "Roof", "kind": "roof", "center": Vector3(cx, 0.6, roof_z), "size": Vector3(11.0, 1.2, 6.0)})
+		# 两道 1.4m 隔断墙（把内部 14×13 分成 3 个 CQB 区）
+		out.append({"name": n + "IntWall1", "kind": "cover", "center": Vector3(cx, 0.7, cz - 3.5), "size": Vector3(10.0, 1.4, 0.5)})
+		out.append({"name": n + "IntWall2", "kind": "cover", "center": Vector3(cx, 0.7, cz + 2.5), "size": Vector3(10.0, 1.4, 0.5)})
+		# 贴外墙 0.9m 箱堆（低掩体，不可跳——0.9m 起跳仍会顶屋顶？无屋顶则室外可跳，但保持低矮避免挡视线）
+		out.append({"name": n + "IntBox1", "kind": "cover", "center": Vector3(cx - 5.0, 0.45, cz + 5.0), "size": Vector3(2.0, 0.9, 1.0)})
+		out.append({"name": n + "IntBox2", "kind": "cover", "center": Vector3(cx + 5.0, 0.45, cz - 5.0), "size": Vector3(2.0, 0.9, 1.0)})
 	return out
 
 # ---- 街道掩体（环形街道：西街 x∈[-16,-11]、东街 x∈[11,16]、北街 z∈[9,14]、南街 z∈[-14,-9]）----
+# 西/东街交火组件组（参考 dust2 mid / bloodstrike 街道掩体模式）：
+#   中央 1.2m 高台（室外可跳，压制街道/看路口）+ 两侧 0.9m 蹲掩体 + 横向 1.4m 隔断墙（分割通道）
 const COVERS := [
-	# 西街箱堆（1m 宽，贴墙，无窄缝）
-	{"name": "BoxW1", "kind": "cover", "center": Vector3(-14.5, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "BoxW2", "kind": "cover", "center": Vector3(-14.5, 0.45, 6), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "BoxW3", "kind": "cover", "center": Vector3(-13.0, 0.45, 0), "size": Vector3(1.0, 0.9, 1.0)},
-	# 东街集装箱（贴墙）
-	{"name": "ContainerE1", "kind": "cover", "center": Vector3(14.5, 1.1, -6), "size": Vector3(3.5, 2.2, 2.5)},
-	{"name": "ContainerE2", "kind": "cover", "center": Vector3(14.5, 1.1, 6), "size": Vector3(3.5, 2.2, 2.5)},
+	# ===== 西街（x∈[-16,-11]，5m 宽）=====
+	# 中央高台（可跳压制，z=±4.5 避开中央隔断墙）
+	{"name": "WestHigh1", "kind": "cover", "center": Vector3(-13.5, 0.6, -4.5), "size": Vector3(2.0, 1.2, 1.5)},
+	{"name": "WestHigh2", "kind": "cover", "center": Vector3(-13.5, 0.6, 4.5), "size": Vector3(2.0, 1.2, 1.5)},
+	# 贴西墙 0.9m 蹲掩体
+	{"name": "WestBox1", "kind": "cover", "center": Vector3(-14.5, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "WestBox2", "kind": "cover", "center": Vector3(-14.5, 0.45, 6), "size": Vector3(1.0, 0.9, 1.0)},
+	# 横向 1.4m 隔断墙（z∈[-1.5,1.5] 中央；高台在 z=±4.5 → 通道 3m）
+	{"name": "WestWall1", "kind": "cover", "center": Vector3(-14.5, 0.7, 0), "size": Vector3(1.0, 1.4, 3.0)},
+	# ===== 东街（x∈[11,16]，5m 宽）=====
+	# 中央高台（z=±4.5 避开中央隔断墙）
+	{"name": "EastHigh1", "kind": "cover", "center": Vector3(13.5, 0.6, -4.5), "size": Vector3(2.0, 1.2, 1.5)},
+	{"name": "EastHigh2", "kind": "cover", "center": Vector3(13.5, 0.6, 4.5), "size": Vector3(2.0, 1.2, 1.5)},
+	# 贴东墙 0.9m 蹲掩体
+	{"name": "EastBox1", "kind": "cover", "center": Vector3(14.5, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "EastBox2", "kind": "cover", "center": Vector3(14.5, 0.45, 6), "size": Vector3(1.0, 0.9, 1.0)},
+	# 横向 1.4m 隔断墙（z∈[-1.5,1.5] 中央）
+	{"name": "EastWall1", "kind": "cover", "center": Vector3(14.5, 0.7, 0), "size": Vector3(1.0, 1.4, 3.0)},
 	# 北街箱堆
 	{"name": "BoxN1", "kind": "cover", "center": Vector3(-4, 0.45, 11.5), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "BoxN2", "kind": "cover", "center": Vector3(4, 0.45, 11.5), "size": Vector3(1.0, 0.9, 1.0)},
