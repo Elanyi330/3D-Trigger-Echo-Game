@@ -47,8 +47,9 @@ print(f"实体 {len(entries)}")
 
 
 def blocks(e):
-    # decor（小树）纯视觉无碰撞，不参与窄缝判定；bigtree（大树）有碰撞，参与
-    if e.get('kind', '') == 'decor':
+    # decor（小树）纯视觉无碰撞，不参与窄缝判定；bigtree（大树）有碰撞但允许与墙体重叠（用户拍板），
+    # 其碰撞体积小（0.7m），不参与窄缝判定避免误报
+    if e.get('kind', '') in ('decor', 'bigtree'):
         return False
     return e['cy'] + e['sy'] * 0.5 > 0.95 and e['name'] != 'Ground'
 

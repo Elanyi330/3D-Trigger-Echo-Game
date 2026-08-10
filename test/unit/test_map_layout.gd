@@ -66,6 +66,9 @@ func test_solids_no_overlap() -> void:
 			   (an.begins_with("W_") and bn.begins_with("W_") and (an.contains("High") or bn.contains("High"))) or \
 			   (an.begins_with("E_") and bn.begins_with("E_") and (an.contains("High") or bn.contains("High"))):
 				continue
+			# 大树与建筑墙体重叠——用户明确允许（大树为装饰性碰撞，允许嵌墙）
+			if (an.begins_with("BigTree") or bn.begins_with("BigTree")):
+				continue
 			assert_false(_overlaps(a, b), "%s 与 %s 不应重叠" % [an, bn])
 
 

@@ -162,6 +162,43 @@ static func _corner_walls() -> Array:
 			out.append({"name": n + "Wall_W", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
 	return out
 
+# ---- 两侧街区建筑岛（恢复 2026-08-10——用户要求两侧建筑不可拆）----
+# 设计（参考地图设计原则：街区-街道-街区对枪纵深）：
+#   建筑岛 8×8m 贴边界墙 x=±25（x∈[-29,-21]/[21,29]），z∈[-11,-3]/[3,11]（4 个）
+#   与西/东街（x∈[-16,-11]）之间留 5m 宽通道——无窄缝
+#   每个建筑 2 扇门（东+西，3m 门洞居中）——铁律
+#   内部：1.4m 矮墙 + 1.2m 高台（两级可跳）
+static func _side_buildings() -> Array:
+	var out := []
+	var specs := [
+		{"name": "W_N", "cx": -25.0, "cz": -7.0},
+		{"name": "W_S", "cx": -25.0, "cz": 7.0},
+		{"name": "E_N", "cx": 25.0, "cz": -7.0},
+		{"name": "E_S", "cx": 25.0, "cz": 7.0},
+	]
+	for s in specs:
+		var n: String = s["name"]
+		var cx: float = s["cx"]
+		var cz: float = s["cz"]
+		var x0 := cx - 4.0   # 8m 宽
+		var x1 := cx + 4.0
+		var z0 := cz - 4.0   # 8m 深
+		var z1 := cz + 4.0
+		# 四面外墙：东+西各开 3m 门（双门铁律），南北实心
+		out.append({"name": n + "_WallN", "kind": "wall", "center": Vector3((x0+x1)*0.5, 1.5, z1-0.5), "size": Vector3(x1-x0, 3.0, 1)})
+		out.append({"name": n + "_WallS", "kind": "wall", "center": Vector3((x0+x1)*0.5, 1.5, z0+0.5), "size": Vector3(x1-x0, 3.0, 1)})
+		# 西墙（开门 2 段）
+		out.append({"name": n + "_WallW_T", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
+		out.append({"name": n + "_WallW_B", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
+		# 东墙（开门 2 段）
+		out.append({"name": n + "_WallE_T", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
+		out.append({"name": n + "_WallE_B", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
+		# 内部：1.4m 矮墙 + 1.2m 高台（两级）
+		out.append({"name": n + "_IntWall", "kind": "cover", "center": Vector3(cx, 0.7, cz-0.5), "size": Vector3(6.0, 1.4, 0.5)})
+		out.append({"name": n + "_HighBase", "kind": "cover", "center": Vector3(cx, 0.3, cz+2.5), "size": Vector3(1.5, 0.6, 1.2)})
+		out.append({"name": n + "_HighTop", "kind": "cover", "center": Vector3(cx, 0.9, cz+2.5), "size": Vector3(1.2, 0.6, 0.9)})
+	return out
+
 # ---- 角建筑内部（开放院落，无屋顶——室内 1.2m 屋顶下净高不足 1.83m 会卡玩家）----
 # 内部：两道 1.4m 隔断墙分割 3 个 CQB 区（不可跳）+ 贴墙 0.9m 箱堆（低掩体）
 static func _corner_interiors() -> Array:
@@ -258,20 +295,20 @@ const OUTER_CORRIDORS := [
 # 小树保持 decor 无碰撞（用户确认保留）。
 const BIG_TREES := [
 	# 西街外侧（x∈[-21,-18] 空地，西边界墙 -30）— 中心 y=1.25（树干从地面到 2.5m）
-	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-27.5, 1.25, -10), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW2", "kind": "bigtree", "center": Vector3(-27.5, 1.25, -3), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW3", "kind": "bigtree", "center": Vector3(-27.5, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-27.5, 1.25, 10), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-25.0, 1.25, 0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW2", "kind": "bigtree", "center": Vector3(-21.5, 1.25, -4.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW3", "kind": "bigtree", "center": Vector3(-21.5, 1.25, 4.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-25.0, 1.25, 8.0), "size": Vector3(0.7, 2.5, 0.7)},
 	# 东街外侧（x∈[18,21] 空地）
-	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(27.5, 1.25, -10), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE2", "kind": "bigtree", "center": Vector3(27.5, 1.25, -3), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(27.5, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(27.5, 1.25, 10), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(25.0, 1.25, 0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE2", "kind": "bigtree", "center": Vector3(21.5, 1.25, -4.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(21.5, 1.25, 4.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(25.0, 1.25, 8.0), "size": Vector3(0.7, 2.5, 0.7)},
 	# 南北带两侧（x=±15.5 空旷带）
-	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-24.0, 1.25, 12.0), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(24.0, 1.25, 12.0), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeS1", "kind": "bigtree", "center": Vector3(-24.0, 1.25, -12.0), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeS2", "kind": "bigtree", "center": Vector3(24.0, 1.25, -12.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, 18.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(15.5, 1.25, 18.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeS1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, -18.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeS2", "kind": "bigtree", "center": Vector3(15.5, 1.25, -18.0), "size": Vector3(0.7, 2.5, 0.7)},
 ]
 
 # ---- 两侧墙体碎片（西/东街 + 南北带补充短墙，形成更多交火位）----
@@ -357,6 +394,7 @@ static func all_solids() -> Array:
 	out.append_array(HALL_DOOR_FRAMES)
 	out.append_array(_corner_walls())
 	out.append_array(_corner_interiors())
+	out.append_array(_side_buildings())
 	out.append_array(COVERS)
 	out.append_array(GREENERY)
 	out.append_array(BIG_TREES)
