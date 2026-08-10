@@ -94,10 +94,10 @@
 
 - 文件：`Assets/Models/Characters/Soldier_Echo/Soldier_Echo.glb`；**自产**（`tools/render/build_character.py`）
 - 高 **1.83m（CS 站立 72u × 0.0254 = 1.8288m；2026-08 按 CS 身高统一缩放，因子 S≈1.0274）**，脚踩 z=0，面朝 **+Y（Blender）= −Z（Godot 前向）**；眼/脚尖朝前
-- **单一蒙皮网格 `Soldier_Echo_Body`**（所有部件 join 成一件，避免节点/骨骼同名冲突），每部件单骨顶点组绑定（防拉伸）
-- 换色：改网格材质 albedo（玩家绿 `(0.35,0.48,0.32)` / 敌人红 `(0.65,0.25,0.22)`；Enemy.gd 用 `material_override` 整体换色）
+- **两件蒙皮网格**（M1.75 拆分，共享同一骨架）：`Soldier_Echo_Body`（无头，4 面）+ `Soldier_Echo_Head`（头+眼，2 面）；每部件单骨顶点组绑定（防拉伸）。拆分目的：第一人称挂眼位相机时可隐藏头网格。
+- 换色：改网格材质 albedo（玩家绿 `(0.35,0.48,0.32)` / 敌人红 `(0.65,0.25,0.22)`；Enemy.gd 用 `material_override` 整体换色，两网格同换）
 - 命中判定（Enemy.gd，CS 比例对齐）：躯干胶囊（半径0.31/高1.54，中心 y+0.92，group `torso`）+ 头部球（半径0.16，y+1.70，group `head`，爆头 ×4）
-- **敌人持枪（M1.5）**：`Enemy.gd._equip_random_weapon()` 随机配一款武器——右臂前摆（`UpperArm_R` 局部 X -50°）+ 武器经 `BoneAttachment3D` 挂 `Hand_R`（GripRight=握把原点，真实尺寸，与角色比例统一）
+- **统一持枪（M1.75）**：`Character/GripRig.gd` 两骨 IK——方块手（`Hand_L/R`）精确到达武器 `_GripRight/_GripLeft` 标记；持握位姿从第一人称 `ViewModel.WEAPON_FRAME` 派生（第三人称向第一人称看齐）。`Enemy.gd` 经 GripRig 随机持枪（双手武器自动向中线收拢保左臂可达）。**第一人称 ViewModel 保持 M1.5 不动**（基准）。
 
 > **坐标注意**：下文骨骼/部件坐标表为 `build_character.py` 的**原始定义值**；GLB 实际值 = 这些 × **S≈1.0274**（CS 身高缩放）。
 
