@@ -88,6 +88,7 @@ func setup(manager: WeaponManager, move: MovementController) -> void:
 
 # 下半身自见：与 Soldier_Echo 同比例的骨盆/双腿/双脚，挂玩家（随 yaw、不随俯仰）。
 # 低头时看到自己的身体——第一人称与角色建模一致、不割裂。
+# M2：补全上半身（骨盆/躯干/头）——玩家低头可见完整身体，影子完整，AI 命中判定有据。
 func _build_body() -> void:
 	if movement == null:
 		return
@@ -97,12 +98,19 @@ func _build_body() -> void:
 	# 与角色同色（玩家绿）
 	var uniform := _body_mat(Color(0.35, 0.48, 0.32))
 	var uniform_dark := _body_mat(Color(0.245, 0.336, 0.224))
+	var skin := _body_mat(Color(0.85, 0.68, 0.55))
 	var boot := _body_mat(Color(0.15, 0.13, 0.12))
-	# 双腿（±X）+ 双脚（脚尖朝 -Z 前方）；不含骨盆/上躯干（贴相机太近会像堵墙）
+	# 双腿（±X）+ 双脚（脚尖朝 -Z 前方）
 	for sx in [0.11, -0.11]:
 		_body_box(body, Vector3(sx, 0.67, 0), Vector3(0.16, 0.38, 0.18), uniform_dark)  # 大腿
 		_body_box(body, Vector3(sx, 0.28, 0), Vector3(0.14, 0.40, 0.16), uniform)       # 小腿
 		_body_box(body, Vector3(sx, 0.04, -0.04), Vector3(0.14, 0.08, 0.26), boot)      # 脚（尖朝前）
+	# 骨盆（0.86-1.00 高度带）
+	_body_box(body, Vector3(0, 0.93, 0), Vector3(0.40, 0.14, 0.24), uniform_dark)
+	# 躯干（1.00-1.46 高度带，胸/腹）——相机在眼位 1.63，低头可见躯干
+	_body_box(body, Vector3(0, 1.23, 0), Vector3(0.42, 0.46, 0.24), uniform)
+	# 头（1.52-1.78 高度带）——低头可见头顶/额头
+	_body_box(body, Vector3(0, 1.65, 0.02), Vector3(0.26, 0.26, 0.26), skin)
 	movement.add_child(body)
 
 

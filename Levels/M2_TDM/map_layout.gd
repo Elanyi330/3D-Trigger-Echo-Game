@@ -199,6 +199,32 @@ const COVERS := [
 	{"name": "CarM1", "kind": "cover", "center": Vector3(0, 0.65, -16), "size": Vector3(4.0, 1.3, 1.2)},
 ]
 
+# ---- 街道绿化/零散组件（用户：两侧太空——植物/矮墙碎片填充，营造城市感 + 散点掩体）----
+const GREENERY := [
+	# 西街外侧（x≈-17.5，贴西边界墙）：树/花坛/长凳
+	{"name": "TreeW1", "kind": "cover", "center": Vector3(-18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeW2", "kind": "cover", "center": Vector3(-18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "PlanterW1", "kind": "cover", "center": Vector3(-17.0, 0.5, -5), "size": Vector3(1.2, 1.0, 1.2)},
+	{"name": "PlanterW2", "kind": "cover", "center": Vector3(-17.0, 0.5, 5), "size": Vector3(1.2, 1.0, 1.2)},
+	{"name": "BenchW1", "kind": "cover", "center": Vector3(-17.0, 0.4, 0), "size": Vector3(1.6, 0.8, 0.6)},
+	# 东街外侧（x≈17.5，贴东边界墙）
+	{"name": "TreeE1", "kind": "cover", "center": Vector3(18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeE2", "kind": "cover", "center": Vector3(18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "PlanterE1", "kind": "cover", "center": Vector3(17.0, 0.5, -5), "size": Vector3(1.2, 1.0, 1.2)},
+	{"name": "PlanterE2", "kind": "cover", "center": Vector3(17.0, 0.5, 5), "size": Vector3(1.2, 1.0, 1.2)},
+	{"name": "BenchE1", "kind": "cover", "center": Vector3(17.0, 0.4, 0), "size": Vector3(1.6, 0.8, 0.6)},
+	# 北街/南街绿化（稀疏点缀）
+	{"name": "TreeN1", "kind": "cover", "center": Vector3(-8, 1.0, 13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeN2", "kind": "cover", "center": Vector3(8, 1.0, 13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeS1", "kind": "cover", "center": Vector3(-8, 1.0, -13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeS2", "kind": "cover", "center": Vector3(8, 1.0, -13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	# 大厅四角外散碎矮墙（0.9m 掩体碎片，填空白）
+	{"name": "Scrap1", "kind": "cover", "center": Vector3(-13, 0.45, -11), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "Scrap2", "kind": "cover", "center": Vector3(13, 0.45, -11), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "Scrap3", "kind": "cover", "center": Vector3(-13, 0.45, 11), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "Scrap4", "kind": "cover", "center": Vector3(13, 0.45, 11), "size": Vector3(1.0, 0.9, 1.0)},
+]
+
 # ---- 紧凑出生区（8×8：x∈[-6,6], z∈[21,29] / z∈[-29,-21]）----
 const SPAWNS := [
 	{"name": "SpawnN", "kind": "spawn", "center": Vector3(0, 0, 25), "facing": "S"},
@@ -228,6 +254,7 @@ static func all_solids() -> Array:
 	out.append_array(_corner_walls())
 	out.append_array(_corner_interiors())
 	out.append_array(COVERS)
+	out.append_array(GREENERY)
 	out.append_array(SPAWN_WALLS)
 	out.append_array(SPAWN_COVERS)
 	return out
