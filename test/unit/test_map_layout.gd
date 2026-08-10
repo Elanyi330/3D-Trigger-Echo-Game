@@ -73,10 +73,12 @@ func test_solids_no_overlap() -> void:
 func _is_wall_corner(an: String, bn: String) -> bool:
 	var a_wall := an.ends_with("Wall_N") or an.ends_with("Wall_S") or an.ends_with("Wall_E") \
 		or an.ends_with("Wall_W") or an.ends_with("Wall_E_T") or an.ends_with("Wall_E_B") \
+		or an.ends_with("Wall_W_T") or an.ends_with("Wall_W_B") \
 		or an.ends_with("Wall_S_L") or an.ends_with("Wall_S_R") or an.ends_with("Wall_N_L") \
 		or an.ends_with("Wall_N_R")
 	var b_wall := bn.ends_with("Wall_N") or bn.ends_with("Wall_S") or bn.ends_with("Wall_E") \
 		or bn.ends_with("Wall_W") or bn.ends_with("Wall_E_T") or bn.ends_with("Wall_E_B") \
+		or bn.ends_with("Wall_W_T") or bn.ends_with("Wall_W_B") \
 		or bn.ends_with("Wall_S_L") or bn.ends_with("Wall_S_R") or bn.ends_with("Wall_N_L") \
 		or bn.ends_with("Wall_N_R")
 	if not (a_wall and b_wall):
@@ -99,6 +101,39 @@ func test_hall_dimensions() -> void:
 		var d: Dictionary = d0
 		var gap: float = d.get("gap_x", d.get("gap_z", 0.0))
 		assert_gte(gap, LAYOUT.DOOR_MIN, "%s 门宽 ≥2m" % d["name"])
+
+
+# ---- §11.3b: 铁律——每个建筑至少 2 个门（用户明确要求：单门封闭盒子无博弈性）----
+func test_every_building_has_two_doors() -> void:
+	# 建筑岛：西侧建筑(W_N/W_S)东西墙各开门，东侧(E_N/E_S)东西墙各开门 → 2 门
+	for pref in ["W_N", "W_S", "E_N", "E_S"]:
+		var door_walls := 0
+		for e in _solids():
+			var n: String = e["name"]
+			if n.begins_with(pref + "_Wall"):
+				# 有 _T/_B 后缀 = 该墙是开门分段（门洞）
+				if n.ends_with("_T") or n.ends_with("_B"):
+					door_walls += 1
+		# 每扇门 = 2 段（T+B）→ 2 扇门 = 4 段
+		assert_eq(door_walls, 4, "%s 建筑应有 2 扇门（4 段墙）" % pref)
+	# 角建筑：2 门（生成函数验证——门朝中心的两面墙分段；墙名如 NEWall_S_L 无下划线）
+	for pref in ["NW", "NE", "SW", "SE"]:
+		var door_walls := 0
+		for e in _solids():
+			var n: String = e["name"]
+			if n.begins_with(pref + "Wall"):
+				if n.ends_with("_T") or n.ends_with("_B") or n.ends_with("_L") or n.ends_with("_R"):
+					door_walls += 1
+		assert_gte(door_walls, 4, "%s 角建筑应有 2 扇门" % pref)
+	# 出生建筑：左右 2 门（东西墙分段）
+	for pref in ["SpawnB_N", "SpawnB_S"]:
+		var door_walls := 0
+		for e in _solids():
+			var n: String = e["name"]
+			if n.begins_with(pref + "_WallW") or n.begins_with(pref + "_WallE"):
+				if n.ends_with("_T") or n.ends_with("_B"):
+					door_walls += 1
+		assert_eq(door_walls, 4, "%s 出生建筑应有 2 扇门" % pref)
 
 
 # ---- §11.4: jumpable surfaces ≤1.3m（角建筑屋顶 1.2m 可跳；大厅 3m 不可跳）----

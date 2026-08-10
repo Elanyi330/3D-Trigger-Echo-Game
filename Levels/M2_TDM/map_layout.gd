@@ -130,14 +130,20 @@ static func _corner_walls() -> Array:
 		var x1 := cx + 7.0   # 外廓东沿
 		var z0 := cz - 7.5   # 外廓南沿
 		var z1 := cz + 7.5   # 外廓北沿
-		# 门朝向（朝地图中心的两面）
-		var door_e := n.contains("W")   # NW/SW 东墙开门（朝东街）
-		var door_s := n.contains("N")   # NW/NE 南墙开门（朝南街）
-		# --- 北墙（z1，横跨 x0..x1）---
-		out.append({"name": n + "Wall_N", "kind": "wall", "center": Vector3((x0 + x1) * 0.5, 1.5, z1 - 0.5), "size": Vector3(x1 - x0, 3.0, 1)})
+		# 铁律（用户）：每个建筑至少 2 个门——朝地图中心的两面各开 1 门（3m 门洞居中）。
+		# 门朝向：NW 开东+南、NE 开西+南、SW 开东+北、SE 开西+北
+		var door_e := n == "NW" or n == "SW"   # 东墙开门（朝东街）
+		var door_w := n == "NE" or n == "SE"   # 西墙开门（朝西街）
+		var door_s := n == "NW" or n == "NE"   # 南墙开门（朝南街）
+		var door_n := n == "SW" or n == "SE"   # 北墙开门（朝北街）
+		# --- 北墙（z1，若开门则分两段）---
+		if door_n:
+			out.append({"name": n + "Wall_N_L", "kind": "wall", "center": Vector3((x0 + cx - 1.5) * 0.5, 1.5, z1 - 0.5), "size": Vector3((cx - 1.5) - x0, 3.0, 1)})
+			out.append({"name": n + "Wall_N_R", "kind": "wall", "center": Vector3((cx + 1.5 + x1) * 0.5, 1.5, z1 - 0.5), "size": Vector3(x1 - (cx + 1.5), 3.0, 1)})
+		else:
+			out.append({"name": n + "Wall_N", "kind": "wall", "center": Vector3((x0 + x1) * 0.5, 1.5, z1 - 0.5), "size": Vector3(x1 - x0, 3.0, 1)})
 		# --- 南墙（z0，若开门则分两段）---
 		if door_s:
-			# 门洞 3m：x∈[cx-1.5, cx+1.5]
 			out.append({"name": n + "Wall_S_L", "kind": "wall", "center": Vector3((x0 + cx - 1.5) * 0.5, 1.5, z0 + 0.5), "size": Vector3((cx - 1.5) - x0, 3.0, 1)})
 			out.append({"name": n + "Wall_S_R", "kind": "wall", "center": Vector3((cx + 1.5 + x1) * 0.5, 1.5, z0 + 0.5), "size": Vector3(x1 - (cx + 1.5), 3.0, 1)})
 		else:
@@ -148,8 +154,12 @@ static func _corner_walls() -> Array:
 			out.append({"name": n + "Wall_E_B", "kind": "wall", "center": Vector3(x1 - 0.5, 1.5, (z0 + cz - 1.5) * 0.5), "size": Vector3(1, 3.0, (cz - 1.5) - z0)})
 		else:
 			out.append({"name": n + "Wall_E", "kind": "wall", "center": Vector3(x1 - 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
-		# --- 西墙（x0）---
-		out.append({"name": n + "Wall_W", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
+		# --- 西墙（x0，若开门则分两段）---
+		if door_w:
+			out.append({"name": n + "Wall_W_T", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (cz + 1.5 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - (cz + 1.5))})
+			out.append({"name": n + "Wall_W_B", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (z0 + cz - 1.5) * 0.5), "size": Vector3(1, 3.0, (cz - 1.5) - z0)})
+		else:
+			out.append({"name": n + "Wall_W", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
 	return out
 
 # ---- 角建筑内部（开放院落，无屋顶——室内 1.2m 屋顶下净高不足 1.83m 会卡玩家）----
@@ -268,24 +278,18 @@ static func _side_buildings() -> Array:
 		var x1 := cx + 6.0
 		var z0 := cz - 4.0   # 8m 深
 		var z1 := cz + 4.0
-		# 四面外墙（门洞朝地图中心：西侧建筑东墙开门，东侧建筑西墙开门）
-		var door_east := n.begins_with("W")   # 西侧建筑门朝东（面向街道）
-		var door_west := n.begins_with("E")   # 东侧建筑门朝西
-		# 北墙
+		# 铁律（用户）：每个建筑至少 2 个门——东西相对两面各开 1 门（门洞 3m 居中），
+		# 保证穿行/绕后/夹击的博弈性，杜绝单门封闭盒子。南北墙实心。
+		# 北墙（实心）
 		out.append({"name": n + "_WallN", "kind": "wall", "center": Vector3((x0+x1)*0.5, 1.5, z1-0.5), "size": Vector3(x1-x0, 3.0, 1)})
-		# 南墙
+		# 南墙（实心）
 		out.append({"name": n + "_WallS", "kind": "wall", "center": Vector3((x0+x1)*0.5, 1.5, z0+0.5), "size": Vector3(x1-x0, 3.0, 1)})
-		# 西墙
-		out.append({"name": n + "_WallW", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (z0+z1)*0.5), "size": Vector3(1, 3.0, z1-z0)})
-		# 东墙（开门则分两段，门洞 3m 居中）
-		if door_east:
-			out.append({"name": n + "_WallE_T", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
-			out.append({"name": n + "_WallE_B", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
-		else:
-			out.append({"name": n + "_WallE", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (z0+z1)*0.5), "size": Vector3(1, 3.0, z1-z0)})
-		if door_west:
-			out.append({"name": n + "_WallW_T", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
-			out.append({"name": n + "_WallW_B", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
+		# 西墙（开门，2 段）
+		out.append({"name": n + "_WallW_T", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
+		out.append({"name": n + "_WallW_B", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
+		# 东墙（开门，2 段）
+		out.append({"name": n + "_WallE_T", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
+		out.append({"name": n + "_WallE_B", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
 		# 内部：1.4m 矮墙（横向分割）+ 1.2m 高台（两级，可跳压制）
 		out.append({"name": n + "_IntWall", "kind": "cover", "center": Vector3(cx, 0.7, cz-0.5), "size": Vector3(9.0, 1.4, 0.5)})
 		out.append({"name": n + "_HighBase", "kind": "cover", "center": Vector3(cx, 0.3, cz+2.5), "size": Vector3(2.0, 0.6, 1.5)})
