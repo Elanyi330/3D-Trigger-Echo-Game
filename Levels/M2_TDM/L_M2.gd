@@ -62,6 +62,11 @@ func _setup_weapons() -> void:
 		slots.append(r)
 	_manager.setup(slots, _player)
 	_manager.set_head(_head)
+	# 开火即刷新弹药 HUD（WeaponManager 不在逐发时发 ammo 信号——L_Main 同款修复）
+	for i in slots.size():
+		var c := _manager.get_core(i)
+		if c:
+			c.shot_fired.connect(func(_a: int) -> void: _refresh_hud())
 	_view = WeaponView.new()
 	_view.name = "WeaponView"
 	_head.add_child(_view)
@@ -143,7 +148,7 @@ func _on_enemy_hit() -> void:
 
 
 func _refresh_hud() -> void:
-	if _manager == null:
+	if _manager == null or _ammo_label == null:
 		return
 	var slot := _manager.get_current_slot()
 	var core := _manager.get_core(slot)
