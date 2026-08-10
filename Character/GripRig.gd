@@ -40,7 +40,8 @@ func _style_for(weapon_name: String) -> Dictionary:
 	var f: Dictionary = VM.WEAPON_FRAME.get(weapon_name, {})
 	var off: Vector3 = f.get("offset", DEFAULT_OFFSET)
 	var rot: Vector3 = f.get("rot", Vector3.ZERO)
-	return {"pos": Vector3(-off.x, EYE_Y + off.y, off.z), "rot": rot}
+	# 相机空间 right=+ → 角色空间：解剖右=+X（资产已修正镜像），故 x 取 +off.x。
+	return {"pos": Vector3(off.x, EYE_Y + off.y, off.z), "rot": rot}
 
 var _skel: Skeleton3D
 var _mount: Node3D
@@ -163,8 +164,8 @@ func _solve_arm(side: String, target: Vector3) -> void:
 	var dir := to_t.normalized()
 	var a := (L1 * L1 - L2 * L2 + dist * dist) / (2.0 * dist)
 	var h := sqrt(maxf(L1 * L1 - a * a, 0.0))
-	# 极向（肘弯方向）：向下 + 向外侧 + 略向后，自然持枪肘姿
-	var out_x := -0.35 if side == "R" else 0.35
+	# 极向（肘弯方向）：向下 + 向外侧 + 略向后，自然持枪肘姿（解剖右=+X）
+	var out_x := 0.35 if side == "R" else -0.35
 	var pole_target := S + Vector3(out_x, -0.45, 0.20)
 	var pole_vec := pole_target - S
 	var perp := pole_vec - dir * pole_vec.dot(dir)
