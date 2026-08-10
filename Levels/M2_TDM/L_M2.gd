@@ -32,18 +32,11 @@ var _enemies: Array[Enemy] = []
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	# 灰盒地图
+	# 灰盒地图（纯灰盒——Kenney 平铺方向错误导致视觉更差，已回退；视觉重做放 T5）
 	var gb: Node3D = GREYBOX.new()
 	gb.name = "Greybox"
 	add_child(gb)
 	gb.build()
-	# 视觉装饰层（Kenney CC0 模型覆盖灰盒表面，问题B）
-	var vis: Node3D = VISUALS.new()
-	vis.name = "Visuals"
-	add_child(vis)
-	vis.build_visuals()
-	# 视觉层覆盖后隐藏灰盒网格（保留碰撞）——消灭 Z-fighting 闪烁
-	gb.hide_meshes()
 	# 玩家（Player.tscn：MovementController + Head + Crouch）
 	_player = load("res://Player/Player.tscn").instantiate()
 	_player.name = "Player"
