@@ -132,12 +132,13 @@ func _body_mat(c: Color) -> StandardMaterial3D:
 
 
 # 虚化身体材质（用户：低头看自己躯干/脚应半透明，方便看路不挡视野）
+# 注意：TRANSPARENCY_ALPHA 禁用阴影投射（玩家影子消失）→ 改用 ALPHA_HASH（半透明 + 可投射阴影）
 func _ghost_body_mat(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	var ghost := c
 	ghost.a = 0.35  # 半透明 35%
 	m.albedo_color = ghost
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH  # 半透明 + 可投射阴影
 	m.roughness = 0.8
 	return m
 

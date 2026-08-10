@@ -61,6 +61,11 @@ func test_solids_no_overlap() -> void:
 			if (an.begins_with("SpawnB") and bn.begins_with("SpawnB")) or \
 			   (bn.begins_with("SpawnB") and an.begins_with("SpawnB")):
 				continue
+			# 建筑岛：同建筑墙段角落相接 + 高台贴墙（结构正常）——豁免
+			if (an.contains("_Wall") and bn.contains("_Wall") and an.get_slice("_", 0) == bn.get_slice("_", 0)) or \
+			   (an.begins_with("W_") and bn.begins_with("W_") and (an.contains("High") or bn.contains("High"))) or \
+			   (an.begins_with("E_") and bn.begins_with("E_") and (an.contains("High") or bn.contains("High"))):
+				continue
 			assert_false(_overlaps(a, b), "%s 与 %s 不应重叠" % [an, bn])
 
 

@@ -211,14 +211,10 @@ const COVERS := [
 # ---- 街道绿化/零散组件（用户：两侧太空——植物/矮墙碎片填充，营造城市感 + 散点掩体）----
 const GREENERY := [
 	# 西街外侧（x≈-17.5，贴西边界墙）：树/花坛/长凳
-	{"name": "TreeW1", "kind": "decor", "center": Vector3(-18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeW2", "kind": "decor", "center": Vector3(-18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
 	{"name": "PlanterW1", "kind": "cover", "center": Vector3(-17.0, 0.5, -5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "PlanterW2", "kind": "cover", "center": Vector3(-17.0, 0.5, 5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "BenchW1", "kind": "cover", "center": Vector3(-17.0, 0.4, 0), "size": Vector3(1.6, 0.8, 0.6)},
 	# 东街外侧（x≈17.5，贴东边界墙）
-	{"name": "TreeE1", "kind": "decor", "center": Vector3(18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeE2", "kind": "decor", "center": Vector3(18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
 	{"name": "PlanterE1", "kind": "cover", "center": Vector3(17.0, 0.5, -5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "PlanterE2", "kind": "cover", "center": Vector3(17.0, 0.5, 5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "BenchE1", "kind": "cover", "center": Vector3(17.0, 0.4, 0), "size": Vector3(1.6, 0.8, 0.6)},
@@ -239,45 +235,77 @@ const GREENERY := [
 # 每侧 2 段 6m 长 3m 高大墙，段间留 4m 通道。
 const SIDE_BIG_WALLS := [
 	# 西街外侧大墙（x=-23）
-	{"name": "BigWallW1", "kind": "wall", "center": Vector3(-23.0, 1.5, -4.0), "size": Vector3(1.0, 3.0, 6.0)},
-	{"name": "BigWallW2", "kind": "wall", "center": Vector3(-23.0, 1.5, 4.0), "size": Vector3(1.0, 3.0, 6.0)},
 	# 东街外侧大墙（x=23）
-	{"name": "BigWallE1", "kind": "wall", "center": Vector3(23.0, 1.5, -4.0), "size": Vector3(1.0, 3.0, 6.0)},
-	{"name": "BigWallE2", "kind": "wall", "center": Vector3(23.0, 1.5, 4.0), "size": Vector3(1.0, 3.0, 6.0)},
 	# 南北带大墙（z=±14.5，x∈[-13.5,-9.5]/[9.5,13.5]——远离矮墙 NMidWall4(z=16.5,x=12) 缝 1.75m）
-	{"name": "BigWallN1", "kind": "wall", "center": Vector3(-11.5, 1.5, 14.5), "size": Vector3(4.0, 3.0, 1.0)},
-	{"name": "BigWallN2", "kind": "wall", "center": Vector3(11.5, 1.5, 14.5), "size": Vector3(4.0, 3.0, 1.0)},
-	{"name": "BigWallS1", "kind": "wall", "center": Vector3(-11.5, 1.5, -14.5), "size": Vector3(4.0, 3.0, 1.0)},
-	{"name": "BigWallS2", "kind": "wall", "center": Vector3(11.5, 1.5, -14.5), "size": Vector3(4.0, 3.0, 1.0)},
 ]
 
 # ---- 外环走廊（地图设计原则①：外环线——最外侧应有可走的战术走廊，任何两点可绕外环转点）----
 # 西/东边界带（x≈±27）各 3 段 3m 高墙，段间 4m 缺口——形成之字形外环走廊，与大树交错。
 const OUTER_CORRIDORS := [
 	# 西外侧（x=-27，走廊在 x∈[-30.5,-27.5] 宽 3m）
-	{"name": "OuterWallW1", "kind": "wall", "center": Vector3(-27.0, 1.5, -9.0), "size": Vector3(1.0, 3.0, 5.0)},
-	{"name": "OuterWallW2", "kind": "wall", "center": Vector3(-27.0, 1.5, 0.0), "size": Vector3(1.0, 3.0, 5.0)},
-	{"name": "OuterWallW3", "kind": "wall", "center": Vector3(-27.0, 1.5, 9.0), "size": Vector3(1.0, 3.0, 5.0)},
 	# 东外侧（x=27）
-	{"name": "OuterWallE1", "kind": "wall", "center": Vector3(27.0, 1.5, -9.0), "size": Vector3(1.0, 3.0, 5.0)},
-	{"name": "OuterWallE2", "kind": "wall", "center": Vector3(27.0, 1.5, 0.0), "size": Vector3(1.0, 3.0, 5.0)},
-	{"name": "OuterWallE3", "kind": "wall", "center": Vector3(27.0, 1.5, 9.0), "size": Vector3(1.0, 3.0, 5.0)},
 ]
+
+# ---- 两侧街区建筑岛（大改：两侧从"空地+散件"升级为街区——每侧 2 个 12×8m 建筑岛）----
+# 建筑岛：3m 外墙（2 门洞）+ 内部 1.4m 矮墙（分割）+ 1.2m 高台（可跳压制）。
+# 位置：西侧 x∈[-27,-15] 带 z=±12；东侧对称。形成"街区-街道-街区"的对枪纵深。
+static func _side_buildings() -> Array:
+	var out := []
+	# 建筑岛（8×8m）放南北带外侧 x∈[-25,-17]/[17,25]、z∈[-11,-3]/[3,11]
+	# 避开：角建筑(x∈[-30,-16]/[16,30] z∈[-29,-14]/[14,29])缝 3m、
+	#       街道(x∈[-16,-11]/[11,16])缝 1m、大厅(x∈[-10.5,10.5])缝 6.5m
+	var specs := [
+		{"name": "W_N", "cx": -21.0, "cz": -7.0},
+		{"name": "W_S", "cx": -21.0, "cz": 7.0},
+		{"name": "E_N", "cx": 21.0, "cz": -7.0},
+		{"name": "E_S", "cx": 21.0, "cz": 7.0},
+	]
+	for s in specs:
+		var n: String = s["name"]
+		var cx: float = s["cx"]
+		var cz: float = s["cz"]
+		var x0 := cx - 6.0   # 12m 宽
+		var x1 := cx + 6.0
+		var z0 := cz - 4.0   # 8m 深
+		var z1 := cz + 4.0
+		# 四面外墙（门洞朝地图中心：西侧建筑东墙开门，东侧建筑西墙开门）
+		var door_east := n.begins_with("W")   # 西侧建筑门朝东（面向街道）
+		var door_west := n.begins_with("E")   # 东侧建筑门朝西
+		# 北墙
+		out.append({"name": n + "_WallN", "kind": "wall", "center": Vector3((x0+x1)*0.5, 1.5, z1-0.5), "size": Vector3(x1-x0, 3.0, 1)})
+		# 南墙
+		out.append({"name": n + "_WallS", "kind": "wall", "center": Vector3((x0+x1)*0.5, 1.5, z0+0.5), "size": Vector3(x1-x0, 3.0, 1)})
+		# 西墙
+		out.append({"name": n + "_WallW", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (z0+z1)*0.5), "size": Vector3(1, 3.0, z1-z0)})
+		# 东墙（开门则分两段，门洞 3m 居中）
+		if door_east:
+			out.append({"name": n + "_WallE_T", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
+			out.append({"name": n + "_WallE_B", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
+		else:
+			out.append({"name": n + "_WallE", "kind": "wall", "center": Vector3(x1-0.5, 1.5, (z0+z1)*0.5), "size": Vector3(1, 3.0, z1-z0)})
+		if door_west:
+			out.append({"name": n + "_WallW_T", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (cz+1.5+z1)*0.5), "size": Vector3(1, 3.0, z1-(cz+1.5))})
+			out.append({"name": n + "_WallW_B", "kind": "wall", "center": Vector3(x0+0.5, 1.5, (z0+cz-1.5)*0.5), "size": Vector3(1, 3.0, (cz-1.5)-z0)})
+		# 内部：1.4m 矮墙（横向分割）+ 1.2m 高台（两级，可跳压制）
+		out.append({"name": n + "_IntWall", "kind": "cover", "center": Vector3(cx, 0.7, cz-0.5), "size": Vector3(9.0, 1.4, 0.5)})
+		out.append({"name": n + "_HighBase", "kind": "cover", "center": Vector3(cx, 0.3, cz+2.5), "size": Vector3(2.0, 0.6, 1.5)})
+		out.append({"name": n + "_HighTop", "kind": "cover", "center": Vector3(cx, 0.9, cz+2.5), "size": Vector3(1.6, 0.6, 1.1)})
+	return out
 
 # ---- 两侧交火区加粗（用户：左右两侧太空——加大树（有碰撞）+ 墙体碎片）----
 # 大树 = kind "bigtree"：有碰撞体积（Box 0.7×2.5×0.7 近似树干），视觉树干+树冠。
 # 小树保持 decor 无碰撞（用户确认保留）。
 const BIG_TREES := [
 	# 西街外侧（x∈[-21,-18] 空地，西边界墙 -30）— 中心 y=1.25（树干从地面到 2.5m）
-	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-19.0, 1.25, -7), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW2", "kind": "bigtree", "center": Vector3(-20.5, 1.25, -2), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW3", "kind": "bigtree", "center": Vector3(-19.0, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-20.5, 1.25, 8), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-27.5, 1.25, -10), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW2", "kind": "bigtree", "center": Vector3(-27.5, 1.25, -3), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW3", "kind": "bigtree", "center": Vector3(-27.5, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-27.5, 1.25, 10), "size": Vector3(0.7, 2.5, 0.7)},
 	# 东街外侧（x∈[18,21] 空地）
-	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(19.0, 1.25, -7), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE2", "kind": "bigtree", "center": Vector3(20.5, 1.25, -2), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(19.0, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(20.5, 1.25, 8), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(27.5, 1.25, -10), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE2", "kind": "bigtree", "center": Vector3(27.5, 1.25, -3), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(27.5, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(27.5, 1.25, 10), "size": Vector3(0.7, 2.5, 0.7)},
 	# 南北带两侧（x=±15.5 空旷带）
 	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-24.0, 1.25, 12.0), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(24.0, 1.25, 12.0), "size": Vector3(0.7, 2.5, 0.7)},
@@ -374,6 +402,7 @@ static func all_solids() -> Array:
 	out.append_array(HALL_DOOR_FRAMES)
 	out.append_array(_corner_walls())
 	out.append_array(_corner_interiors())
+	out.append_array(_side_buildings())
 	out.append_array(COVERS)
 	out.append_array(GREENERY)
 	out.append_array(BIG_TREES)

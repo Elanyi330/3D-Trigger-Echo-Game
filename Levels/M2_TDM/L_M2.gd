@@ -22,6 +22,7 @@ const LAYOUT := preload("res://Levels/M2_TDM/map_layout.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 
 @export var enemy_count := 10   # 随机撒敌人数量（验收可调）
+@export var range_mode := true  # 测试模式：枪械备弹无限（弹匣有限正常换弹）+ 手雷无限（投完切回主武器但可再切回投）
 
 var _player: CharacterBody3D
 var _head: Node3D
@@ -62,6 +63,17 @@ func _setup_weapons() -> void:
 		slots.append(r)
 	_manager.setup(slots, _player)
 	_manager.set_head(_head)
+	if range_mode:
+		# 测试模式（L_Main 同款）：枪械备弹无限（弹匣有限正常换弹）；手雷无限（投完自动切回主武器，可再切回投）
+		for i in slots.size():
+			var core := _manager.get_core(i)
+			if core == null:
+				continue
+			var res := _manager.get_resource(i)
+			if res.fire_mode == WeaponResource.FireMode.THROWABLE:
+				core.infinite_ammo = true  # 手雷无限（投出后 refund 回 1 枚）
+			elif res.fire_mode != WeaponResource.FireMode.MELEE:
+				core.infinite_reserve = true  # 枪械备弹无限、弹匣有限
 	# 开火即刷新弹药 HUD（WeaponManager 不在逐发时发 ammo 信号——L_Main 同款修复）
 	for i in slots.size():
 		var c := _manager.get_core(i)
