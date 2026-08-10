@@ -70,11 +70,11 @@ P("Eye_L", (-0.06, 0.135, 1.68), (0.045, 0.02, 0.06), EYE, "Head")
 P("Eye_R", (0.06, 0.135, 1.68), (0.045, 0.02, 0.06), EYE, "Head")
 # M1.75 修正左右手镜像：角色面朝 -Z(Godot) 时解剖右侧=+X，故 _R 骨/网格放 +X。
 # 精细化比例：手缩小、手臂略细，避免方块手吞没真实尺寸武器。
-# arms: shoulder z=1.42, elbow z=1.10, wrist z=0.80, hand 0.70-0.80
+# arms: shoulder z=1.42, elbow z=1.10, wrist z=0.80。
+# M1.75：不渲染手盒（用户：手方块吞没武器）——Hand 骨骼保留供 GripRig IK/挂枪，仅去掉可见手网格。
 for s, sx in [("L", -0.265), ("R", 0.265)]:
     P("UpperArm_"+s, (sx, 0, 1.26), (0.10, 0.12, 0.34), UNIFORM, "UpperArm_"+s)
     P("Forearm_"+s,  (sx, 0, 0.95), (0.09, 0.10, 0.30), UNIFORM_DARK, "Forearm_"+s)
-    P("Hand_"+s,     (sx, 0.0, 0.735), (0.085, 0.095, 0.11), SKIN, "Hand_"+s)
 # legs: hip z=0.86, knee z=0.48, ankle z=0.08
 for s, sx in [("L", -0.11), ("R", 0.11)]:
     P("UpperLeg_"+s, (sx, 0, 0.67), (0.16, 0.18, 0.38), UNIFORM_DARK, "UpperLeg_"+s)
