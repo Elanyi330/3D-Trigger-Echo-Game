@@ -23,9 +23,12 @@ func build() -> void:
 		return
 	built = true
 	for e in LAYOUT.all_solids():
-		# decor（树等纯视觉装饰）不生成碰撞——只生成无碰撞网格
-		if e.get("kind", "cover") == "decor":
+		var kind: String = e.get("kind", "cover")
+		if kind == "decor":
 			_spawn_decor(e)
+			continue
+		if kind == "bigtree":
+			_spawn_big_tree(e)
 			continue
 		_spawn_solid(e)
 
@@ -80,7 +83,48 @@ func _color_for(kind: String) -> Color:
 			return MAT_COVER
 
 
-# 装饰（树/植物）：无碰撞纯视觉——树干圆柱 + 树冠球
+# 大树（有碰撞体积——用户要求）：StaticBody 树干碰撞（0.7m 见方高 2.5m）+ 树冠视觉球
+func _spawn_big_tree(e: Dictionary) -> void:
+	var c: Vector3 = e["center"]
+	var s: Vector3 = e["size"]
+	var body := StaticBody3D.new()
+	body.name = e["name"]
+	body.collision_layer = 1
+	body.collision_mask = 0
+	add_child(body)
+	# 树干碰撞（Box 近似树干）
+	var col := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = s
+	col.shape = box
+	col.position = Vector3(0, s.y * 0.5, 0)  # 树干从地面到 2.5m
+	body.add_child(col)
+	body.global_position = c
+	# 视觉：树干圆柱 + 大树冠球
+	var trunk := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.3
+	cyl.bottom_radius = 0.4
+	cyl.height = s.y
+	trunk.mesh = cyl
+	var trunk_mat := StandardMaterial3D.new()
+	trunk_mat.albedo_color = Color(0.4, 0.28, 0.15)
+	trunk.material_override = trunk_mat
+	trunk.position = Vector3(0, s.y * 0.5, 0)
+	body.add_child(trunk)
+	var crown := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 1.6
+	sph.height = 3.2
+	crown.mesh = sph
+	var crown_mat := StandardMaterial3D.new()
+	crown_mat.albedo_color = Color(0.15, 0.55, 0.2)
+	crown.material_override = crown_mat
+	crown.position = Vector3(0, s.y + 1.0, 0)
+	body.add_child(crown)
+
+
+# 装饰（小树/植物）：无碰撞纯视觉——树干圆柱 + 树冠球
 func _spawn_decor(e: Dictionary) -> void:
 	var c: Vector3 = e["center"]
 	var s: Vector3 = e["size"]

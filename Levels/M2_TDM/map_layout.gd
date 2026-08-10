@@ -234,6 +234,45 @@ const GREENERY := [
 	{"name": "Scrap4", "kind": "cover", "center": Vector3(13, 0.45, 11), "size": Vector3(1.0, 0.9, 1.0)},
 ]
 
+# ---- 两侧交火区加粗（用户：左右两侧太空——加大树（有碰撞）+ 墙体碎片）----
+# 大树 = kind "bigtree"：有碰撞体积（Box 0.7×2.5×0.7 近似树干），视觉树干+树冠。
+# 小树保持 decor 无碰撞（用户确认保留）。
+const BIG_TREES := [
+	# 西街外侧（x∈[-21,-18] 空地，西边界墙 -30）— 中心 y=1.25（树干从地面到 2.5m）
+	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-19.0, 1.25, -7), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW2", "kind": "bigtree", "center": Vector3(-20.5, 1.25, -2), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW3", "kind": "bigtree", "center": Vector3(-19.0, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-20.5, 1.25, 8), "size": Vector3(0.7, 2.5, 0.7)},
+	# 东街外侧（x∈[18,21] 空地）
+	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(19.0, 1.25, -7), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE2", "kind": "bigtree", "center": Vector3(20.5, 1.25, -2), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(19.0, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(20.5, 1.25, 8), "size": Vector3(0.7, 2.5, 0.7)},
+	# 南北带两侧（x=±15.5 空旷带）
+	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, 16.5), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(15.5, 1.25, 16.5), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeS1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, -16.5), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeS2", "kind": "bigtree", "center": Vector3(15.5, 1.25, -16.5), "size": Vector3(0.7, 2.5, 0.7)},
+]
+
+# ---- 两侧墙体碎片（西/东街 + 南北带补充短墙，形成更多交火位）----
+const SIDE_WALLS := [
+	# 西街（已有 WestWall1 在 z=0）补充上下段
+	{"name": "WestWall2", "kind": "cover", "center": Vector3(-14.5, 0.7, -2.5), "size": Vector3(1.0, 1.4, 2.0)},
+	{"name": "WestWall3", "kind": "cover", "center": Vector3(-14.5, 0.7, 2.5), "size": Vector3(1.0, 1.4, 2.0)},
+	# 东街（已有 EastWall1）补充上下段
+	{"name": "EastWall2", "kind": "cover", "center": Vector3(14.5, 0.7, -2.5), "size": Vector3(1.0, 1.4, 2.0)},
+	{"name": "EastWall3", "kind": "cover", "center": Vector3(14.5, 0.7, 2.5), "size": Vector3(1.0, 1.4, 2.0)},
+	# 南北带补充短墙（错开已有 NMid/SMid 墙）— z=17 远离出生建筑南墙 19.5（缝 1.75m）
+	{"name": "NWall5", "kind": "cover", "center": Vector3(0, 0.7, 17.0), "size": Vector3(2.0, 1.4, 0.5)},
+	{"name": "SWall5", "kind": "cover", "center": Vector3(0, 0.7, -17.0), "size": Vector3(2.0, 1.4, 0.5)},
+	# 大厅四角外补充碎墙（Scrap5-8）
+	{"name": "Scrap5", "kind": "cover", "center": Vector3(-13, 0.45, -13), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "Scrap6", "kind": "cover", "center": Vector3(13, 0.45, -13), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "Scrap7", "kind": "cover", "center": Vector3(-13, 0.45, 13), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "Scrap8", "kind": "cover", "center": Vector3(13, 0.45, 13), "size": Vector3(1.0, 0.9, 1.0)},
+]
+
 # ---- 南北中间带填充（用户：两侧仍太空——z∈[14,21]/-[21,-14] 空带）----
 # 布局：四条横向矮墙（分割南北通道形成对枪位）+ 中央箱堆掩体 + 两侧树
 const NORTH_MID_FILL := [
@@ -307,6 +346,8 @@ static func all_solids() -> Array:
 	out.append_array(_corner_interiors())
 	out.append_array(COVERS)
 	out.append_array(GREENERY)
+	out.append_array(BIG_TREES)
+	out.append_array(SIDE_WALLS)
 	out.append_array(NORTH_MID_FILL)
 	out.append_array(SOUTH_MID_FILL)
 	out.append_array(SPAWN_BUILDINGS)
