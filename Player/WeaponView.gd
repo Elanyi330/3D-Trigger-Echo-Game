@@ -95,11 +95,11 @@ func _build_body() -> void:
 	var body := Node3D.new()
 	body.name = "FirstPersonBody"
 	body.position = Vector3(0, -0.915, 0)  # 玩家 origin（胶囊中心）→ 脚底贴地
-	# 与角色同色（玩家绿）
-	var uniform := _body_mat(Color(0.35, 0.48, 0.32))
-	var uniform_dark := _body_mat(Color(0.245, 0.336, 0.224))
-	var skin := _body_mat(Color(0.85, 0.68, 0.55))
-	var boot := _body_mat(Color(0.15, 0.13, 0.12))
+	# 虚化材质（用户：低头看自己身体半透明，不挡视野）
+	var uniform := _ghost_body_mat(Color(0.35, 0.48, 0.32))
+	var uniform_dark := _ghost_body_mat(Color(0.245, 0.336, 0.224))
+	var skin := _ghost_body_mat(Color(0.85, 0.68, 0.55))
+	var boot := _ghost_body_mat(Color(0.15, 0.13, 0.12))
 	# 双腿（±X）+ 双脚（脚尖朝 -Z 前方）
 	for sx in [0.11, -0.11]:
 		_body_box(body, Vector3(sx, 0.67, 0), Vector3(0.16, 0.38, 0.18), uniform_dark)  # 大腿
@@ -127,6 +127,17 @@ func _body_box(parent: Node3D, center: Vector3, size: Vector3, mat: Material) ->
 func _body_mat(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
+	m.roughness = 0.8
+	return m
+
+
+# 虚化身体材质（用户：低头看自己躯干/脚应半透明，方便看路不挡视野）
+func _ghost_body_mat(c: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	var ghost := c
+	ghost.a = 0.35  # 半透明 35%
+	m.albedo_color = ghost
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.roughness = 0.8
 	return m
 

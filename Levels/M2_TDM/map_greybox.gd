@@ -23,6 +23,10 @@ func build() -> void:
 		return
 	built = true
 	for e in LAYOUT.all_solids():
+		# decor（树等纯视觉装饰）不生成碰撞——只生成无碰撞网格
+		if e.get("kind", "cover") == "decor":
+			_spawn_decor(e)
+			continue
 		_spawn_solid(e)
 
 
@@ -70,8 +74,43 @@ func _color_for(kind: String) -> Color:
 			return MAT_RAMP
 		"spawn":
 			return MAT_SPAWN
+		"decor":
+			return Color(0.3, 0.7, 0.3)  # 树绿色
 		_:
 			return MAT_COVER
+
+
+# 装饰（树/植物）：无碰撞纯视觉——树干圆柱 + 树冠球
+func _spawn_decor(e: Dictionary) -> void:
+	var c: Vector3 = e["center"]
+	var s: Vector3 = e["size"]
+	var root_node := Node3D.new()
+	root_node.name = e["name"]
+	add_child(root_node)
+	root_node.global_position = c
+	# 树干（深棕圆柱）
+	var trunk := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.12
+	cyl.bottom_radius = 0.15
+	cyl.height = s.y * 0.5
+	trunk.mesh = cyl
+	var trunk_mat := StandardMaterial3D.new()
+	trunk_mat.albedo_color = Color(0.35, 0.25, 0.15)
+	trunk.material_override = trunk_mat
+	trunk.position = Vector3(0, -s.y * 0.25, 0)
+	root_node.add_child(trunk)
+	# 树冠（绿色球）
+	var crown := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = s.x * 0.7
+	sph.height = s.x * 1.4
+	crown.mesh = sph
+	var crown_mat := StandardMaterial3D.new()
+	crown_mat.albedo_color = Color(0.2, 0.6, 0.25)
+	crown.material_override = crown_mat
+	crown.position = Vector3(0, s.y * 0.25, 0)
+	root_node.add_child(crown)
 
 
 # ---- 提供导航层所需的静态体集合（T6 navmesh 烘焙用）----

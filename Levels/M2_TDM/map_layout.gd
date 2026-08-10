@@ -195,34 +195,65 @@ const COVERS := [
 	# 南街箱堆
 	{"name": "BoxS1", "kind": "cover", "center": Vector3(-4, 0.45, -11.5), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "BoxS2", "kind": "cover", "center": Vector3(4, 0.45, -11.5), "size": Vector3(1.0, 0.9, 1.0)},
-	# 中街车（z=-16 横置大车）
-	{"name": "CarM1", "kind": "cover", "center": Vector3(0, 0.65, -16), "size": Vector3(4.0, 1.3, 1.2)},
 ]
 
 # ---- 街道绿化/零散组件（用户：两侧太空——植物/矮墙碎片填充，营造城市感 + 散点掩体）----
 const GREENERY := [
 	# 西街外侧（x≈-17.5，贴西边界墙）：树/花坛/长凳
-	{"name": "TreeW1", "kind": "cover", "center": Vector3(-18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeW2", "kind": "cover", "center": Vector3(-18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeW1", "kind": "decor", "center": Vector3(-18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeW2", "kind": "decor", "center": Vector3(-18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
 	{"name": "PlanterW1", "kind": "cover", "center": Vector3(-17.0, 0.5, -5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "PlanterW2", "kind": "cover", "center": Vector3(-17.0, 0.5, 5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "BenchW1", "kind": "cover", "center": Vector3(-17.0, 0.4, 0), "size": Vector3(1.6, 0.8, 0.6)},
 	# 东街外侧（x≈17.5，贴东边界墙）
-	{"name": "TreeE1", "kind": "cover", "center": Vector3(18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeE2", "kind": "cover", "center": Vector3(18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeE1", "kind": "decor", "center": Vector3(18.0, 1.0, -10), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeE2", "kind": "decor", "center": Vector3(18.0, 1.0, 10), "size": Vector3(0.8, 2.0, 0.8)},
 	{"name": "PlanterE1", "kind": "cover", "center": Vector3(17.0, 0.5, -5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "PlanterE2", "kind": "cover", "center": Vector3(17.0, 0.5, 5), "size": Vector3(1.2, 1.0, 1.2)},
 	{"name": "BenchE1", "kind": "cover", "center": Vector3(17.0, 0.4, 0), "size": Vector3(1.6, 0.8, 0.6)},
 	# 北街/南街绿化（稀疏点缀）
-	{"name": "TreeN1", "kind": "cover", "center": Vector3(-8, 1.0, 13.5), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeN2", "kind": "cover", "center": Vector3(8, 1.0, 13.5), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeS1", "kind": "cover", "center": Vector3(-8, 1.0, -13.5), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "TreeS2", "kind": "cover", "center": Vector3(8, 1.0, -13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeN1", "kind": "decor", "center": Vector3(-8, 1.0, 13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeN2", "kind": "decor", "center": Vector3(8, 1.0, 13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeS1", "kind": "decor", "center": Vector3(-8, 1.0, -13.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "TreeS2", "kind": "decor", "center": Vector3(8, 1.0, -13.5), "size": Vector3(0.8, 2.0, 0.8)},
 	# 大厅四角外散碎矮墙（0.9m 掩体碎片，填空白）
 	{"name": "Scrap1", "kind": "cover", "center": Vector3(-13, 0.45, -11), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "Scrap2", "kind": "cover", "center": Vector3(13, 0.45, -11), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "Scrap3", "kind": "cover", "center": Vector3(-13, 0.45, 11), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "Scrap4", "kind": "cover", "center": Vector3(13, 0.45, 11), "size": Vector3(1.0, 0.9, 1.0)},
+]
+
+# ---- 南北中间带填充（用户：两侧仍太空——z∈[14,21]/-[21,-14] 空带）----
+# 布局：四条横向矮墙（分割南北通道形成对枪位）+ 中央箱堆掩体 + 两侧树
+const NORTH_MID_FILL := [
+	# 横向 1.4m 矮墙（北带，z≈17 和 z≈19，错开排列形成曲折通道）
+	{"name": "NMidWall1", "kind": "cover", "center": Vector3(-8, 0.7, 17.0), "size": Vector3(4.0, 1.4, 0.5)},
+	{"name": "NMidWall2", "kind": "cover", "center": Vector3(8, 0.7, 19.0), "size": Vector3(4.0, 1.4, 0.5)},
+	{"name": "NMidWall3", "kind": "cover", "center": Vector3(-12, 0.7, 19.5), "size": Vector3(3.0, 1.4, 0.5)},
+	{"name": "NMidWall4", "kind": "cover", "center": Vector3(12, 0.7, 17.5), "size": Vector3(3.0, 1.4, 0.5)},
+	# 中央箱堆（北带）
+	{"name": "NMidBox1", "kind": "cover", "center": Vector3(0, 0.45, 16.0), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "NMidBox2", "kind": "cover", "center": Vector3(0, 0.45, 20.5), "size": Vector3(1.0, 0.9, 1.0)},
+	# 树（x=±5 中央区装饰，纯视觉无碰撞——不参与掩体/窄缝判定）
+	{"name": "NMidTree1", "kind": "decor", "center": Vector3(-5, 1.0, 17.0), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "NMidTree2", "kind": "decor", "center": Vector3(5, 1.0, 17.0), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "NMidTree3", "kind": "decor", "center": Vector3(-5, 1.0, 19.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "NMidTree4", "kind": "decor", "center": Vector3(5, 1.0, 19.5), "size": Vector3(0.8, 2.0, 0.8)},
+]
+const SOUTH_MID_FILL := [
+	# 横向 1.4m 矮墙（南带，z≈-17 和 z≈-19，错开排列）
+	{"name": "SMidWall1", "kind": "cover", "center": Vector3(-8, 0.7, -17.0), "size": Vector3(4.0, 1.4, 0.5)},
+	{"name": "SMidWall2", "kind": "cover", "center": Vector3(8, 0.7, -19.0), "size": Vector3(4.0, 1.4, 0.5)},
+	{"name": "SMidWall3", "kind": "cover", "center": Vector3(-12, 0.7, -19.5), "size": Vector3(3.0, 1.4, 0.5)},
+	{"name": "SMidWall4", "kind": "cover", "center": Vector3(12, 0.7, -17.5), "size": Vector3(3.0, 1.4, 0.5)},
+	# 中央箱堆（南带）— SMidBox1 移 z=-15 避开 CarM1(z=-16)
+	{"name": "SMidBox1", "kind": "cover", "center": Vector3(0, 0.45, -15.0), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "SMidBox2", "kind": "cover", "center": Vector3(0, 0.45, -20.5), "size": Vector3(1.0, 0.9, 1.0)},
+	# 树（x=±5 中央区装饰，纯视觉无碰撞——不参与掩体/窄缝判定）
+	{"name": "SMidTree1", "kind": "decor", "center": Vector3(-5, 1.0, -17.0), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "SMidTree2", "kind": "decor", "center": Vector3(5, 1.0, -17.0), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "SMidTree3", "kind": "decor", "center": Vector3(-5, 1.0, -19.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "SMidTree4", "kind": "decor", "center": Vector3(5, 1.0, -19.5), "size": Vector3(0.8, 2.0, 0.8)},
 ]
 
 # ---- 紧凑出生区（8×8：x∈[-6,6], z∈[21,29] / z∈[-29,-21]）----
@@ -255,6 +286,8 @@ static func all_solids() -> Array:
 	out.append_array(_corner_interiors())
 	out.append_array(COVERS)
 	out.append_array(GREENERY)
+	out.append_array(NORTH_MID_FILL)
+	out.append_array(SOUTH_MID_FILL)
 	out.append_array(SPAWN_WALLS)
 	out.append_array(SPAWN_COVERS)
 	return out
