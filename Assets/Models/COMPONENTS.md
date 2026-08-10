@@ -116,33 +116,34 @@
 | LowerLeg_L / R | (±0.11,0,0.48) | (±0.11,0,0.08) | UpperLeg_L/R |
 | Foot_L / R | (±0.11,0,0.08) | (±0.11,0.12,0.02) | LowerLeg_L/R |
 
-> `Hand_L`/`Hand_R` 是 M3 AI 持武器/队友挂武器的挂点。左=+X、右=−X。
+> `Hand_L`/`Hand_R` 是 GripRig IK/挂武器的挂点（**骨骼保留、无可见手盒**）。M1.75 修正镜像后：**解剖右=+X（_R）、解剖左=−X（_L）**，角色面朝 −Z。
 
-### 部件盒（已合并进 `Soldier_Echo_Body`；中心/尺寸 m，绑定骨）
-| 部件 | 中心 (x,y,z) | 尺寸 (x,y,z) | 材质 | 骨 |
-|---|---|---|---|---|
-| Torso | (0,0,1.23) | (0.42,0.24,0.46) | UNIFORM | Spine |
-| Pelvis | (0,0,0.93) | (0.40,0.24,0.14) | UNIFORM_DARK | Root |
-| Head | (0,0.005,1.65) | (0.26,0.26,0.26) | SKIN | Head |
-| Eye_L / R | (±0.06,0.135,1.68) | (0.045,0.02,0.06) | EYE | Head |
-| UpperArm_L/R | (±0.265,0,1.26) | (0.11,0.13,0.34) | UNIFORM | UpperArm_L/R |
-| Forearm_L/R | (±0.265,0,0.95) | (0.10,0.11,0.30) | UNIFORM_DARK | Forearm_L/R |
-| Hand_L/R | (±0.265,0,0.735) | (0.10,0.11,0.13) | SKIN | Hand_L/R |
-| UpperLeg_L/R | (±0.11,0,0.67) | (0.16,0.18,0.38) | UNIFORM_DARK | UpperLeg_L/R |
-| LowerLeg_L/R | (±0.11,0,0.28) | (0.14,0.16,0.40) | UNIFORM | LowerLeg_L/R |
-| Foot_L/R | (±0.11,0.05,0.04) | (0.14,0.26,0.08) | BOOT | Foot_L/R |
+### 部件盒（M1.75 拆两网格：`Soldier_Echo_Body`=无头、`Soldier_Echo_Head`=头+眼；**无手盒**；中心/尺寸 m，绑定骨）
+| 部件 | 中心 (x,y,z) | 尺寸 (x,y,z) | 材质 | 骨 | 网格 |
+|---|---|---|---|---|---|
+| Torso | (0,0,1.23) | (0.42,0.24,0.46) | UNIFORM | Spine | Body |
+| Pelvis | (0,0,0.93) | (0.40,0.24,0.14) | UNIFORM_DARK | Root | Body |
+| Head | (0,0.005,1.65) | (0.26,0.26,0.26) | SKIN | Head | Head |
+| Eye_L / R | (∓0.06,0.135,1.68) | (0.045,0.02,0.06) | EYE | Head | Head |
+| UpperArm_L/R | (∓0.265,0,1.26) | (0.10,0.12,0.34) | UNIFORM | UpperArm_L/R | Body |
+| Forearm_L/R | (∓0.265,0,0.95) | (0.09,0.10,0.30) | UNIFORM_DARK | Forearm_L/R | Body |
+| UpperLeg_L/R | (∓0.11,0,0.67) | (0.16,0.18,0.38) | UNIFORM_DARK | UpperLeg_L/R | Body |
+| LowerLeg_L/R | (∓0.11,0,0.28) | (0.14,0.16,0.40) | UNIFORM | LowerLeg_L/R | Body |
+| Foot_L/R | (∓0.11,0.05,0.04) | (0.14,0.26,0.08) | BOOT | Foot_L/R | Body |
+
+> 手盒已移除（防吞没武器）：`Hand_L/R` 骨骼仍在（IK/挂枪），但无对应网格。
 
 ### 材质（tintable）
 | 材质 | 颜色 | 用于 |
 |---|---|---|
 | UNIFORM | 可换色（默认玩家绿 0.35,0.48,0.32） | 躯干/上臂/小腿 |
 | UNIFORM_DARK | 0.7×UNIFORM | 骨盆/前臂/大腿 |
-| SKIN | (0.85,0.68,0.55) | 头/手 |
+| SKIN | (0.85,0.68,0.55) | 头（手盒已移除） |
 | BOOT | (0.15,0.13,0.12) | 脚 |
 | ACCENT | (0.12,0.12,0.14) | 腰带/护具 |
 | EYE | (0.10,0.10,0.12) | 眼 |
 
-> **第一人称一致性**：视图模型手臂（`Assets/Viewmodel/ViewModel.gd`）与 Soldier_Echo **同尺寸同色系**（上臂0.11×0.13/前臂0.10×0.11/手0.10×0.11×0.13），低头可见下半身（`WeaponView._build_body`）——相机挂在角色眼睛上，不割裂。
+> **第一人称=基准**：ViewModel（`Assets/Viewmodel/ViewModel.gd`，程序化手臂+手、部分武器×2 缩放）保持 M1.5 不重做。第三人称 Soldier_Echo **无手盒**，经 `Character/GripRig.gd` 两骨 IK 持枪、位姿从 `WEAPON_FRAME` 派生向第一人称看齐。低头自见下半身由 `WeaponView._build_body` 提供。
 
 ---
 

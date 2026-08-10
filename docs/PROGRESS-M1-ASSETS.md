@@ -185,10 +185,14 @@
 | 目录收敛 | 三文件夹合并回单目录 `Trigger-Echo`（feat/m1-assets），worktree 移除、分支保留 | b651e2d |
 | 刀/手雷双重结算修复 | Enemy 躯干+头双 collider 转发致伤害×2；近战/手雷跳过 `head` 组 → 手雷脚下 98 不秒杀、近战 40/65 正常 | 33adb49 |
 | 手雷 CS 线性衰减 | 阶梯 [98,60,30]→`98×(1−d/8.89)`，半径 6→8.89m(350u) | 33adb49 |
-| 第三人称统一持握 | 新建 `Character/GripRig.gd` 两骨 IK（方块手到 `_GripRight/_GripLeft`）；Enemy 接入；持握位姿从第一人称 `WEAPON_FRAME` 派生对齐；双手武器向中线收拢保左臂可达 | ec4fd0c |
+| 第三人称统一持握 | 新建 `Character/GripRig.gd` 两骨 IK（腕到 `_GripRight/_GripLeft`）；Enemy 接入；持握位姿从第一人称 `WEAPON_FRAME` 派生对齐；双手武器向中线收拢保左臂可达 | ec4fd0c |
 | 资产拆 Body/Head | Soldier_Echo 拆两蒙皮网格（共享骨架），为隐藏头预留 | ec4fd0c |
+| 修正左右手镜像 | 角色 `_R` 骨原在解剖左侧致敌人左手持枪/步枪偏左；`build_character.py` 修正 `_R`=解剖右(+X)，GripRig 映射改 `+off.x` | 8f272ba |
+| 去掉可见手盒 | 手方块吞没真实尺寸武器；删 Hand 网格、保留 Hand 骨骼供 IK/挂枪，武器完整可见 | fd54597 |
 | 第一人称 | **保持 M1.5 不动**（用户确认手感恢复） | 回滚 |
 
-**测试**：GUT 163/163 绿（原 158 + 去重 2 + GripRig 4 − 改写）。渲染验证 `tools/render/out/grip/`（align_*.png 第三人称、view_grip harness）。
+**测试**：GUT 163/163 绿（原 158 + 去重 2 + GripRig 4 − 改写）。渲染验证 `tools/render/out/grip/`（front_*/q_*/nohand_* 第三人称、view_grip harness）。
+
+**收尾**：用户 2026-08-10 确认 M1.75 收尾；**暂不进 M2**，先全面更新文档。
 
 **遗留（M2 前待办）**：手雷墙体遮挡挡伤（LOS 视线检测，需专项设计）；近战连击窗口严格化/stab 射程分级；`_in_cone` 垂直差上限。

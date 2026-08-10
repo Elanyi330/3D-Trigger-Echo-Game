@@ -54,9 +54,11 @@ tools/render/*.py                                # 处理/构建脚本（可复�
 
 ## 四、角色（Soldier_Echo）
 
-- 方块风，高 1.78m，面朝 −Z；18 骨（含 `Hand_L`/`Hand_R` 挂武器）。
-- 单一蒙皮网格 `Soldier_Echo_Body`（避免节点/骨骼同名冲突），顶点组单骨绑定（防折断/拉扯）。
+- 方块风，高 **1.83m**（CS 72u，2026-08 缩放），面朝 −Z；18 骨（含 `Hand_L`/`Hand_R` 供 IK/挂武器）。
+- **两件蒙皮网格**（M1.75）：`Soldier_Echo_Body`（无头）+ `Soldier_Echo_Head`（头+眼），共享骨架、顶点组单骨绑定；**无可见手盒**（Hand 骨骼保留，防吞没武器）。
+- **左右手已修正镜像**：`_R`=解剖右(+X)、`_L`=解剖左(−X)。
 - 换色：改材质 albedo（玩家绿/队友蓝/敌人红）。
+- 持枪：第三人称经 `Character/GripRig.gd` 两骨 IK 向第一人称 `WEAPON_FRAME` 看齐（第一人称 ViewModel 不变）。
 
 ## 五、如何新增一件武器（零歧义流程）
 
