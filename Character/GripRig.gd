@@ -74,6 +74,10 @@ func equip(weapon_scene: PackedScene) -> Node3D:
 	# 挂骨架节点（角色空间，随角色动但不随单根骨头动）
 	_skel.add_child(_mount)
 	_mount.add_child(_weapon)
+	# 手雷特判：第三人称与第一人称观感一致（ViewModel WEAPON_FRAME 手雷 scale=2.2 放大）
+	# ——玩家视角手雷 2.2 倍，敌人手持若真实 0.1m 会"太迷你"，统一放大
+	if _weapon.name.begins_with("Grenade"):
+		_weapon.scale = Vector3.ONE * 2.2
 	var style: Dictionary = _style_for(_weapon.name)
 	_style = style
 	_base_pos = style["pos"]

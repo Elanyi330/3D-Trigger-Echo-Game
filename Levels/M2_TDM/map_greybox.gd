@@ -43,6 +43,7 @@ func _spawn_solid(e: Dictionary) -> void:
 	body.collision_layer = 1
 	body.collision_mask = 0
 	add_child(body)
+	body.position = c
 
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -59,8 +60,6 @@ func _spawn_solid(e: Dictionary) -> void:
 	mat.roughness = 0.85
 	mesh.material_override = mat
 	body.add_child(mesh)
-
-	body.global_position = c
 
 
 func _color_for(kind: String) -> Color:
@@ -102,7 +101,7 @@ func _spawn_big_tree(e: Dictionary) -> void:
 	col.position = Vector3(0, s.y * 0.5, 0)  # 树干从地面到 2.5m（相对 body 原点）
 	body.add_child(col)
 	# body 放地面（global y = 0），x/z 取数据位置
-	body.global_position = Vector3(c.x, 0, c.z)
+	body.position = Vector3(c.x, 0, c.z)
 	# 视觉：树干圆柱 + 大树冠球（相对 body 原点）
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
@@ -135,7 +134,7 @@ func _spawn_decor(e: Dictionary) -> void:
 	var root_node := Node3D.new()
 	root_node.name = e["name"]
 	add_child(root_node)
-	root_node.global_position = Vector3(c.x, 0, c.z)
+	root_node.position = Vector3(c.x, 0, c.z)
 	# 树干（深棕圆柱，从地面到 1.0m）
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()

@@ -105,17 +105,7 @@ func test_hall_dimensions() -> void:
 
 # ---- §11.3b: 铁律——每个建筑至少 2 个门（用户明确要求：单门封闭盒子无博弈性）----
 func test_every_building_has_two_doors() -> void:
-	# 建筑岛：西侧建筑(W_N/W_S)东西墙各开门，东侧(E_N/E_S)东西墙各开门 → 2 门
-	for pref in ["W_N", "W_S", "E_N", "E_S"]:
-		var door_walls := 0
-		for e in _solids():
-			var n: String = e["name"]
-			if n.begins_with(pref + "_Wall"):
-				# 有 _T/_B 后缀 = 该墙是开门分段（门洞）
-				if n.ends_with("_T") or n.ends_with("_B"):
-					door_walls += 1
-		# 每扇门 = 2 段（T+B）→ 2 扇门 = 4 段
-		assert_eq(door_walls, 4, "%s 建筑应有 2 扇门（4 段墙）" % pref)
+	# 建筑岛已移除（2026-08-10 布局清理——角建筑+出生建筑已覆盖双门铁律）
 	# 角建筑：2 门（生成函数验证——门朝中心的两面墙分段；墙名如 NEWall_S_L 无下划线）
 	for pref in ["NW", "NE", "SW", "SE"]:
 		var door_walls := 0
