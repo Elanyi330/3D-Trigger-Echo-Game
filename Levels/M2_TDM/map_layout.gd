@@ -172,18 +172,22 @@ static func _corner_interiors() -> Array:
 #   中央 1.2m 高台（室外可跳，压制街道/看路口）+ 两侧 0.9m 蹲掩体 + 横向 1.4m 隔断墙（分割通道）
 const COVERS := [
 	# ===== 西街（x∈[-16,-11]，5m 宽）=====
-	# 中央高台（可跳压制，z=±4.5 避开中央隔断墙）
-	{"name": "WestHigh1", "kind": "cover", "center": Vector3(-13.5, 0.6, -4.5), "size": Vector3(2.0, 1.2, 1.5)},
-	{"name": "WestHigh2", "kind": "cover", "center": Vector3(-13.5, 0.6, 4.5), "size": Vector3(2.0, 1.2, 1.5)},
+	# 中央高台（可跳压制）——用 2 级 0.6m 微台阶替代 1.2m 垂直面（杜绝跳上卡角：玩家逐级走上）
+	{"name": "WestHigh1_Base", "kind": "cover", "center": Vector3(-13.5, 0.3, -4.5), "size": Vector3(2.0, 0.6, 1.5)},
+	{"name": "WestHigh1_Top", "kind": "cover", "center": Vector3(-13.5, 0.9, -4.5), "size": Vector3(1.6, 0.6, 1.1)},
+	{"name": "WestHigh2_Base", "kind": "cover", "center": Vector3(-13.5, 0.3, 4.5), "size": Vector3(2.0, 0.6, 1.5)},
+	{"name": "WestHigh2_Top", "kind": "cover", "center": Vector3(-13.5, 0.9, 4.5), "size": Vector3(1.6, 0.6, 1.1)},
 	# 贴西墙 0.9m 蹲掩体
 	{"name": "WestBox1", "kind": "cover", "center": Vector3(-14.5, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "WestBox2", "kind": "cover", "center": Vector3(-14.5, 0.45, 6), "size": Vector3(1.0, 0.9, 1.0)},
 	# 横向 1.4m 隔断墙（z∈[-1.5,1.5] 中央；高台在 z=±4.5 → 通道 3m）
 	{"name": "WestWall1", "kind": "cover", "center": Vector3(-14.5, 0.7, 0), "size": Vector3(1.0, 1.4, 3.0)},
 	# ===== 东街（x∈[11,16]，5m 宽）=====
-	# 中央高台（z=±4.5 避开中央隔断墙）
-	{"name": "EastHigh1", "kind": "cover", "center": Vector3(13.5, 0.6, -4.5), "size": Vector3(2.0, 1.2, 1.5)},
-	{"name": "EastHigh2", "kind": "cover", "center": Vector3(13.5, 0.6, 4.5), "size": Vector3(2.0, 1.2, 1.5)},
+	# 中央高台（可跳压制）——2 级 0.6m 微台阶（杜绝跳上卡角）
+	{"name": "EastHigh1_Base", "kind": "cover", "center": Vector3(13.5, 0.3, -4.5), "size": Vector3(2.0, 0.6, 1.5)},
+	{"name": "EastHigh1_Top", "kind": "cover", "center": Vector3(13.5, 0.9, -4.5), "size": Vector3(1.6, 0.6, 1.1)},
+	{"name": "EastHigh2_Base", "kind": "cover", "center": Vector3(13.5, 0.3, 4.5), "size": Vector3(2.0, 0.6, 1.5)},
+	{"name": "EastHigh2_Top", "kind": "cover", "center": Vector3(13.5, 0.9, 4.5), "size": Vector3(1.6, 0.6, 1.1)},
 	# 贴东墙 0.9m 蹲掩体
 	{"name": "EastBox1", "kind": "cover", "center": Vector3(14.5, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "EastBox2", "kind": "cover", "center": Vector3(14.5, 0.45, 6), "size": Vector3(1.0, 0.9, 1.0)},
@@ -228,48 +232,53 @@ const GREENERY := [
 const NORTH_MID_FILL := [
 	# 横向 1.4m 矮墙（北带，z≈17 和 z≈19，错开排列形成曲折通道）
 	{"name": "NMidWall1", "kind": "cover", "center": Vector3(-8, 0.7, 17.0), "size": Vector3(4.0, 1.4, 0.5)},
-	{"name": "NMidWall2", "kind": "cover", "center": Vector3(8, 0.7, 19.0), "size": Vector3(4.0, 1.4, 0.5)},
+	{"name": "NMidWall2", "kind": "cover", "center": Vector3(8, 0.7, 17.5), "size": Vector3(4.0, 1.4, 0.5)},
 	{"name": "NMidWall3", "kind": "cover", "center": Vector3(-12, 0.7, 19.5), "size": Vector3(3.0, 1.4, 0.5)},
-	{"name": "NMidWall4", "kind": "cover", "center": Vector3(12, 0.7, 17.5), "size": Vector3(3.0, 1.4, 0.5)},
+	{"name": "NMidWall4", "kind": "cover", "center": Vector3(12, 0.7, 16.5), "size": Vector3(3.0, 1.4, 0.5)},
 	# 中央箱堆（北带）
 	{"name": "NMidBox1", "kind": "cover", "center": Vector3(0, 0.45, 16.0), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "NMidBox2", "kind": "cover", "center": Vector3(0, 0.45, 20.5), "size": Vector3(1.0, 0.9, 1.0)},
 	# 树（x=±5 中央区装饰，纯视觉无碰撞——不参与掩体/窄缝判定）
 	{"name": "NMidTree1", "kind": "decor", "center": Vector3(-5, 1.0, 17.0), "size": Vector3(0.8, 2.0, 0.8)},
 	{"name": "NMidTree2", "kind": "decor", "center": Vector3(5, 1.0, 17.0), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "NMidTree3", "kind": "decor", "center": Vector3(-5, 1.0, 19.5), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "NMidTree4", "kind": "decor", "center": Vector3(5, 1.0, 19.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "NMidTree3", "kind": "decor", "center": Vector3(-5, 1.0, 18.0), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "NMidTree4", "kind": "decor", "center": Vector3(5, 1.0, 18.0), "size": Vector3(0.8, 2.0, 0.8)},
 ]
 const SOUTH_MID_FILL := [
 	# 横向 1.4m 矮墙（南带，z≈-17 和 z≈-19，错开排列）
 	{"name": "SMidWall1", "kind": "cover", "center": Vector3(-8, 0.7, -17.0), "size": Vector3(4.0, 1.4, 0.5)},
-	{"name": "SMidWall2", "kind": "cover", "center": Vector3(8, 0.7, -19.0), "size": Vector3(4.0, 1.4, 0.5)},
+	{"name": "SMidWall2", "kind": "cover", "center": Vector3(8, 0.7, -17.5), "size": Vector3(4.0, 1.4, 0.5)},
 	{"name": "SMidWall3", "kind": "cover", "center": Vector3(-12, 0.7, -19.5), "size": Vector3(3.0, 1.4, 0.5)},
-	{"name": "SMidWall4", "kind": "cover", "center": Vector3(12, 0.7, -17.5), "size": Vector3(3.0, 1.4, 0.5)},
+	{"name": "SMidWall4", "kind": "cover", "center": Vector3(12, 0.7, -16.5), "size": Vector3(3.0, 1.4, 0.5)},
 	# 中央箱堆（南带）— SMidBox1 移 z=-15 避开 CarM1(z=-16)
 	{"name": "SMidBox1", "kind": "cover", "center": Vector3(0, 0.45, -15.0), "size": Vector3(1.0, 0.9, 1.0)},
 	{"name": "SMidBox2", "kind": "cover", "center": Vector3(0, 0.45, -20.5), "size": Vector3(1.0, 0.9, 1.0)},
 	# 树（x=±5 中央区装饰，纯视觉无碰撞——不参与掩体/窄缝判定）
 	{"name": "SMidTree1", "kind": "decor", "center": Vector3(-5, 1.0, -17.0), "size": Vector3(0.8, 2.0, 0.8)},
 	{"name": "SMidTree2", "kind": "decor", "center": Vector3(5, 1.0, -17.0), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "SMidTree3", "kind": "decor", "center": Vector3(-5, 1.0, -19.5), "size": Vector3(0.8, 2.0, 0.8)},
-	{"name": "SMidTree4", "kind": "decor", "center": Vector3(5, 1.0, -19.5), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "SMidTree3", "kind": "decor", "center": Vector3(-5, 1.0, -18.0), "size": Vector3(0.8, 2.0, 0.8)},
+	{"name": "SMidTree4", "kind": "decor", "center": Vector3(5, 1.0, -18.0), "size": Vector3(0.8, 2.0, 0.8)},
 ]
 
-# ---- 紧凑出生区（8×8：x∈[-6,6], z∈[21,29] / z∈[-29,-21]）----
-const SPAWNS := [
-	{"name": "SpawnN", "kind": "spawn", "center": Vector3(0, 0, 25), "facing": "S"},
-	{"name": "SpawnS", "kind": "spawn", "center": Vector3(0, 0, -25), "facing": "N"},
-]
-const SPAWN_WALLS := [
-	{"name": "SpawnWallN", "kind": "cover", "center": Vector3(0, 0.7, 21.5), "size": Vector3(12, 1.4, 1.0)},
-	{"name": "SpawnWallS", "kind": "cover", "center": Vector3(0, 0.7, -21.5), "size": Vector3(12, 1.4, 1.0)},
-]
-const SPAWN_COVERS := [
-	{"name": "SpawnBoxN1", "kind": "cover", "center": Vector3(-4, 0.45, 25), "size": Vector3(1.5, 0.9, 1.0)},
-	{"name": "SpawnBoxN2", "kind": "cover", "center": Vector3(4, 0.45, 25), "size": Vector3(1.5, 0.9, 1.0)},
-	{"name": "SpawnBoxS1", "kind": "cover", "center": Vector3(-4, 0.45, -25), "size": Vector3(1.5, 0.9, 1.0)},
-	{"name": "SpawnBoxS2", "kind": "cover", "center": Vector3(4, 0.45, -25), "size": Vector3(1.5, 0.9, 1.0)},
+# ---- 出生建筑（用户：双方出生点用封顶建筑围起来，左右两个出口）----
+# 建筑 12×10×3.0m（x∈[-6,6], z∈[19,29] 北 / [-29,-19] 南），贴边界墙（北墙=地图北界），屋顶封顶，东/西墙留 3m 出口。
+const SPAWN_BUILDINGS := [
+	# ===== 北（T 出生）=====
+	{"name": "SpawnB_N_WallN", "kind": "wall", "center": Vector3(0, 1.5, 28.5), "size": Vector3(12, 3.0, 1)},     # 北墙（贴地图北界，内沿 29）
+	{"name": "SpawnB_N_WallS", "kind": "wall", "center": Vector3(0, 1.5, 19.5), "size": Vector3(12, 3.0, 1)},     # 南墙（面向地图）
+	{"name": "SpawnB_N_WallW_T", "kind": "wall", "center": Vector3(-6.5, 1.5, 25.5), "size": Vector3(1, 3.0, 6)},  # 西墙北段
+	{"name": "SpawnB_N_WallW_B", "kind": "wall", "center": Vector3(-6.5, 1.5, 21.0), "size": Vector3(1, 3.0, 4)},  # 西墙南段（出口 x∈[-8,-2]）
+	{"name": "SpawnB_N_WallE_T", "kind": "wall", "center": Vector3(6.5, 1.5, 25.5), "size": Vector3(1, 3.0, 6)},   # 东墙北段
+	{"name": "SpawnB_N_WallE_B", "kind": "wall", "center": Vector3(6.5, 1.5, 21.0), "size": Vector3(1, 3.0, 4)},   # 东墙南段（出口 x∈[2,8]）
+	{"name": "SpawnB_N_Roof", "kind": "roof", "center": Vector3(0, 3.0, 24), "size": Vector3(12, 0.5, 10)},       # 封顶
+	# ===== 南（CT 出生）=====
+	{"name": "SpawnB_S_WallN", "kind": "wall", "center": Vector3(0, 1.5, -19.5), "size": Vector3(12, 3.0, 1)},    # 北墙（面向地图）
+	{"name": "SpawnB_S_WallS", "kind": "wall", "center": Vector3(0, 1.5, -28.5), "size": Vector3(12, 3.0, 1)},    # 南墙（贴地图南界，内沿 -29）
+	{"name": "SpawnB_S_WallW_T", "kind": "wall", "center": Vector3(-6.5, 1.5, -21.0), "size": Vector3(1, 3.0, 4)}, # 西墙北段（出口 x∈[-8,-2]）
+	{"name": "SpawnB_S_WallW_B", "kind": "wall", "center": Vector3(-6.5, 1.5, -25.5), "size": Vector3(1, 3.0, 6)}, # 西墙南段
+	{"name": "SpawnB_S_WallE_T", "kind": "wall", "center": Vector3(6.5, 1.5, -21.0), "size": Vector3(1, 3.0, 4)},  # 东墙北段（出口 x∈[2,8]）
+	{"name": "SpawnB_S_WallE_B", "kind": "wall", "center": Vector3(6.5, 1.5, -25.5), "size": Vector3(1, 3.0, 6)},  # 东墙南段
+	{"name": "SpawnB_S_Roof", "kind": "roof", "center": Vector3(0, 3.0, -24), "size": Vector3(12, 0.5, 10)},       # 封顶
 ]
 
 # ---- all solids ----
@@ -288,8 +297,7 @@ static func all_solids() -> Array:
 	out.append_array(GREENERY)
 	out.append_array(NORTH_MID_FILL)
 	out.append_array(SOUTH_MID_FILL)
-	out.append_array(SPAWN_WALLS)
-	out.append_array(SPAWN_COVERS)
+	out.append_array(SPAWN_BUILDINGS)
 	return out
 
 static func hall_center() -> Vector3:

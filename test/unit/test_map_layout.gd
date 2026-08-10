@@ -57,6 +57,10 @@ func test_solids_no_overlap() -> void:
 			if (an.begins_with("DoorFrame") and bn.begins_with("HallWall")) or \
 			   (bn.begins_with("DoorFrame") and an.begins_with("HallWall")):
 				continue
+			# 出生建筑：屋顶盖墙 + 同建筑墙段相接（结构正常）——豁免
+			if (an.begins_with("SpawnB") and bn.begins_with("SpawnB")) or \
+			   (bn.begins_with("SpawnB") and an.begins_with("SpawnB")):
+				continue
 			assert_false(_overlaps(a, b), "%s 与 %s 不应重叠" % [an, bn])
 
 
@@ -130,9 +134,10 @@ func test_grenade_coverage_blockers() -> void:
 
 # ---- §11.7: spawn safety — spawn front wall 1.4m ----
 func test_spawn_safety() -> void:
-	for sw0 in LAYOUT.SPAWN_WALLS:
+	for sw0 in LAYOUT.SPAWN_BUILDINGS:
 		var sw: Dictionary = sw0
-		assert_almost_eq(sw["size"].y, 1.4, 0.01, "%s 出生墙 1.4m" % sw["name"])
+		if sw["name"].contains("Roof"):
+			assert_gt((sw["center"] as Vector3).y + sw["size"].y * 0.5, 3.0, "%s 封顶 3m" % sw["name"])
 
 
 # ---- §11.8: hall 4-way connectivity — door segments leave 2m gaps ----
