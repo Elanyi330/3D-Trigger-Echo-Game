@@ -42,6 +42,8 @@ func _ready() -> void:
 	vis.name = "Visuals"
 	add_child(vis)
 	vis.build_visuals()
+	# 视觉层覆盖后隐藏灰盒网格（保留碰撞）——消灭 Z-fighting 闪烁
+	gb.hide_meshes()
 	# 玩家（Player.tscn：MovementController + Head + Crouch）
 	_player = load("res://Player/Player.tscn").instantiate()
 	_player.name = "Player"

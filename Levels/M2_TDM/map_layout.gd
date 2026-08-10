@@ -110,18 +110,17 @@ const EAST_STEPS := [
 
 # ---- cover pieces ----
 const COVERS := [
-	# west street (x=-10) low boxes (0.9m)
-	{"name": "BoxW1", "kind": "cover", "center": Vector3(-10, 0.45, -8), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "BoxW2", "kind": "cover", "center": Vector3(-10, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "BoxW3", "kind": "cover", "center": Vector3(-10, 0.45, -4), "size": Vector3(1.0, 0.9, 1.0)},
-	# west street cars (1.3m mid cover)
-	{"name": "CarW1", "kind": "cover", "center": Vector3(-10, 0.65, 2), "size": Vector3(2.0, 1.3, 1.2)},
-	{"name": "CarW2", "kind": "cover", "center": Vector3(-10, 0.65, 5), "size": Vector3(2.0, 1.3, 1.2)},
+	# west street 1m 宽箱堆（0.9m 高）— 放 x=-11（占[-11.5,-10.5]）：屋顶~箱 1.5m + 箱~墙 2.5m，无 <1.2m 窄缝
+	{"name": "BoxW1", "kind": "cover", "center": Vector3(-11, 0.45, -8), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "BoxW2", "kind": "cover", "center": Vector3(-11, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "BoxW3", "kind": "cover", "center": Vector3(-11, 0.45, -4), "size": Vector3(1.0, 0.9, 1.0)},
+	# cars 移到中街（西街 5m 放不下车+两侧通道）— 中街 z=-16：单辆横置大车（消灭 1m 中央窄缝），与 BoxM1 缝 ≥1.5m
+	{"name": "CarM1", "kind": "cover", "center": Vector3(0, 0.65, -16), "size": Vector3(4.0, 1.3, 1.2)},
 	# east containers (2.2m high cover) — 东街两侧（避开斜坡 z∈[-6,6]），不挡走廊
 	{"name": "ContainerE1", "kind": "cover", "center": Vector3(11, 1.1, -11), "size": Vector3(3.5, 2.2, 2.5)},
 	{"name": "ContainerE2", "kind": "cover", "center": Vector3(11, 1.1, 9), "size": Vector3(3.5, 2.2, 2.5)},
-	# mid-street 1.4m walls (grenade coverage + spawn cover)
-	{"name": "BoxM1", "kind": "cover", "center": Vector3(0, 0.7, -14), "size": Vector3(2.0, 1.4, 0.5)},
+	# mid-street 1.4m walls (grenade coverage + spawn cover) — BoxM1 移到 z=-13（与 CarM1 z=-16 缝 1.9m）
+	{"name": "BoxM1", "kind": "cover", "center": Vector3(0, 0.7, -13), "size": Vector3(2.0, 1.4, 0.5)},
 	{"name": "BoxM2", "kind": "cover", "center": Vector3(0, 0.7, 14), "size": Vector3(2.0, 1.4, 0.5)},
 ]
 

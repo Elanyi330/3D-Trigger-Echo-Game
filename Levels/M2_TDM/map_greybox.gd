@@ -81,3 +81,11 @@ func static_bodies() -> Array:
 		if c is StaticBody3D:
 			out.append(c)
 	return out
+
+
+# 隐藏全部灰盒网格（视觉层启用后调用——消灭 Z-fighting 闪烁；碰撞保留）
+func hide_meshes() -> void:
+	for body in get_children():
+		if body is StaticBody3D:
+			for mi in body.find_children("*", "MeshInstance3D", true, false):
+				(mi as MeshInstance3D).visible = false
