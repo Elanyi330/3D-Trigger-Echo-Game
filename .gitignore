@@ -13,3 +13,9 @@ export_presets.cfg
 
 # render debug output (regenerable)
 tools/render/out/
+
+# Godot 导入 GLB 时从内嵌贴图抽出的副产物（GLB 已内嵌 ECHO 印花贴图，重导入自动再生，勿提交）
+Assets/Models/Weapons/**/*_echo_decal.png
+Assets/Models/Weapons/**/*_echo_decal.png.import
+# 管线源贴图的 Godot 导入元数据（非运行时资产，重开自动生成）
+tools/render/sources/*.png.import
