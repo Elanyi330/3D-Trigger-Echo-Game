@@ -84,6 +84,8 @@ func _color_for(kind: String) -> Color:
 
 
 # 大树（有碰撞体积——用户要求）：StaticBody 树干碰撞（0.7m 见方高 2.5m）+ 树冠视觉球
+# 注意：bigtree 数据 center.y 是树干高度一半（1.25）——body 放在全局 y=0（地面），
+# 树干从地面起（y 0→2.5m），树冠在顶部。杜绝悬空。
 func _spawn_big_tree(e: Dictionary) -> void:
 	var c: Vector3 = e["center"]
 	var s: Vector3 = e["size"]
@@ -92,15 +94,16 @@ func _spawn_big_tree(e: Dictionary) -> void:
 	body.collision_layer = 1
 	body.collision_mask = 0
 	add_child(body)
-	# 树干碰撞（Box 近似树干）
+	# 树干碰撞（Box 近似树干）——body 原点在地面，树干 0→2.5m
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = s
 	col.shape = box
-	col.position = Vector3(0, s.y * 0.5, 0)  # 树干从地面到 2.5m
+	col.position = Vector3(0, s.y * 0.5, 0)  # 树干从地面到 2.5m（相对 body 原点）
 	body.add_child(col)
-	body.global_position = c
-	# 视觉：树干圆柱 + 大树冠球
+	# body 放地面（global y = 0），x/z 取数据位置
+	body.global_position = Vector3(c.x, 0, c.z)
+	# 视觉：树干圆柱 + 大树冠球（相对 body 原点）
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.3
@@ -125,14 +128,15 @@ func _spawn_big_tree(e: Dictionary) -> void:
 
 
 # 装饰（小树/植物）：无碰撞纯视觉——树干圆柱 + 树冠球
+# 注意：decor 数据 center.y 是视觉中心高度——root 放地面（y=0），树干从地面起。
 func _spawn_decor(e: Dictionary) -> void:
 	var c: Vector3 = e["center"]
 	var s: Vector3 = e["size"]
 	var root_node := Node3D.new()
 	root_node.name = e["name"]
 	add_child(root_node)
-	root_node.global_position = c
-	# 树干（深棕圆柱）
+	root_node.global_position = Vector3(c.x, 0, c.z)
+	# 树干（深棕圆柱，从地面到 1.0m）
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.12
@@ -142,9 +146,9 @@ func _spawn_decor(e: Dictionary) -> void:
 	var trunk_mat := StandardMaterial3D.new()
 	trunk_mat.albedo_color = Color(0.35, 0.25, 0.15)
 	trunk.material_override = trunk_mat
-	trunk.position = Vector3(0, -s.y * 0.25, 0)
+	trunk.position = Vector3(0, s.y * 0.25, 0)
 	root_node.add_child(trunk)
-	# 树冠（绿色球）
+	# 树冠（绿色球，在树干顶部上方）
 	var crown := MeshInstance3D.new()
 	var sph := SphereMesh.new()
 	sph.radius = s.x * 0.7
@@ -153,7 +157,7 @@ func _spawn_decor(e: Dictionary) -> void:
 	var crown_mat := StandardMaterial3D.new()
 	crown_mat.albedo_color = Color(0.2, 0.6, 0.25)
 	crown.material_override = crown_mat
-	crown.position = Vector3(0, s.y * 0.25, 0)
+	crown.position = Vector3(0, s.y * 0.5 + 0.5, 0)
 	root_node.add_child(crown)
 
 

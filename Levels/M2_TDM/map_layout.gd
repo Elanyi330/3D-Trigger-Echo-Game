@@ -234,6 +234,23 @@ const GREENERY := [
 	{"name": "Scrap4", "kind": "cover", "center": Vector3(13, 0.45, 11), "size": Vector3(1.0, 0.9, 1.0)},
 ]
 
+# ---- 两侧大墙体（用户：要大的墙体——3m 高建筑外墙形成掩体长廊）----
+# 西街外侧 x∈[-24,-22]（贴西边界墙-30 前 6m 空地，远离大树 x∈[-21,-18] 和矮墙 x=-14.5）
+# 每侧 2 段 6m 长 3m 高大墙，段间留 4m 通道。
+const SIDE_BIG_WALLS := [
+	# 西街外侧大墙（x=-23）
+	{"name": "BigWallW1", "kind": "wall", "center": Vector3(-23.0, 1.5, -4.0), "size": Vector3(1.0, 3.0, 6.0)},
+	{"name": "BigWallW2", "kind": "wall", "center": Vector3(-23.0, 1.5, 4.0), "size": Vector3(1.0, 3.0, 6.0)},
+	# 东街外侧大墙（x=23）
+	{"name": "BigWallE1", "kind": "wall", "center": Vector3(23.0, 1.5, -4.0), "size": Vector3(1.0, 3.0, 6.0)},
+	{"name": "BigWallE2", "kind": "wall", "center": Vector3(23.0, 1.5, 4.0), "size": Vector3(1.0, 3.0, 6.0)},
+	# 南北带大墙（z=±14.5，x∈[-13.5,-9.5]/[9.5,13.5]——远离矮墙 NMidWall4(z=16.5,x=12) 缝 1.75m）
+	{"name": "BigWallN1", "kind": "wall", "center": Vector3(-11.5, 1.5, 14.5), "size": Vector3(4.0, 3.0, 1.0)},
+	{"name": "BigWallN2", "kind": "wall", "center": Vector3(11.5, 1.5, 14.5), "size": Vector3(4.0, 3.0, 1.0)},
+	{"name": "BigWallS1", "kind": "wall", "center": Vector3(-11.5, 1.5, -14.5), "size": Vector3(4.0, 3.0, 1.0)},
+	{"name": "BigWallS2", "kind": "wall", "center": Vector3(11.5, 1.5, -14.5), "size": Vector3(4.0, 3.0, 1.0)},
+]
+
 # ---- 两侧交火区加粗（用户：左右两侧太空——加大树（有碰撞）+ 墙体碎片）----
 # 大树 = kind "bigtree"：有碰撞体积（Box 0.7×2.5×0.7 近似树干），视觉树干+树冠。
 # 小树保持 decor 无碰撞（用户确认保留）。
@@ -249,10 +266,10 @@ const BIG_TREES := [
 	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(19.0, 1.25, 3), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(20.5, 1.25, 8), "size": Vector3(0.7, 2.5, 0.7)},
 	# 南北带两侧（x=±15.5 空旷带）
-	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, 16.5), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(15.5, 1.25, 16.5), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeS1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, -16.5), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeS2", "kind": "bigtree", "center": Vector3(15.5, 1.25, -16.5), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-27.5, 1.25, 11.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(27.5, 1.25, 11.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeS1", "kind": "bigtree", "center": Vector3(-27.5, 1.25, -11.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeS2", "kind": "bigtree", "center": Vector3(27.5, 1.25, -11.0), "size": Vector3(0.7, 2.5, 0.7)},
 ]
 
 # ---- 两侧墙体碎片（西/东街 + 南北带补充短墙，形成更多交火位）----
@@ -348,6 +365,7 @@ static func all_solids() -> Array:
 	out.append_array(GREENERY)
 	out.append_array(BIG_TREES)
 	out.append_array(SIDE_WALLS)
+	out.append_array(SIDE_BIG_WALLS)
 	out.append_array(NORTH_MID_FILL)
 	out.append_array(SOUTH_MID_FILL)
 	out.append_array(SPAWN_BUILDINGS)
