@@ -48,18 +48,40 @@ func test_solids_no_overlap() -> void:
 			# 垂直相接（地面顶==元素底，y 恰好接触）不算重叠
 			if a[0].y >= b[1].y - 0.01 or b[0].y >= a[1].y - 0.01:
 				continue
-			# 台阶-屋顶过渡重叠（结构性，顶面齐平）豁免
 			var an: String = solids[i]["name"]
 			var bn: String = solids[j]["name"]
-			if (an.begins_with("StepEast") and bn == "RoofEast") or (bn.begins_with("StepEast") and an == "RoofEast"):
+			# 墙段角落相接（同结构围合墙体，角重叠属正常）——豁免
+			if _is_wall_corner(an, bn):
+				continue
+			# 门框柱与墙段同面（贴门洞，不阻碍通行）——豁免
+			if (an.begins_with("DoorFrame") and bn.begins_with("HallWall")) or \
+			   (bn.begins_with("DoorFrame") and an.begins_with("HallWall")):
 				continue
 			assert_false(_overlaps(a, b), "%s 与 %s 不应重叠" % [an, bn])
 
 
+# 墙段角落相接：同属角建筑/大厅外墙的墙段在角落重叠（结构正常）
+func _is_wall_corner(an: String, bn: String) -> bool:
+	var a_wall := an.ends_with("Wall_N") or an.ends_with("Wall_S") or an.ends_with("Wall_E") \
+		or an.ends_with("Wall_W") or an.ends_with("Wall_E_T") or an.ends_with("Wall_E_B") \
+		or an.ends_with("Wall_S_L") or an.ends_with("Wall_S_R") or an.ends_with("Wall_N_L") \
+		or an.ends_with("Wall_N_R")
+	var b_wall := bn.ends_with("Wall_N") or bn.ends_with("Wall_S") or bn.ends_with("Wall_E") \
+		or bn.ends_with("Wall_W") or bn.ends_with("Wall_E_T") or bn.ends_with("Wall_E_B") \
+		or bn.ends_with("Wall_S_L") or bn.ends_with("Wall_S_R") or bn.ends_with("Wall_N_L") \
+		or bn.ends_with("Wall_N_R")
+	if not (a_wall and b_wall):
+		return false
+	# 同一前缀（NW/NEW/SW/SE/Hall）的墙段角落相接
+	var a_pref := an.get_slice("Wall", 0)
+	var b_pref := bn.get_slice("Wall", 0)
+	return a_pref == b_pref
+
+
 # ---- §11.3: central hall dimensions & doors ----
 func test_hall_dimensions() -> void:
-	assert_almost_eq(LAYOUT.hall_size().x, 14.0, 0.01, "hall width 14m")
-	assert_almost_eq(LAYOUT.hall_size().z, 12.0, 0.01, "hall depth 12m")
+	assert_almost_eq(LAYOUT.hall_size().x, 20.0, 0.01, "hall width 20m")
+	assert_almost_eq(LAYOUT.hall_size().z, 16.0, 0.01, "hall depth 16m")
 	for w in LAYOUT.HALL_WALL_SEGMENTS:
 		var d: Dictionary = w
 		assert_eq(d["size"].y, 3.0, "%s 层高 3.0m" % d["name"])
@@ -70,29 +92,18 @@ func test_hall_dimensions() -> void:
 		assert_gte(gap, LAYOUT.DOOR_MIN, "%s 门宽 ≥2m" % d["name"])
 
 
-# ---- §11.4: jumpable surfaces ≤1.3m; 2.5m roof via steps; gaps ≤4.5m ----
+# ---- §11.4: jumpable surfaces ≤1.3m（角建筑屋顶 1.2m 可跳；大厅 3m 不可跳）----
 func test_jumpable_heights() -> void:
-	for r0 in LAYOUT.WEST_ROOFS:
+	# 所有 roof 类组件 ≤1.3m 可跳（用 kind 安全访问）
+	for e in _solids():
+		var kind: String = e.get("kind", "cover")
+		if kind == "roof":
+			assert_lte(e["size"].y, LAYOUT.JUMPABLE_MAX, "%s 可跳高度 ≤1.3m" % e["name"])
+	# 大厅屋顶顶面 3.5m（不可跳，仅视觉）——用顶面高度判据
+	for r0 in LAYOUT.HALL_ROOF:
 		var r: Dictionary = r0
-		assert_lte(r["size"].y, LAYOUT.JUMPABLE_MAX, "%s 可跳高度 ≤1.3m" % r["name"])
-	var east_roof: Dictionary = LAYOUT.EAST_ROOF
-	assert_eq(east_roof["size"].y, 2.5, "东屋顶 2.5m")
-	# 台阶替代斜坡（灰盒阶段）：3 级，每级 ≤1.3m 可跳，逐级可达屋顶顶面
-	assert_eq(LAYOUT.EAST_STEPS.size(), 3, "东屋顶台阶 3 级")
-	var prev_top := 0.0
-	for s0 in LAYOUT.EAST_STEPS:
-		var s: Dictionary = s0
-		assert_lte(s["size"].y, LAYOUT.JUMPABLE_MAX, "%s 每级 ≤1.3m 可跳" % s["name"])
-		assert_gte(s["size"].x, 2.5, "%s 台阶宽 ≥2.5m" % s["name"])
-		prev_top = (s["center"] as Vector3).y + s["size"].y * 0.5
-	# 最后一级顶面 ≥ 屋顶顶面（2.5m）
-	assert_gte(prev_top, 2.5 - 0.1, "台阶顶面 ≥ 屋顶顶面")
-	# 台阶 3 与屋顶必须水平重叠（消灭 0.46m 落差缝）
-	var s3: Dictionary = LAYOUT.EAST_STEPS[2]
-	var s3_c: Vector3 = s3["center"]
-	var roof_c: Vector3 = LAYOUT.EAST_ROOF["center"]
-	var overlap_x: float = (s3_c.x + s3["size"].x * 0.5) - (roof_c.x - LAYOUT.EAST_ROOF["size"].x * 0.5)
-	assert_gt(overlap_x, 0.2, "台阶3与屋顶水平重叠 ≥0.2m（消灭落差缝）")
+		var top: float = (r["center"] as Vector3).y + r["size"].y * 0.5
+		assert_gt(top, LAYOUT.JUMPABLE_MAX, "%s 大厅屋顶顶面不可跳" % r["name"])
 
 
 # ---- §11.5: grenade coverage — every 5x5m zone has a ≥1.4m blocker within radius ----

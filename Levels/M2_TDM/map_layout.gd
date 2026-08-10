@@ -1,33 +1,38 @@
-## Map layout data (v1) for the M2 TDM map "回声集市" (60x58m).
+## Map layout data (v2) for the M2 TDM map "回声集市" (60x58m).
 ##
-## Data-driven layout: single source of truth for the greybox. All coordinates in
-## meters, Godot frame: +X = east, +Z = north (south = -Z), Y = up.
-## North = T spawn, South = CT spawn (mirror symmetry).
+## v2 布局重构（2026-08-10 用户反馈）：出生区缩小、中央建筑扩大、四角加建筑、街道环形化，
+## 增加交火区域密度，使地图更饱满、适合 5v5 团战。
 ##
-## Values calibrated by T1 probes (2026-08-10):
-##   player capsule r0.5/h1.83 (width 1.0m) → corridor min 3.0m, doors min 2.0m
-##   stand jump reachable top ≈1.39-1.45m  → jumpable ≤1.3m
-##   run jump distance ≈4.87m              → jump gaps ≤4.5m
-##   grenade radius 8.89m                  → hall 14x12m (diag 18.4m > radius)
+## 结构（俯视）：
+##   z=29   ┌───北墙────────────┐
+##          │ NW建筑  出生区   NE建筑 │  z∈[14,29]: 角建筑(±16..±30) + 出生区(-6..6)
+##   z=14   ├───门─────────────┤
+##          │  西街   中央大厅    │  z∈[9,14]: 北街(5m)
+##   z=9    ├───门─────────────┤
+##          │                  │  z∈[-9,9]: 中央大厅(20×16m)
+##   z=-9   ├───门─────────────┤
+##          │  西街   中央大厅    │  z∈[-14,-9]: 南街(5m)
+##   z=-14  ├───门─────────────┤
+##          │ SW建筑  出生区   SE建筑 │  z∈[-29,-14]: 角建筑 + 出生区
+##   z=-29  └───南墙────────────┘
+##          x=-30  -16    16  30
+##
+## Godot frame: +X=east, +Z=north, Y=up. North=T spawn, South=CT spawn (mirror).
+## T1 实测：站立跳可达 1.39m → 可跳 ≤1.3m；玩家宽 1.0m → 通道 ≥3m、门 ≥2m。
 
-# ---------------------------------------------------------------------------
-# AABB element type: {name, kind, center: Vector3, size: Vector3}
-# kind: "ground" | "wall" | "cover" | "roof" | "ramp" | "spawn"
-# ---------------------------------------------------------------------------
-const PLAYER_W := 1.0   # player capsule width (r0.5)
-const CORRIDOR_MIN := 3.0   # min corridor width
-const DOOR_MIN := 2.0   # min doorway width
-const JUMPABLE_MAX := 1.3  # max height jumpable (T1: 1.39m - margin)
-const JUMP_GAP_MAX := 4.5  # max jumpable gap (T1: 4.87m - margin)
-const BOUND_X := 30.0   # half map width (60m)
-const BOUND_Z := 29.0   # half map depth (58m)
+const PLAYER_W := 1.0
+const CORRIDOR_MIN := 3.0
+const DOOR_MIN := 2.0
+const JUMPABLE_MAX := 1.3
+const BOUND_X := 30.0
+const BOUND_Z := 29.0
 
-# ---- single ground slab (60 x 58) ----
+# ---- 地面 ----
 const GROUNDS := [
 	{"name": "Ground", "kind": "ground", "center": Vector3(0, -0.5, 0), "size": Vector3(60, 1, 58)},
 ]
 
-# ---- boundary walls (height 4m, thick 1m, y center 2.0) — 边到边相接，角点不重叠 ----
+# ---- 边界墙 ----
 const WALLS := [
 	{"name": "WallNorth", "kind": "wall", "center": Vector3(0, 2.0, 29.5),   "size": Vector3(60, 4, 1)},
 	{"name": "WallSouth", "kind": "wall", "center": Vector3(0, 2.0, -29.5),  "size": Vector3(60, 4, 1)},
@@ -35,120 +40,167 @@ const WALLS := [
 	{"name": "WallEast",  "kind": "wall", "center": Vector3(30.5, 2.0, 0),   "size": Vector3(1, 4, 58)},
 ]
 
-# ---- central hall (14 x 12 x 3.0m), walls split into 8 segments with 2m door gaps ----
-# 内廓 x -7..7, z -6..6；墙厚 1m。门缝 x/z ∈ [-1,1]。
+# ---- 中央大厅（20×16×3.0m，内廓 x∈[-10,10] z∈[-8,8]，墙厚 1m）----
+# 墙段精确分段：门洞 4m（x/z∈[-2,2]）。墙段贴门洞边界，角落相接（oz/ox=0）不重叠。
 const HALL_WALL_SEGMENTS := [
-	{"name": "HallWallN_L", "kind": "wall", "center": Vector3(-4.0, 1.5, 6.5), "size": Vector3(6, 3.0, 1)},
-	{"name": "HallWallN_R", "kind": "wall", "center": Vector3(4.0, 1.5, 6.5),  "size": Vector3(6, 3.0, 1)},
-	{"name": "HallWallS_L", "kind": "wall", "center": Vector3(-4.0, 1.5, -6.5), "size": Vector3(6, 3.0, 1)},
-	{"name": "HallWallS_R", "kind": "wall", "center": Vector3(4.0, 1.5, -6.5),  "size": Vector3(6, 3.0, 1)},
-	{"name": "HallWallW_T", "kind": "wall", "center": Vector3(-7.5, 1.5, 3.5), "size": Vector3(1, 3.0, 5)},
-	{"name": "HallWallW_B", "kind": "wall", "center": Vector3(-7.5, 1.5, -3.5), "size": Vector3(1, 3.0, 5)},
-	{"name": "HallWallE_T", "kind": "wall", "center": Vector3(7.5, 1.5, 3.5),  "size": Vector3(1, 3.0, 5)},
-	{"name": "HallWallE_B", "kind": "wall", "center": Vector3(7.5, 1.5, -3.5),  "size": Vector3(1, 3.0, 5)},
+	{"name": "HallWallN_L", "kind": "wall", "center": Vector3(-6.0, 1.5, 8.5), "size": Vector3(8, 3.0, 1)},
+	{"name": "HallWallN_R", "kind": "wall", "center": Vector3(6.0, 1.5, 8.5),  "size": Vector3(8, 3.0, 1)},
+	{"name": "HallWallS_L", "kind": "wall", "center": Vector3(-6.0, 1.5, -8.5), "size": Vector3(8, 3.0, 1)},
+	{"name": "HallWallS_R", "kind": "wall", "center": Vector3(6.0, 1.5, -8.5),  "size": Vector3(8, 3.0, 1)},
+	# 西/东墙：z∈[2,8]（上段 center 5 深 6）与 z∈[-8,-2]（下段 center -5 深 6）——贴门洞边界 ±2
+	{"name": "HallWallW_T", "kind": "wall", "center": Vector3(-10.5, 1.5, 5.0), "size": Vector3(1, 3.0, 6)},
+	{"name": "HallWallW_B", "kind": "wall", "center": Vector3(-10.5, 1.5, -5.0), "size": Vector3(1, 3.0, 6)},
+	{"name": "HallWallE_T", "kind": "wall", "center": Vector3(10.5, 1.5, 5.0),  "size": Vector3(1, 3.0, 6)},
+	{"name": "HallWallE_B", "kind": "wall", "center": Vector3(10.5, 1.5, -5.0),  "size": Vector3(1, 3.0, 6)},
 ]
 
 const HALL_DOORS := [
-	{"name": "DoorNorth", "center": Vector3(0, 1.5, 6.5),   "gap_x": 2.0},
-	{"name": "DoorSouth", "center": Vector3(0, 1.5, -6.5),  "gap_x": 2.0},
-	{"name": "DoorWest",  "center": Vector3(-7.5, 1.5, 0),  "gap_z": 2.0},
-	{"name": "DoorEast",  "center": Vector3(7.5, 1.5, 0),   "gap_z": 2.0},
+	{"name": "DoorNorth", "center": Vector3(0, 1.5, 8.5),   "gap_x": 4.0},
+	{"name": "DoorSouth", "center": Vector3(0, 1.5, -8.5),  "gap_x": 4.0},
+	{"name": "DoorWest",  "center": Vector3(-10.5, 1.5, 0), "gap_z": 4.0},
+	{"name": "DoorEast",  "center": Vector3(10.5, 1.5, 0),  "gap_z": 4.0},
 ]
 
-# ---- interior pillars (0.6m, 2x3 grid, height 3.0) ----
+# ---- 大厅柱列（4×3=12 根，0.6m 见方，高 3.0）----
 const HALL_PILLARS := [
-	{"name": "PillarA", "center": Vector3(-3.5, 1.5, -3.0), "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarB", "center": Vector3(0.0, 1.5, -3.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarC", "center": Vector3(3.5, 1.5, -3.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarD", "center": Vector3(-3.5, 1.5, 3.0),  "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarE", "center": Vector3(0.0, 1.5, 3.0),   "size": Vector3(0.6, 3.0, 0.6)},
-	{"name": "PillarF", "center": Vector3(3.5, 1.5, 3.0),   "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarA", "center": Vector3(-6.5, 1.5, -5.0), "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarB", "center": Vector3(-2.5, 1.5, -5.0), "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarC", "center": Vector3(2.5, 1.5, -5.0),  "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarD", "center": Vector3(6.5, 1.5, -5.0),  "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarE", "center": Vector3(-6.5, 1.5, 0.0),  "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarF", "center": Vector3(-2.5, 1.5, 0.0),  "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarG", "center": Vector3(2.5, 1.5, 0.0),   "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarH", "center": Vector3(6.5, 1.5, 0.0),   "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarI", "center": Vector3(-6.5, 1.5, 5.0),  "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarJ", "center": Vector3(-2.5, 1.5, 5.0),  "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarK", "center": Vector3(2.5, 1.5, 5.0),   "size": Vector3(0.6, 3.0, 0.6)},
+	{"name": "PillarL", "center": Vector3(6.5, 1.5, 5.0),   "size": Vector3(0.6, 3.0, 0.6)},
 ]
 
-# ---- interior half-walls (1.2m, split north/south blocks) ----
+# ---- 大厅内矮墙（分割南北区）----
 const HALL_DIVIDERS := [
-	{"name": "DividerN", "kind": "cover", "center": Vector3(-3.0, 0.6, 1.5),  "size": Vector3(6.0, 1.2, 0.5)},
-	{"name": "DividerS", "kind": "cover", "center": Vector3(3.0, 0.6, -1.5),  "size": Vector3(6.0, 1.2, 0.5)},
+	{"name": "DividerN", "kind": "cover", "center": Vector3(-4.0, 0.6, 2.0), "size": Vector3(7.0, 1.2, 0.5)},
+	{"name": "DividerS", "kind": "cover", "center": Vector3(4.0, 0.6, -2.0),  "size": Vector3(7.0, 1.2, 0.5)},
 ]
 
-# ---- 大厅屋顶（问题4：中央建筑实体感——加盖 3.0m 高屋顶，形成建筑而非开放几何）----
-# 屋顶面板：y 中心 3.25（顶面 3.5，高于柱顶 3.0），厚度 0.5；两端留 2m 天窗缝（采光+视觉）
+# ---- 大厅屋顶（3m 高实体感）----
 const HALL_ROOF := [
-	{"name": "HallRoofN", "kind": "roof", "center": Vector3(0, 3.25, 3.5), "size": Vector3(14, 0.5, 4.0)},
-	{"name": "HallRoofS", "kind": "roof", "center": Vector3(0, 3.25, -3.5), "size": Vector3(14, 0.5, 4.0)},
+	{"name": "HallRoofN", "kind": "roof", "center": Vector3(0, 3.25, 4.0), "size": Vector3(20, 0.5, 6.0)},
+	{"name": "HallRoofS", "kind": "roof", "center": Vector3(0, 3.25, -4.0), "size": Vector3(20, 0.5, 6.0)},
 ]
-# 门框（问题4：门洞加框柱，强化出入口的"门"感）——框柱内移（中心 ±0.8）避开墙段边界（±1.0 起）
+
+# ---- 大厅门框（门洞两侧框柱，贴墙段内沿，不与墙段重叠；4m 门洞）----
 const HALL_DOOR_FRAMES := [
-	{"name": "DoorFrameN_L", "kind": "wall", "center": Vector3(-0.8, 1.5, 6.5), "size": Vector3(0.4, 3.0, 1.4)},
-	{"name": "DoorFrameN_R", "kind": "wall", "center": Vector3(0.8, 1.5, 6.5),  "size": Vector3(0.4, 3.0, 1.4)},
-	{"name": "DoorFrameS_L", "kind": "wall", "center": Vector3(-0.8, 1.5, -6.5), "size": Vector3(0.4, 3.0, 1.4)},
-	{"name": "DoorFrameS_R", "kind": "wall", "center": Vector3(0.8, 1.5, -6.5),  "size": Vector3(0.4, 3.0, 1.4)},
-	{"name": "DoorFrameW_T", "kind": "wall", "center": Vector3(-7.5, 1.5, 0.8), "size": Vector3(1.4, 3.0, 0.4)},
-	{"name": "DoorFrameW_B", "kind": "wall", "center": Vector3(-7.5, 1.5, -0.8), "size": Vector3(1.4, 3.0, 0.4)},
-	{"name": "DoorFrameE_T", "kind": "wall", "center": Vector3(7.5, 1.5, 0.8),  "size": Vector3(1.4, 3.0, 0.4)},
-	{"name": "DoorFrameE_B", "kind": "wall", "center": Vector3(7.5, 1.5, -0.8),  "size": Vector3(1.4, 3.0, 0.4)},
+	{"name": "DoorFrameN_L", "kind": "wall", "center": Vector3(-2.2, 1.5, 8.5), "size": Vector3(0.4, 3.0, 1.4)},
+	{"name": "DoorFrameN_R", "kind": "wall", "center": Vector3(2.2, 1.5, 8.5),  "size": Vector3(0.4, 3.0, 1.4)},
+	{"name": "DoorFrameS_L", "kind": "wall", "center": Vector3(-2.2, 1.5, -8.5), "size": Vector3(0.4, 3.0, 1.4)},
+	{"name": "DoorFrameS_R", "kind": "wall", "center": Vector3(2.2, 1.5, -8.5),  "size": Vector3(0.4, 3.0, 1.4)},
+	{"name": "DoorFrameW_T", "kind": "wall", "center": Vector3(-10.5, 1.5, 2.2), "size": Vector3(1.4, 3.0, 0.4)},
+	{"name": "DoorFrameW_B", "kind": "wall", "center": Vector3(-10.5, 1.5, -2.2), "size": Vector3(1.4, 3.0, 0.4)},
+	{"name": "DoorFrameE_T", "kind": "wall", "center": Vector3(10.5, 1.5, 2.2),  "size": Vector3(1.4, 3.0, 0.4)},
+	{"name": "DoorFrameE_B", "kind": "wall", "center": Vector3(10.5, 1.5, -2.2),  "size": Vector3(1.4, 3.0, 0.4)},
 ]
 
-# ---- outdoor vertical layer ----
-# West low roofs (1.2m jumpable), only in mid street band (z -6.5..6.5), west of west street
-const WEST_ROOFS := [
-	{"name": "RoofWest1", "kind": "roof", "center": Vector3(-16, 0.6, -4), "size": Vector3(6, 1.2, 5)},
-	{"name": "RoofWest2", "kind": "roof", "center": Vector3(-16, 0.6, 4),  "size": Vector3(6, 1.2, 5)},
-]
-# East rooftop (2.5m) — 东侧建筑群（问题3 修复）：
-#   东街走廊 x∈[9.5,13.5]（4m，大厅东口直通）
-#   三级台阶 x∈[13.5,21.5]（每级 2.67m 宽 × 0.83m 高 → 逐级跳上屋顶；灰盒斜坡替代，真斜坡 T4 三角棱柱）
-#   屋顶 x∈[21.5,29.5]（8m 宽，顶面 2.5m，顶到东墙 → 零夹缝）
-#   StepEast3 顶面(2.49) 与 RoofEast 顶面(2.5) 齐平并重叠 0.5m —— 消灭"台阶→屋顶"落差缝卡人
-#   注：台阶每级 0.83m 远小于可跳上限 1.3m ✓
-const EAST_ROOF := {"name": "RoofEast", "kind": "roof", "center": Vector3(25.5, 1.25, 0), "size": Vector3(8, 2.5, 12)}
-const EAST_STEPS := [
-	{"name": "StepEast1", "kind": "roof", "center": Vector3(14.3, 0.415, 0), "size": Vector3(2.67, 0.83, 12)},
-	{"name": "StepEast2", "kind": "roof", "center": Vector3(17.0, 1.245, 0), "size": Vector3(2.67, 0.83, 12)},
-	{"name": "StepEast3", "kind": "roof", "center": Vector3(20.6, 2.075, 0), "size": Vector3(2.67, 0.83, 12)},
-]
+# ---- 四角建筑（14×15m 外廓，2 门朝地图中心，内部 CQB，1.2m 屋顶盖后半可跳上俯瞰街道）----
+# 角建筑外廓：x∈[cx-7, cx+7], z∈[cz-7.5, cz+7.5]（14 宽 × 15 深）
+# 角落规则：墙段从外廓边界起、到相邻垂墙外沿止（角落 ox=0/oz=0 相接，不重叠不露缝）。
+# 门洞：朝向地图中心的两面墙各留 3m 门洞（居中）。
+# 由 _corner_walls() 生成——避免手算坐标误差。
+static func _corner_walls() -> Array:
+	var out := []
+	# 四角建筑规格（外廓 + 门朝向）
+	var corners := [
+		{"name": "NW", "cx": -23.0, "cz": 21.5},   # 门朝 东(E) + 南(S)
+		{"name": "NE", "cx": 23.0,  "cz": 21.5},   # 门朝 西(W) + 南(S)
+		{"name": "SW", "cx": -23.0, "cz": -21.5},  # 门朝 东(E) + 北(N)
+		{"name": "SE", "cx": 23.0,  "cz": -21.5},  # 门朝 西(W) + 北(N)
+	]
+	for c in corners:
+		var n: String = c["name"]
+		var cx: float = c["cx"]
+		var cz: float = c["cz"]
+		var x0 := cx - 7.0   # 外廓西沿
+		var x1 := cx + 7.0   # 外廓东沿
+		var z0 := cz - 7.5   # 外廓南沿
+		var z1 := cz + 7.5   # 外廓北沿
+		# 门朝向（朝地图中心的两面）
+		var door_e := n.contains("W")   # NW/SW 东墙开门（朝东街）
+		var door_s := n.contains("N")   # NW/NE 南墙开门（朝南街）
+		# --- 北墙（z1，横跨 x0..x1）---
+		out.append({"name": n + "Wall_N", "kind": "wall", "center": Vector3((x0 + x1) * 0.5, 1.5, z1 - 0.5), "size": Vector3(x1 - x0, 3.0, 1)})
+		# --- 南墙（z0，若开门则分两段）---
+		if door_s:
+			# 门洞 3m：x∈[cx-1.5, cx+1.5]
+			out.append({"name": n + "Wall_S_L", "kind": "wall", "center": Vector3((x0 + cx - 1.5) * 0.5, 1.5, z0 + 0.5), "size": Vector3((cx - 1.5) - x0, 3.0, 1)})
+			out.append({"name": n + "Wall_S_R", "kind": "wall", "center": Vector3((cx + 1.5 + x1) * 0.5, 1.5, z0 + 0.5), "size": Vector3(x1 - (cx + 1.5), 3.0, 1)})
+		else:
+			out.append({"name": n + "Wall_S", "kind": "wall", "center": Vector3((x0 + x1) * 0.5, 1.5, z0 + 0.5), "size": Vector3(x1 - x0, 3.0, 1)})
+		# --- 东墙（x1，若开门则分两段）---
+		if door_e:
+			out.append({"name": n + "Wall_E_T", "kind": "wall", "center": Vector3(x1 - 0.5, 1.5, (cz + 1.5 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - (cz + 1.5))})
+			out.append({"name": n + "Wall_E_B", "kind": "wall", "center": Vector3(x1 - 0.5, 1.5, (z0 + cz - 1.5) * 0.5), "size": Vector3(1, 3.0, (cz - 1.5) - z0)})
+		else:
+			out.append({"name": n + "Wall_E", "kind": "wall", "center": Vector3(x1 - 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
+		# --- 西墙（x0）---
+		out.append({"name": n + "Wall_W", "kind": "wall", "center": Vector3(x0 + 0.5, 1.5, (z0 + z1) * 0.5), "size": Vector3(1, 3.0, z1 - z0)})
+	return out
 
-# ---- cover pieces ----
+# ---- 角建筑内部矮墙 + 后半 1.2m 屋顶（屋顶内缩 0.5m 不顶外墙）----
+static func _corner_interiors() -> Array:
+	var out := []
+	var corners := [
+		{"name": "NW", "cx": -23.0, "cz": 21.5},
+		{"name": "NE", "cx": 23.0,  "cz": 21.5},
+		{"name": "SW", "cx": -23.0, "cz": -21.5},
+		{"name": "SE", "cx": 23.0,  "cz": -21.5},
+	]
+	for c in corners:
+		var n: String = c["name"]
+		var cx: float = c["cx"]
+		var cz: float = c["cz"]
+		# 内部矮墙（中央横隔，1.2m）
+		out.append({"name": n + "IntWall", "kind": "cover", "center": Vector3(cx, 0.6, cz - 1.5), "size": Vector3(10.0, 1.2, 0.5)})
+		# 后半 1.2m 屋顶（靠北侧，内缩 0.5m）
+		var roof_z := cz + 3.0
+		out.append({"name": n + "Roof", "kind": "roof", "center": Vector3(cx, 0.6, roof_z), "size": Vector3(11.0, 1.2, 6.0)})
+	return out
+
+# ---- 街道掩体（环形街道：西街 x∈[-16,-11]、东街 x∈[11,16]、北街 z∈[9,14]、南街 z∈[-14,-9]）----
 const COVERS := [
-	# west street 1m 宽箱堆（0.9m 高）— 放 x=-11（占[-11.5,-10.5]）：屋顶~箱 1.5m + 箱~墙 2.5m，无 <1.2m 窄缝
-	{"name": "BoxW1", "kind": "cover", "center": Vector3(-11, 0.45, -8), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "BoxW2", "kind": "cover", "center": Vector3(-11, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "BoxW3", "kind": "cover", "center": Vector3(-11, 0.45, -4), "size": Vector3(1.0, 0.9, 1.0)},
-	# cars 移到中街（西街 5m 放不下车+两侧通道）— 中街 z=-16：单辆横置大车（消灭 1m 中央窄缝），与 BoxM1 缝 ≥1.5m
+	# 西街箱堆（1m 宽，贴墙，无窄缝）
+	{"name": "BoxW1", "kind": "cover", "center": Vector3(-14.5, 0.45, -6), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "BoxW2", "kind": "cover", "center": Vector3(-14.5, 0.45, 6), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "BoxW3", "kind": "cover", "center": Vector3(-13.0, 0.45, 0), "size": Vector3(1.0, 0.9, 1.0)},
+	# 东街集装箱（贴墙）
+	{"name": "ContainerE1", "kind": "cover", "center": Vector3(14.5, 1.1, -6), "size": Vector3(3.5, 2.2, 2.5)},
+	{"name": "ContainerE2", "kind": "cover", "center": Vector3(14.5, 1.1, 6), "size": Vector3(3.5, 2.2, 2.5)},
+	# 北街箱堆
+	{"name": "BoxN1", "kind": "cover", "center": Vector3(-4, 0.45, 11.5), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "BoxN2", "kind": "cover", "center": Vector3(4, 0.45, 11.5), "size": Vector3(1.0, 0.9, 1.0)},
+	# 南街箱堆
+	{"name": "BoxS1", "kind": "cover", "center": Vector3(-4, 0.45, -11.5), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "BoxS2", "kind": "cover", "center": Vector3(4, 0.45, -11.5), "size": Vector3(1.0, 0.9, 1.0)},
+	# 中街车（z=-16 横置大车）
 	{"name": "CarM1", "kind": "cover", "center": Vector3(0, 0.65, -16), "size": Vector3(4.0, 1.3, 1.2)},
-	# east containers (2.2m high cover) — 东街两侧（避开斜坡 z∈[-6,6]），不挡走廊
-	{"name": "ContainerE1", "kind": "cover", "center": Vector3(11, 1.1, -11), "size": Vector3(3.5, 2.2, 2.5)},
-	{"name": "ContainerE2", "kind": "cover", "center": Vector3(11, 1.1, 9), "size": Vector3(3.5, 2.2, 2.5)},
-	# mid-street 1.4m walls (grenade coverage + spawn cover) — BoxM1 移到 z=-13（与 CarM1 z=-16 缝 1.9m）
-	{"name": "BoxM1", "kind": "cover", "center": Vector3(0, 0.7, -13), "size": Vector3(2.0, 1.4, 0.5)},
-	{"name": "BoxM2", "kind": "cover", "center": Vector3(0, 0.7, 14), "size": Vector3(2.0, 1.4, 0.5)},
 ]
 
-# ---- spawn alcoves (symmetric N/S; 1.4m half-wall blocks spawn-kill LOS) ----
+# ---- 紧凑出生区（8×8：x∈[-6,6], z∈[21,29] / z∈[-29,-21]）----
 const SPAWNS := [
-	{"name": "SpawnN", "kind": "spawn", "center": Vector3(-2, 0, 27), "facing": "S"},
-	{"name": "SpawnS", "kind": "spawn", "center": Vector3(-2, 0, -27), "facing": "N"},
+	{"name": "SpawnN", "kind": "spawn", "center": Vector3(0, 0, 25), "facing": "S"},
+	{"name": "SpawnS", "kind": "spawn", "center": Vector3(0, 0, -25), "facing": "N"},
 ]
 const SPAWN_WALLS := [
-	{"name": "SpawnWallN", "kind": "cover", "center": Vector3(0, 0.7, 25.5), "size": Vector3(12, 1.4, 1.0)},
-	{"name": "SpawnWallS", "kind": "cover", "center": Vector3(0, 0.7, -25.5), "size": Vector3(12, 1.4, 1.0)},
+	{"name": "SpawnWallN", "kind": "cover", "center": Vector3(0, 0.7, 21.5), "size": Vector3(12, 1.4, 1.0)},
+	{"name": "SpawnWallS", "kind": "cover", "center": Vector3(0, 0.7, -21.5), "size": Vector3(12, 1.4, 1.0)},
 ]
-
-# ---- 出生区掩体（问题4：出生区过分空旷——补箱堆/矮墙形成遮蔽，防出生即被看穿）----
 const SPAWN_COVERS := [
-	# T 出生（北）：前方两侧箱堆 + 中央矮墙
-	{"name": "SpawnBoxN1", "kind": "cover", "center": Vector3(-6, 0.45, 27), "size": Vector3(2.0, 0.9, 1.0)},
-	{"name": "SpawnBoxN2", "kind": "cover", "center": Vector3(6, 0.45, 27), "size": Vector3(2.0, 0.9, 1.0)},
-	{"name": "SpawnBoxN3", "kind": "cover", "center": Vector3(-3, 0.45, 24), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "SpawnBoxN4", "kind": "cover", "center": Vector3(3, 0.45, 24), "size": Vector3(1.0, 0.9, 1.0)},
-	# CT 出生（南）：对称
-	{"name": "SpawnBoxS1", "kind": "cover", "center": Vector3(-6, 0.45, -27), "size": Vector3(2.0, 0.9, 1.0)},
-	{"name": "SpawnBoxS2", "kind": "cover", "center": Vector3(6, 0.45, -27), "size": Vector3(2.0, 0.9, 1.0)},
-	{"name": "SpawnBoxS3", "kind": "cover", "center": Vector3(-3, 0.45, -24), "size": Vector3(1.0, 0.9, 1.0)},
-	{"name": "SpawnBoxS4", "kind": "cover", "center": Vector3(3, 0.45, -24), "size": Vector3(1.0, 0.9, 1.0)},
+	{"name": "SpawnBoxN1", "kind": "cover", "center": Vector3(-4, 0.45, 25), "size": Vector3(1.5, 0.9, 1.0)},
+	{"name": "SpawnBoxN2", "kind": "cover", "center": Vector3(4, 0.45, 25), "size": Vector3(1.5, 0.9, 1.0)},
+	{"name": "SpawnBoxS1", "kind": "cover", "center": Vector3(-4, 0.45, -25), "size": Vector3(1.5, 0.9, 1.0)},
+	{"name": "SpawnBoxS2", "kind": "cover", "center": Vector3(4, 0.45, -25), "size": Vector3(1.5, 0.9, 1.0)},
 ]
 
-# ---- all solids for AABB checks ----
+# ---- all solids ----
 static func all_solids() -> Array:
 	var out := []
 	out.append_array(GROUNDS)
@@ -158,9 +210,8 @@ static func all_solids() -> Array:
 	out.append_array(HALL_DIVIDERS)
 	out.append_array(HALL_ROOF)
 	out.append_array(HALL_DOOR_FRAMES)
-	out.append_array(WEST_ROOFS)
-	out.append_array([EAST_ROOF])
-	out.append_array(EAST_STEPS)
+	out.append_array(_corner_walls())
+	out.append_array(_corner_interiors())
 	out.append_array(COVERS)
 	out.append_array(SPAWN_WALLS)
 	out.append_array(SPAWN_COVERS)
@@ -170,4 +221,4 @@ static func hall_center() -> Vector3:
 	return Vector3(0, 0, 0)
 
 static func hall_size() -> Vector3:
-	return Vector3(14, 3.0, 12)
+	return Vector3(20, 3.0, 16)
