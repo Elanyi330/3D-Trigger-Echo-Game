@@ -123,25 +123,33 @@ for nm, par in PARENT.items():
     name2bone[nm].parent = name2bone[par]
 bpy.ops.object.mode_set(mode='OBJECT')
 
-# ---------------------------------------------------------------- bind (single bone per box, then ONE merged skinned mesh)
+# ---------------------------------------------------------------- bind (two skinned meshes: Body + Head, same armature)
+# M1.75：拆成 Body/Head 两网格——第一人称把相机挂眼位时需隐藏头网格（相机在头盒内），
+# 敌人/队友两网格全显示。共享同一骨架、同一顶点组绑定，比例不变。
 # 1) per-part vertex group (bone name) so groups merge correctly on join
 for o, bone in parts:
     vg = o.vertex_groups.new(name=bone)
     vg.add(list(range(len(o.data.vertices))), 1.0, 'REPLACE')
-# 2) join all parts into a single mesh (keeps material slots + merges vertex groups)
-bpy.ops.object.select_all(action='DESELECT')
-for o, bone in parts:
-    o.select_set(True)
-bpy.context.view_layer.objects.active = parts[0][0]
-bpy.ops.object.join()
-body = parts[0][0]
-body.name = "Soldier_Echo_Body"
-# 3) clear object transform so the skinned mesh sits at the armature origin
-body.location = (0, 0, 0)
-# 4) one armature modifier on the merged mesh
-mod = body.modifiers.new("Armature", 'ARMATURE')
-mod.object = arm_obj
-body.parent = arm_obj
+
+def merge(group, name):
+    bpy.ops.object.select_all(action='DESELECT')
+    for o, _b in group:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = group[0][0]
+    bpy.ops.object.join()
+    m = group[0][0]
+    m.name = name
+    m.location = (0, 0, 0)  # clear object transform so skinned mesh sits at armature origin
+    mod = m.modifiers.new("Armature", 'ARMATURE')
+    mod.object = arm_obj
+    m.parent = arm_obj
+    return m
+
+HEAD_BONES = {"Head"}
+body_parts = [(o, b) for (o, b) in parts if b not in HEAD_BONES]
+head_parts = [(o, b) for (o, b) in parts if b in HEAD_BONES]
+body = merge(body_parts, "Soldier_Echo_Body")
+head = merge(head_parts, "Soldier_Echo_Head")
 
 # ---------------------------------------------------------------- export / debug
 if DEBUG:

@@ -59,34 +59,26 @@ func _ready() -> void:
 	add_child(_label)
 
 
-# M1.5：随机武器配备（用户：查看第三人称角色持枪表现）——真实尺寸 + 真实握把挂接，
-# 与 1.83m（CS 身高）角色比例统一适配。每件武器：右臂前摆 + 武器挂 Hand_R（GripRight=原点即握把）。
-const ENEMY_WEAPONS := [  # 路径 → 武器在手中的 (位移, 欧拉角°)；wrot 翻正枪口朝前、贴右手
-	{"path": "res://Assets/Models/Weapons/Rifle/AK47_Echo/AK47_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
-	{"path": "res://Assets/Models/Weapons/Pistol/Glock18_Echo/Glock18_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
-	{"path": "res://Assets/Models/Weapons/Melee/Knife_Echo/Knife_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
-	{"path": "res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb", "pos": Vector3(0, 0, 0), "rot": Vector3(25, 180, 0)},
+# M1.75：随机武器配备——统一 GripRig 持握（与玩家/队友同一组件同一数据表）。
+# 持握姿态（双手据枪/单手持/竖持刀/掌心雷）由 GripRig.GRIP_STYLE 唯一定义，IK 双手到握把标记。
+const ENEMY_WEAPONS := [
+	"res://Assets/Models/Weapons/Rifle/AK47_Echo/AK47_Echo.glb",
+	"res://Assets/Models/Weapons/Pistol/Glock18_Echo/Glock18_Echo.glb",
+	"res://Assets/Models/Weapons/Melee/Knife_Echo/Knife_Echo.glb",
+	"res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb",
 ]
-const ARM_RAISE_DEG := -50.0  # 右臂前摆角（UpperArm_R 局部 X）
 
+var _rig: GripRig
 
 func _equip_random_weapon() -> void:
 	var skel := _find_skeleton(_visual)
 	if skel == null:
 		return
-	# 右臂前摆（持枪姿态）
-	var ua := skel.find_bone("UpperArm_R")
-	if ua >= 0:
-		skel.set_bone_pose_rotation(ua, Quaternion.from_euler(Vector3(deg_to_rad(ARM_RAISE_DEG), 0.0, 0.0)))
-	# 随机选一款，挂右手骨（GripRight=武器原点即握把，真实尺寸——与角色比例统一适配）
-	var cfg: Dictionary = ENEMY_WEAPONS[randi() % ENEMY_WEAPONS.size()]
-	var ba := BoneAttachment3D.new()
-	ba.bone_name = "Hand_R"
-	skel.add_child(ba)
-	var w: Node3D = load(cfg["path"]).instantiate()
-	ba.add_child(w)
-	w.position = cfg["pos"]
-	w.rotation = Vector3(deg_to_rad(cfg["rot"].x), deg_to_rad(cfg["rot"].y), deg_to_rad(cfg["rot"].z))
+	_rig = GripRig.new()
+	_rig.name = "GripRig"
+	add_child(_rig)
+	_rig.setup(skel)
+	_rig.equip(load(ENEMY_WEAPONS[randi() % ENEMY_WEAPONS.size()]))
 
 
 func _find_skeleton(n: Node) -> Skeleton3D:
