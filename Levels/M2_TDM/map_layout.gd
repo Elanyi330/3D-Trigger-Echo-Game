@@ -171,10 +171,10 @@ static func _corner_walls() -> Array:
 static func _side_buildings() -> Array:
 	var out := []
 	var specs := [
-		{"name": "W_N", "cx": -25.0, "cz": -7.0},
-		{"name": "W_S", "cx": -25.0, "cz": 7.0},
-		{"name": "E_N", "cx": 25.0, "cz": -7.0},
-		{"name": "E_S", "cx": 25.0, "cz": 7.0},
+		{"name": "W_N", "cx": -23.0, "cz": -7.0},
+		{"name": "W_S", "cx": -23.0, "cz": 7.0},
+		{"name": "E_N", "cx": 23.0, "cz": -7.0},
+		{"name": "E_S", "cx": 23.0, "cz": 7.0},
 	]
 	for s in specs:
 		var n: String = s["name"]
@@ -295,15 +295,15 @@ const OUTER_CORRIDORS := [
 # 小树保持 decor 无碰撞（用户确认保留）。
 const BIG_TREES := [
 	# 西街外侧（x∈[-21,-18] 空地，西边界墙 -30）— 中心 y=1.25（树干从地面到 2.5m）
-	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-25.0, 1.25, 0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW1", "kind": "bigtree", "center": Vector3(-24.5, 1.25, -2.0), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeW2", "kind": "bigtree", "center": Vector3(-21.5, 1.25, -4.0), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeW3", "kind": "bigtree", "center": Vector3(-21.5, 1.25, 4.0), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-25.0, 1.25, 8.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeW4", "kind": "bigtree", "center": Vector3(-24.5, 1.25, 12.0), "size": Vector3(0.7, 2.5, 0.7)},
 	# 东街外侧（x∈[18,21] 空地）
-	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(25.0, 1.25, 0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE1", "kind": "bigtree", "center": Vector3(24.5, 1.25, -2.0), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeE2", "kind": "bigtree", "center": Vector3(21.5, 1.25, -4.0), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeE3", "kind": "bigtree", "center": Vector3(21.5, 1.25, 4.0), "size": Vector3(0.7, 2.5, 0.7)},
-	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(25.0, 1.25, 8.0), "size": Vector3(0.7, 2.5, 0.7)},
+	{"name": "BigTreeE4", "kind": "bigtree", "center": Vector3(24.5, 1.25, 12.0), "size": Vector3(0.7, 2.5, 0.7)},
 	# 南北带两侧（x=±15.5 空旷带）
 	{"name": "BigTreeN1", "kind": "bigtree", "center": Vector3(-15.5, 1.25, 18.0), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "BigTreeN2", "kind": "bigtree", "center": Vector3(15.5, 1.25, 18.0), "size": Vector3(0.7, 2.5, 0.7)},
