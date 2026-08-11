@@ -145,7 +145,11 @@ static var STREETS: Array = [
 # （center z=14 配 size.z=3 → z∈[12.5,15.5]），且会破坏测试 5/6/8 与 boost gate；
 # 按项目墙体惯例 (长, 墙高 3, 厚 1) 取 (9,3,1)（坐地面，同 rim 墙），详见任务报告。
 static var GATES: Array = _bell_gate(1) + _market_belt(1) + _bell_gate(-1) + _market_belt(-1)
-const BACKSTREETS := []  # 任务6：背街/营
+# ---- 任务 6：背街 + 营（南半 = 北半 180° 旋转：(x,z)→(−x,−z)）----
+# GDScript const 不允许函数调用，故表为 static var（同 RAMPS/STREETS/GATES）。
+# 命名按物理位置：北半 CampN_/BackN_ 前缀，南半 CampS_/BackS_ 前缀，
+# W/E 按实体旋转后的实际 x 侧（旋转映射含 W↔E 互换）。
+static var BACKSTREETS: Array = _backstreet(1) + _camp(1) + _backstreet(-1) + _camp(-1)
 const OUTER := []        # 任务7：外环/角场
 
 
@@ -211,6 +215,66 @@ static func _market_belt(side: int) -> Array:
 			"center": Vector3(-3 * side, 4.7, 10.75 * side), "size": Vector3(4, 0.4, 2.5)},
 		{"name": tag + "_CanopyE", "kind": "roof",
 			"center": Vector3(3 * side, 4.7, 10.75 * side), "size": Vector3(4, 0.4, 2.5)},
+	]
+
+
+## 背街生成器：side=1 北 / side=-1 南（180° 旋转 = x/z 乘 side）。
+## LOS 断视板 ×2（x=±10）+ 大树 ×2（x=±21，bigtree：center.y=树干半高，
+## 数据 AABB = center±size/2，y∈[0,2.5]）。W/E 按旋转后物理位置命名。
+static func _backstreet(side: int) -> Array:
+	var tag: String = "BackN" if side == 1 else "BackS"
+	# 180° 旋转映射含 E↔W 互换：side=1 北半保持原字符，side=-1 南半互换
+	var e_ch: String = "E" if side == 1 else "W"
+	var w_ch: String = "W" if side == 1 else "E"
+	return [
+		{"name": tag + "_LOS_" + e_ch, "kind": "cover",
+			"center": Vector3(10 * side, 1.1, 17.75 * side), "size": Vector3(3, 2.2, 0.4)},
+		{"name": tag + "_LOS_" + w_ch, "kind": "cover",
+			"center": Vector3(-10 * side, 1.1, 17.75 * side), "size": Vector3(3, 2.2, 0.4)},
+		{"name": tag + "_Tree_" + e_ch, "kind": "bigtree",
+			"center": Vector3(21 * side, 1.25, 18 * side), "size": Vector3(0.7, 2.5, 0.7)},
+		{"name": tag + "_Tree_" + w_ch, "kind": "bigtree",
+			"center": Vector3(-21 * side, 1.25, 18 * side), "size": Vector3(0.7, 2.5, 0.7)},
+	]
+
+
+## 营生成器：side=1 北 / side=-1 南（180° 旋转 = x/z 乘 side）。
+## 营墙 3m 高 1m 厚：北墙 x∈[-6,6]（角部由东西墙覆盖，避免角重叠）；
+## 南门缝 x∈[-1.5,1.5] 宽 3m；东西侧门缝 z∈[25.5,27.5] 宽 2m；
+## 顶板底 4.5 出挑 0.5；影壁三道（南门缝 2.0 / 侧缝 2.25）；营前场货车掩体
+## （偏离门轴 x=0——2026-08-11 碰撞审计修正：原 x=2.5 与影壁 AABB 重叠）。
+static func _camp(side: int) -> Array:
+	var tag: String = "CampN" if side == 1 else "CampS"
+	# 180° 旋转映射含 N↔S / E↔W 互换：后缀方向字符按旋转后物理位置命名
+	var n_ch: String = "N" if side == 1 else "S"
+	var s_ch: String = "S" if side == 1 else "N"
+	var e_ch: String = "E" if side == 1 else "W"
+	var w_ch: String = "W" if side == 1 else "E"
+	return [
+		{"name": tag + "_Wall" + n_ch, "kind": "wall",
+			"center": Vector3(0, 1.5, 28.5 * side), "size": Vector3(12, 3, 1)},
+		{"name": tag + "_Wall" + s_ch + "_" + w_ch, "kind": "wall",
+			"center": Vector3(-3.75 * side, 1.5, 24.5 * side), "size": Vector3(4.5, 3, 1)},
+		{"name": tag + "_Wall" + s_ch + "_" + e_ch, "kind": "wall",
+			"center": Vector3(3.75 * side, 1.5, 24.5 * side), "size": Vector3(4.5, 3, 1)},
+		{"name": tag + "_Wall" + w_ch + "_" + s_ch, "kind": "wall",
+			"center": Vector3(-6.5 * side, 1.5, 24.75 * side), "size": Vector3(1, 3, 1.5)},
+		{"name": tag + "_Wall" + w_ch + "_" + n_ch, "kind": "wall",
+			"center": Vector3(-6.5 * side, 1.5, 28.25 * side), "size": Vector3(1, 3, 1.5)},
+		{"name": tag + "_Wall" + e_ch + "_" + s_ch, "kind": "wall",
+			"center": Vector3(6.5 * side, 1.5, 24.75 * side), "size": Vector3(1, 3, 1.5)},
+		{"name": tag + "_Wall" + e_ch + "_" + n_ch, "kind": "wall",
+			"center": Vector3(6.5 * side, 1.5, 28.25 * side), "size": Vector3(1, 3, 1.5)},
+		{"name": tag + "_Roof", "kind": "roof",
+			"center": Vector3(0, 4.7, 26.5 * side), "size": Vector3(15, 0.4, 6)},
+		{"name": tag + "_Screen_" + s_ch, "kind": "wall",
+			"center": Vector3(1 * side, 1.5, 21.75 * side), "size": Vector3(4, 3, 0.5)},
+		{"name": tag + "_Screen_" + w_ch, "kind": "wall",
+			"center": Vector3(-9.5 * side, 1.5, 26.5 * side), "size": Vector3(0.5, 3, 4)},
+		{"name": tag + "_Screen_" + e_ch, "kind": "wall",
+			"center": Vector3(9.5 * side, 1.5, 26.5 * side), "size": Vector3(0.5, 3, 4)},
+		{"name": tag + "_Truck", "kind": "cover",
+			"center": Vector3(4.5 * side, 1.1, 21.5 * side), "size": Vector3(3, 2.2, 1)},
 	]
 
 

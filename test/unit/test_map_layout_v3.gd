@@ -454,22 +454,44 @@ func _z_spans_in(table: Array, prefix: String) -> Array:
 	return spans
 
 
-# 180° 旋转命名映射：前缀 East→West，其余部分方向字符 N↔S / E↔W 互换。
-# 仅轮换"非单词首字母"的方向字符（后随字符非小写），避免误伤 "Step" 等词首 S。
+# 180° 旋转命名映射：前缀 East↔West（任务 4）、CampN_↔CampS_、BackN_↔BackS_（任务 6），
+# 其余部分方向字符 N↔S / E↔W 互换（W/E 按旋转后物理位置命名）。
+# 仅轮换"后缀方向字符"（后随字符非小写，且前驱字符非大写——前驱大写说明该字符
+# 属于全大写缩写词，如 "LOS" 的词尾 S），避免误伤 "Step" 等词首 S。
 func _rot_pair(nm: String) -> String:
-	var rest := nm.trim_prefix("East")
+	var prefix := ""
+	var rest := nm
+	if nm.begins_with("East"):
+		prefix = "West"
+		rest = nm.trim_prefix("East")
+	elif nm.begins_with("West"):
+		prefix = "East"
+		rest = nm.trim_prefix("West")
+	elif nm.begins_with("CampN_"):
+		prefix = "CampS_"
+		rest = nm.trim_prefix("CampN_")
+	elif nm.begins_with("CampS_"):
+		prefix = "CampN_"
+		rest = nm.trim_prefix("CampS_")
+	elif nm.begins_with("BackN_"):
+		prefix = "BackS_"
+		rest = nm.trim_prefix("BackN_")
+	elif nm.begins_with("BackS_"):
+		prefix = "BackN_"
+		rest = nm.trim_prefix("BackS_")
 	var out := ""
 	for i in rest.length():
 		var ch := rest[i]
 		var word_head: bool = i + 1 < rest.length() and rest[i + 1] >= "a" and rest[i + 1] <= "z"
-		if not word_head:
+		var prev_upper: bool = i > 0 and rest[i - 1] >= "A" and rest[i - 1] <= "Z"
+		if not word_head and not prev_upper:
 			match ch:
 				"N": ch = "S"
 				"S": ch = "N"
 				"E": ch = "W"
 				"W": ch = "E"
 		out += ch
-	return "West" + out
+	return prefix + out
 
 
 # ---- 18. 长墙：东/西各 3 段尺寸位置 + 豁口 z∈[5.5,8]∪[-8,-5.5] 无覆盖 ----
@@ -869,3 +891,189 @@ func test_gates_no_overlap() -> void:
 			var bb := _aabb(b)
 			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
 				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
+
+
+# ==== 任务 6：背街 + 营（南北）====
+
+# ---- 34. 营门缝净空：北营南门缝 x∈[-1.5,1.5] z∈[24,25]；东西侧门缝 z∈[25.5,27.5]
+#         （x∈[-7,-6] 与 [6,7]）；南营镜像（z 取反）。门缝带内无 wall 实体 ----
+func test_camp_doors() -> void:
+	var regions := [
+		[-1.5, 1.5, 24.0, 25.0],
+		[-7.0, -6.0, 25.5, 27.5],
+		[6.0, 7.0, 25.5, 27.5],
+		[-1.5, 1.5, -25.0, -24.0],
+		[-7.0, -6.0, -27.5, -25.5],
+		[6.0, 7.0, -27.5, -25.5],
+	]
+	for r0 in regions:
+		var r: Array = r0
+		for e0 in V3.all_solids():
+			var e: Dictionary = e0
+			if e["kind"] != "wall":
+				continue
+			var bb := _aabb(e)
+			assert_false(_in_region(bb, r[0], r[1], 0.0, 4.5, r[2], r[3]),
+				"营门缝 x∈[%s,%s] z∈[%s,%s]（顶 4.5 以下通行带）出现 wall 实体 %s" % [
+					r[0], r[1], r[2], r[3], e["name"]])
+
+
+# ---- 35. 营顶板：南/北营 Roof 底面 == 4.5 ----
+func test_camp_roof() -> void:
+	for tag in ["CampN", "CampS"]:
+		var ent := _find(V3.BACKSTREETS, tag + "_Roof")
+		assert_false(ent.is_empty(), "BACKSTREETS 含 %s_Roof" % tag)
+		if ent.is_empty():
+			continue
+		assert_eq(ent["kind"], "roof", "%s_Roof kind == roof" % tag)
+		var bb := _aabb(ent)
+		assert_almost_eq(bb[0].y, 4.5, 0.001, "%s_Roof 底面 == 4.5" % tag)
+
+
+# ---- 36. 影壁：南门影壁 ↔ 营南墙外沿缝 == 2.0；侧影壁 ↔ 营侧墙缝 == 2.25；南北共 6 影壁 ----
+func test_camp_screens() -> void:
+	var screen_count := 0
+	for e0 in V3.BACKSTREETS:
+		var e: Dictionary = e0
+		if (e["name"] as String).contains("_Screen_"):
+			screen_count += 1
+	assert_eq(screen_count, 6, "南北营影壁共 6 块")
+	# 每营取影壁与其对应营墙名（南营为 180° 旋转命名：门侧影壁 Screen_N、南墙 = WallN_*）
+	for spec0 in [
+			["CampN", "Screen_S", "WallS_W", "Screen_W", "WallW_S", "Screen_E", "WallE_S"],
+			["CampS", "Screen_N", "WallN_W", "Screen_W", "WallW_S", "Screen_E", "WallE_S"],
+	]:
+		var spec: Array = spec0
+		var camp: String = spec[0]
+		var scr_s := _find(V3.BACKSTREETS, camp + "_" + spec[1])
+		var wall_s := _find(V3.BACKSTREETS, camp + "_" + spec[2])
+		assert_false(scr_s.is_empty(), "BACKSTREETS 含 %s_%s" % [camp, spec[1]])
+		assert_false(wall_s.is_empty(), "BACKSTREETS 含 %s_%s" % [camp, spec[2]])
+		if not scr_s.is_empty() and not wall_s.is_empty():
+			var sb := _aabb(scr_s)
+			var wb := _aabb(wall_s)
+			var gap_z: float = maxf(wb[0].z - sb[1].z, sb[0].z - wb[1].z)
+			assert_almost_eq(gap_z, 2.0, 0.01,
+				"%s_%s ↔ 营南墙外沿缝 == 2.0" % [camp, spec[1]])
+		var scr_w := _find(V3.BACKSTREETS, camp + "_" + spec[3])
+		var wall_w := _find(V3.BACKSTREETS, camp + "_" + spec[4])
+		assert_false(scr_w.is_empty(), "BACKSTREETS 含 %s_%s" % [camp, spec[3]])
+		assert_false(wall_w.is_empty(), "BACKSTREETS 含 %s_%s" % [camp, spec[4]])
+		if not scr_w.is_empty() and not wall_w.is_empty():
+			var sb := _aabb(scr_w)
+			var wb := _aabb(wall_w)
+			var gap_x: float = maxf(wb[0].x - sb[1].x, sb[0].x - wb[1].x)
+			assert_almost_eq(gap_x, 2.25, 0.01,
+				"%s_%s ↔ 营西墙缝 == 2.25" % [camp, spec[3]])
+		var scr_e := _find(V3.BACKSTREETS, camp + "_" + spec[5])
+		var wall_e := _find(V3.BACKSTREETS, camp + "_" + spec[6])
+		assert_false(scr_e.is_empty(), "BACKSTREETS 含 %s_%s" % [camp, spec[5]])
+		assert_false(wall_e.is_empty(), "BACKSTREETS 含 %s_%s" % [camp, spec[6]])
+		if not scr_e.is_empty() and not wall_e.is_empty():
+			var sb := _aabb(scr_e)
+			var wb := _aabb(wall_e)
+			var gap_x: float = maxf(sb[0].x - wb[1].x, wb[0].x - sb[1].x)
+			assert_almost_eq(gap_x, 2.25, 0.01,
+				"%s_%s ↔ 营东墙缝 == 2.25" % [camp, spec[5]])
+
+
+# ---- 37. 营内部净空：北营 x∈[-6,6] z∈[25,28] y∈[0,3] 无任何实体（出生点空间保护）；南营同 ----
+func test_camp_interior_clear() -> void:
+	for region0 in [[-6.0, 6.0, 25.0, 28.0], [-6.0, 6.0, -28.0, -25.0]]:
+		var region: Array = region0
+		for e0 in V3.all_solids():
+			var e: Dictionary = e0
+			var bb := _aabb(e)
+			assert_false(_in_region(bb, region[0], region[1], 0.0, 3.0, region[2], region[3]),
+				"营内部 x∈[%s,%s] z∈[%s,%s] y∈[0,3] 被 %s 侵入" % [
+					region[0], region[1], region[2], region[3], e["name"]])
+
+
+# ---- 38. 背街断视线：北背街 LOS 板 ×2 在 x=±10、大树 ×2 在 x=±21（z=18±0.5 带内）；南背街同 ----
+func test_backstreet_los_breakers() -> void:
+	for spec0 in [
+			["BackN_LOS_E", "cover", 10.0, 18.0],
+			["BackN_LOS_W", "cover", -10.0, 18.0],
+			["BackN_Tree_E", "bigtree", 21.0, 18.0],
+			["BackN_Tree_W", "bigtree", -21.0, 18.0],
+			["BackS_LOS_E", "cover", 10.0, -18.0],
+			["BackS_LOS_W", "cover", -10.0, -18.0],
+			["BackS_Tree_E", "bigtree", 21.0, -18.0],
+			["BackS_Tree_W", "bigtree", -21.0, -18.0],
+	]:
+		var spec: Array = spec0
+		var nm: String = spec[0]
+		var ent := _find(V3.BACKSTREETS, nm)
+		assert_false(ent.is_empty(), "BACKSTREETS 含 %s" % nm)
+		if ent.is_empty():
+			continue
+		assert_eq(ent["kind"], spec[1], "%s kind == %s" % [nm, spec[1]])
+		var c: Vector3 = ent["center"]
+		assert_almost_eq(c.x, spec[2], 0.001, "%s center.x == %s" % [nm, spec[2]])
+		assert_true(absf(c.z - spec[3]) <= 0.5, "%s 在 z=%s±0.5 带内" % [nm, spec[3]])
+
+
+# ---- 39. 货车：center.x == 4.5（偏离门轴）；与南门影壁缝 == 0（面接触）；南营镜像 ----
+func test_truck_placement() -> void:
+	for pair0 in [["CampN_Truck", "CampN_Screen_S", 4.5],
+			["CampS_Truck", "CampS_Screen_N", -4.5]]:
+		var pair: Array = pair0
+		var truck := _find(V3.BACKSTREETS, pair[0])
+		var scr := _find(V3.BACKSTREETS, pair[1])
+		assert_false(truck.is_empty(), "BACKSTREETS 含 %s" % pair[0])
+		assert_false(scr.is_empty(), "BACKSTREETS 含 %s" % pair[1])
+		if truck.is_empty() or scr.is_empty():
+			continue
+		var c: Vector3 = truck["center"]
+		assert_almost_eq(c.x, pair[2], 0.001, "%s center.x == %s（偏离门轴）" % [pair[0], pair[2]])
+		var tb := _aabb(truck)
+		var sb := _aabb(scr)
+		var gap: float = maxf(tb[0].x - sb[1].x, sb[0].x - tb[1].x)
+		assert_almost_eq(gap, 0.0, 0.01, "%s ↔ %s x 缝 == 0（面接触）" % [pair[0], pair[1]])
+
+
+# ---- 40. 旋转对称：每个 CampN_*/BackN_* 有 CampS_*/BackS_* 对应体（_rot_pair 含前缀与 W↔E 轮换），
+#         center 互为 (-x,-z)、size 相同 ----
+func test_backstreets_rotation_pairs() -> void:
+	var north := []
+	for e0 in V3.BACKSTREETS:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		if nm.begins_with("CampN_") or nm.begins_with("BackN_"):
+			north.append(e)
+	assert_eq(north.size(), 16, "北半背街+营实体共 16 个（营 12 + 背街 4）")
+	for e0 in north:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		var want := _rot_pair(nm)
+		var w := _find(V3.BACKSTREETS, want)
+		assert_false(w.is_empty(), "%s 有旋转对应体 %s" % [nm, want])
+		if w.is_empty():
+			continue
+		var cn: Vector3 = e["center"]
+		var cs: Vector3 = w["center"]
+		var sn: Vector3 = e["size"]
+		var ss: Vector3 = w["size"]
+		assert_almost_eq(cs.x, -cn.x, 0.001, "%s/%s center.x 互为 -x" % [nm, want])
+		assert_almost_eq(cs.y, cn.y, 0.001, "%s/%s center.y 相同" % [nm, want])
+		assert_almost_eq(cs.z, -cn.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
+		assert_lt((sn - ss).length(), 0.001, "%s/%s size 相同" % [nm, want])
+
+
+# ---- 41. BACKSTREETS 内部两两 AABB 无重叠（豁免：a 垂直相接 ±0.01；
+#         b 同营墙段角部相接——两名均以同一 CampN_Wall/CampS_Wall 前缀开头，防御性豁免）----
+func test_backstreets_no_overlap() -> void:
+	assert_eq(V3.BACKSTREETS.size(), 32, "BACKSTREETS 实体共 32 个（南/北各 16）")
+	for i in range(V3.BACKSTREETS.size()):
+		for j in range(i + 1, V3.BACKSTREETS.size()):
+			var a: Dictionary = V3.BACKSTREETS[i]
+			var b: Dictionary = V3.BACKSTREETS[j]
+			var ba := _aabb(a)
+			var bb := _aabb(b)
+			var camp_wall_pair: bool = (
+				((a["name"] as String).begins_with("CampN_Wall")
+					and (b["name"] as String).begins_with("CampN_Wall"))
+				or ((a["name"] as String).begins_with("CampS_Wall")
+					and (b["name"] as String).begins_with("CampS_Wall")))
+			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb) or camp_wall_pair,
+				"%s vs %s: AABB 重叠（非垂直相接/同营墙段角部豁免）" % [a["name"], b["name"]])
