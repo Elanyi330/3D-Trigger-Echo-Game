@@ -638,10 +638,10 @@ func test_streets_rotation_pairs() -> void:
 		assert_almost_eq(cw.y, ce.y, 0.001, "%s/%s center.y 相同" % [nm, want])
 		assert_almost_eq(cw.z, -ce.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
 		assert_lt((se - sw).length(), 0.001, "%s/%s size 相同" % [nm, want])
-	assert_eq(east_count, 28, "East* 实体共 28 个（墙3+塔1+栏板5+箱1+坡道10+簇6+阁2）")
+	assert_eq(east_count, 26, "East* 实体共 26 个（墙3+塔1+栏板5+箱1+坡道10+簇4+阁2）")
 
 
-# ---- 24. boost 间距显式断言：4 块 Cluster Panel 与最近箱缝 ≥1.5；摊阁与最近 Panel 缝 ≥1.5 ----
+# ---- 24. boost 间距显式断言：4 块 Cluster Panel ↔ 最近箱缝 ≥1.5；Panel ↔ 最近摊阁缝 ≥1.5 ----
 func test_streets_boost_spacing() -> void:
 	var cboxes := []
 	for e0 in V3.STREETS:
@@ -649,7 +649,7 @@ func test_streets_boost_spacing() -> void:
 		var nm: String = e["name"]
 		if nm.contains("Cluster") and nm.contains("Box"):
 			cboxes.append(_aabb(e))
-	assert_eq(cboxes.size(), 8, "STREETS 含 8 个摊位簇箱")
+	assert_eq(cboxes.size(), 4, "STREETS 含 4 个摊位簇箱")
 	var panels := ["EastClusterN_Panel", "EastClusterS_Panel", "WestClusterN_Panel", "WestClusterS_Panel"]
 	for pn in panels:
 		var ent := _find(V3.STREETS, pn)
@@ -660,20 +660,23 @@ func test_streets_boost_spacing() -> void:
 		var nd := INF
 		for bb0 in cboxes:
 			nd = minf(nd, _xz_net_dist(pb, bb0))
-		assert_true(nd >= 1.5 - 0.01, "%s 与最近箱缝 %.3f ≥ 1.5（容差 0.01）" % [pn, nd])
+		assert_true(nd >= 1.5 - 0.01, "%s ↔ 最近箱缝 %.3f ≥ 1.5（容差 0.01）" % [pn, nd])
+	# Panel ↔ 最近摊阁缝 ≥ 1.5
+	var pavs := []
 	for pv in ["EastPavilion", "WestPavilion"]:
-		var ent := _find(V3.STREETS, pv)
-		assert_false(ent.is_empty(), "STREETS 含 %s" % pv)
+		var pe := _find(V3.STREETS, pv)
+		assert_false(pe.is_empty(), "STREETS 含 %s" % pv)
+		if not pe.is_empty():
+			pavs.append(_aabb(pe))
+	for pn in panels:
+		var ent := _find(V3.STREETS, pn)
 		if ent.is_empty():
 			continue
 		var pb := _aabb(ent)
 		var nd := INF
-		for pn in panels:
-			var pe := _find(V3.STREETS, pn)
-			if pe.is_empty():
-				continue
-			nd = minf(nd, _xz_net_dist(pb, _aabb(pe)))
-		assert_true(nd >= 1.5 - 0.01, "%s 与最近 Panel 缝 %.3f ≥ 1.5（容差 0.01）" % [pv, nd])
+		for pav0 in pavs:
+			nd = minf(nd, _xz_net_dist(pb, pav0))
+		assert_true(nd >= 1.5 - 0.01, "%s ↔ 最近摊阁缝 %.3f ≥ 1.5（容差 0.01）" % [pn, nd])
 
 
 # ---- 25. STREETS 内部两两 AABB 无重叠（豁免垂直相接 ±0.01）----
