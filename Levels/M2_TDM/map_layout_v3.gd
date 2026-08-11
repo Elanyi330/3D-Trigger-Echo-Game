@@ -84,12 +84,43 @@ const CLOCK := [
 	# 钟饰（无碰撞 weenie，顶 ~9.5）
 	{"name": "BellDecor", "kind": "decor", "center": Vector3(0, 8.6, 0), "size": Vector3(1.2, 1.8, 1.2)},
 ]
-# ---- 空表占位（后续任务填充）----
-const RAMPS := []        # 任务3：坡道/微台阶
+# ---- 任务 3：坡道（生成器产出）+ 祭坛台微台阶（手写）----
+# GDScript const 不允许函数调用，故表为 static var（外部访问方式 V3.RAMPS 不变）。
+static var RAMPS: Array = _ramp_steps(3.5, 6.5, -3.5, 2.5, 0.6, 3.0, "RampE", 8) \
+		+ _ramp_steps(-6.5, -3.5, 2.5, -3.5, 0.6, 3.0, "RampW", 8) \
+		+ [
+	# 祭坛台微台阶（N/S 缘各两级，供 AI 行走登台；坐广场地面，盒底 0，不在台面上）
+	{"name": "MicroN1", "kind": "cover", "center": Vector3(0, 0.15, -5.45), "size": Vector3(2, 0.3, 0.3)},
+	{"name": "MicroN2", "kind": "cover", "center": Vector3(0, 0.3, -5.15), "size": Vector3(2, 0.6, 0.3)},
+	{"name": "MicroS1", "kind": "cover", "center": Vector3(0, 0.15, 5.45), "size": Vector3(2, 0.3, 0.3)},
+	{"name": "MicroS2", "kind": "cover", "center": Vector3(0, 0.3, 5.15), "size": Vector3(2, 0.6, 0.3)},
+]
 const STREETS := []      # 任务4：东/西市街
 const GATES := []        # 任务5：钟门/市集带
 const BACKSTREETS := []  # 任务6：背街/营
 const OUTER := []        # 任务7：外环/角场
+
+
+## 台阶坡道生成器：沿 z 从 z_from 到 z_to 均分 steps 级整高盒。
+## 每级盒底 = y_from（坐落面）、顶 = y_from + (y_to-y_from)*(i+1)/steps；
+## 盒 x 跨度 [x_min,x_max]，z 跨度为均分段，级间 z 不重叠；级 1 在 z_from 端
+## （z_to < z_from 时方向自动反向）。kind "cover"，name = name_prefix + "Step%d"（i 从 1 起）。
+static func _ramp_steps(x_min: float, x_max: float, z_from: float, z_to: float,
+		y_from: float, y_to: float, name_prefix: String, steps: int = 8) -> Array:
+	var out := []
+	for i in range(steps):
+		var top: float = y_from + (y_to - y_from) * float(i + 1) / float(steps)
+		var za: float = z_from + (z_to - z_from) * float(i) / float(steps)
+		var zb: float = z_from + (z_to - z_from) * float(i + 1) / float(steps)
+		var z_lo := minf(za, zb)
+		var z_hi := maxf(za, zb)
+		out.append({
+			"name": name_prefix + "Step%d" % (i + 1),
+			"kind": "cover",
+			"center": Vector3((x_min + x_max) * 0.5, (y_from + top) * 0.5, (z_lo + z_hi) * 0.5),
+			"size": Vector3(x_max - x_min, top - y_from, z_hi - z_lo),
+		})
+	return out
 
 
 static func all_solids() -> Array:

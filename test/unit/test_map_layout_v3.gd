@@ -100,6 +100,51 @@ func _xz_covered(boxes: Array, x: float, z: float) -> bool:
 	return false
 
 
+# 水平净距：两轴投影间隙 dx/dz（正=分离，负=重叠量）。
+# 两轴投影均相交（足迹重叠）→ 返回负值；否则取分离轴间隙的欧氏距离（相交轴按 0 计）。
+func _xz_net_dist(ba: Array, bb: Array) -> float:
+	var dx := maxf(ba[0].x - bb[1].x, bb[0].x - ba[1].x)
+	var dz := maxf(ba[0].z - bb[1].z, bb[0].z - ba[1].z)
+	if dx < 0.0 and dz < 0.0:
+		return maxf(dx, dz)
+	return sqrt(maxf(dx, 0.0) * maxf(dx, 0.0) + maxf(dz, 0.0) * maxf(dz, 0.0))
+
+
+# boost 组合禁令门禁（项目级硬规则，设计 §8.1）：对任意两实体 a(低顶)/b(高顶)，
+# 若 0 < top_b−top_a ≤ 1.39 且 b 非叠坐于 a（b 盒底 < a 盒顶 − 0.01），
+# 则 a/b 水平净距必须 ≥ 1.5m。返回违规描述列表（空 = 通过）。
+# 叠坐豁免（brief 测试 #4 要求必须覆盖的两类）：
+#   ① b 坐 a：b 盒底 ≥ a 盒顶 − 0.01（栏板/组合柱坐回廊板、伞顶坐柱、
+#     坡道级坐台面、微台阶坐地面、斜板坐台面）
+#   ② 同坐落面：|a 盒底 − b 盒底| ≤ 0.01（同级楼梯模式：生成器规定每级盒底=y_from，
+#     相邻级/微台阶对/微台阶与祭坛台均为同坐落面而非叠坐——单靠公式①无法覆盖，
+#     详见任务报告 concerns）
+func _boost_gate_ok() -> Array:
+	var violations := []
+	var solids := V3.all_solids()
+	for i in range(solids.size()):
+		for j in range(i + 1, solids.size()):
+			var ea: Dictionary = solids[i]
+			var eb: Dictionary = solids[j]
+			var ba := _aabb(ea)
+			var bb := _aabb(eb)
+			if bb[1].y < ba[1].y:  # 定向：a = 低顶
+				var ta := ba; ba = bb; bb = ta
+				var te := ea; ea = eb; eb = te
+			var dtop: float = bb[1].y - ba[1].y
+			if dtop <= 0.0 or dtop > 1.39:
+				continue
+			if bb[0].y >= ba[1].y - 0.01:  # 豁免①：b 叠坐于 a
+				continue
+			if absf(bb[0].y - ba[0].y) <= 0.01:  # 豁免②：同坐落面
+				continue
+			var nd := _xz_net_dist(ba, bb)
+			if nd < 1.5:
+				violations.append("%s(top %.3f,底 %.3f) vs %s(top %.3f,底 %.3f): 水平净距 %.3f < 1.5" % [
+					ea["name"], ba[1].y, ba[0].y, eb["name"], bb[1].y, bb[0].y, nd])
+	return violations
+
+
 # ---- 1. 常量表（10 个精确值逐一断言）----
 func test_v3_constants() -> void:
 	assert_almost_eq(V3.PLAYER_W, 1.0, 0.001, "PLAYER_W == 1.0")
@@ -281,3 +326,105 @@ func test_center_block_no_overlap() -> void:
 			var bb := _aabb(b)
 			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
 				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
+
+
+# ---- 13. 坡道生成器产出：恰 8 级 / 宽 3.0 / 顶面等差 0.3 / 盒底坐台面 / 级间 z 不重叠 ----
+func test_ramp_steps() -> void:
+	for prefix in ["RampE", "RampW"]:
+		for n in range(1, 9):
+			var ent := _find(V3.RAMPS, "%sStep%d" % [prefix, n])
+			assert_false(ent.is_empty(), "RAMPS 含 %sStep%d" % [prefix, n])
+			if ent.is_empty():
+				continue
+			var bb := _aabb(ent)
+			var s: Vector3 = ent["size"]
+			assert_almost_eq(s.x, 3.0, 0.001, "%sStep%d 级宽 == 3.0" % [prefix, n])
+			var expect_top: float = 0.6 + 0.3 * n
+			assert_almost_eq(bb[1].y, expect_top, 0.001,
+				"%sStep%d 顶面 == %s" % [prefix, n, expect_top])
+			assert_almost_eq(bb[0].y, 0.6, 0.001, "%sStep%d 盒底 == 0.6（坐台面）" % [prefix, n])
+		# 级间 z 段无交叠且边界相接 ±0.001
+		for n in range(1, 8):
+			var ea := _find(V3.RAMPS, "%sStep%d" % [prefix, n])
+			var eb := _find(V3.RAMPS, "%sStep%d" % [prefix, n + 1])
+			if ea.is_empty() or eb.is_empty():
+				continue
+			var ba := _aabb(ea)
+			var bb2 := _aabb(eb)
+			var gap := maxf(ba[0].z, bb2[0].z) - minf(ba[1].z, bb2[1].z)
+			assert_almost_eq(gap, 0.0, 0.001,
+				"%sStep%d/%d 级间 z 段相接不重叠（gap=%s）" % [prefix, n, n + 1, gap])
+
+
+# ---- 14. 坡道落点：末级顶 = 回廊行走面 3.0，z 范围与对应栏板豁口相交 ----
+func test_ramp_e_landing() -> void:
+	var e8 := _find(V3.RAMPS, "RampEStep8")
+	assert_false(e8.is_empty(), "RAMPS 含 RampEStep8")
+	if not e8.is_empty():
+		var bb := _aabb(e8)
+		assert_almost_eq(bb[1].y, 3.0, 0.001, "RampEStep8 顶面 == 3.0（齐回廊行走面）")
+		assert_true(_span_intersects([[bb[0].z, bb[1].z]], 1.5, 3.5),
+			"RampEStep8 z 范围与回廊 E 豁 z∈[1.5,3.5] 相交")
+	var w8 := _find(V3.RAMPS, "RampWStep8")
+	assert_false(w8.is_empty(), "RAMPS 含 RampWStep8")
+	if not w8.is_empty():
+		var bb := _aabb(w8)
+		assert_almost_eq(bb[1].y, 3.0, 0.001, "RampWStep8 顶面 == 3.0（齐回廊行走面）")
+		assert_true(_span_intersects([[bb[0].z, bb[1].z]], -3.5, -1.5),
+			"RampWStep8 z 范围与回廊 W 豁 z∈[-3.5,-1.5] 相交")
+
+
+# ---- 15. 坡道与基座缝 == 1.5（精确）+ 全部坡道盒与 Pedestal AABB 无重叠 ----
+func test_ramp_pedestal_gap() -> void:
+	var pedestal := _find(V3.CLOCK, "Pedestal")
+	assert_false(pedestal.is_empty(), "CLOCK 含 Pedestal")
+	if pedestal.is_empty():
+		return
+	var ped_bb := _aabb(pedestal)
+	var e_min := INF
+	var w_max := -INF
+	for e0 in V3.RAMPS:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		var bb := _aabb(e)
+		if nm.begins_with("RampE"):
+			e_min = minf(e_min, bb[0].x)
+			assert_false(_overlap(bb, ped_bb), "%s 与 Pedestal AABB 无重叠" % nm)
+		elif nm.begins_with("RampW"):
+			w_max = maxf(w_max, bb[1].x)
+			assert_false(_overlap(bb, ped_bb), "%s 与 Pedestal AABB 无重叠" % nm)
+	assert_almost_eq(e_min - ped_bb[1].x, 1.5, 0.001, "东坡道 x_min − 基座 x_max == 1.5")
+	assert_almost_eq(ped_bb[0].x - w_max, 1.5, 0.001, "基座 x_min − 西坡道 x_max == 1.5")
+
+
+# ---- 16. boost 组合禁令门禁（项目级硬规则）：遍历 all_solids() 全实体对 ----
+func test_boost_gate() -> void:
+	var violations := _boost_gate_ok()
+	assert_true(violations.is_empty(),
+		"boost 组合禁令门禁违规（%d 对）:\n%s" % [violations.size(), "\n".join(violations)])
+
+
+# ---- 17. 祭坛台微台阶：N/S 各两级，顶面 0.3/0.6，级 2 贴台缘 ----
+func test_micro_steps() -> void:
+	var n1 := _find(V3.RAMPS, "MicroN1")
+	assert_false(n1.is_empty(), "RAMPS 含 MicroN1")
+	if not n1.is_empty():
+		var bb := _aabb(n1)
+		assert_almost_eq(bb[1].y, 0.3, 0.001, "MicroN1 顶面 == 0.3")
+	var n2 := _find(V3.RAMPS, "MicroN2")
+	assert_false(n2.is_empty(), "RAMPS 含 MicroN2")
+	if not n2.is_empty():
+		var bb := _aabb(n2)
+		assert_almost_eq(bb[1].y, 0.6, 0.001, "MicroN2 顶面 == 0.6（=台面）")
+		assert_almost_eq(bb[1].z, -5.0, 0.001, "MicroN2 贴台缘 z == -5.0")
+	var s1 := _find(V3.RAMPS, "MicroS1")
+	assert_false(s1.is_empty(), "RAMPS 含 MicroS1")
+	if not s1.is_empty():
+		var bb := _aabb(s1)
+		assert_almost_eq(bb[1].y, 0.3, 0.001, "MicroS1 顶面 == 0.3")
+	var s2 := _find(V3.RAMPS, "MicroS2")
+	assert_false(s2.is_empty(), "RAMPS 含 MicroS2")
+	if not s2.is_empty():
+		var bb := _aabb(s2)
+		assert_almost_eq(bb[1].y, 0.6, 0.001, "MicroS2 顶面 == 0.6（=台面）")
+		assert_almost_eq(bb[0].z, 5.0, 0.001, "MicroS2 贴台缘 z == 5.0")
