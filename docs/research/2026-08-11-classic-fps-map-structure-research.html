@@ -1,0 +1,449 @@
+<title>经典竞技 FPS 地图的结构与动线设计研究</title>
+<style>
+  :root {
+    --bg: #f4f5f2;
+    --surface: #ffffff;
+    --surface2: #eceee8;
+    --ink: #1f242b;
+    --muted: #5c6572;
+    --line: #d7dbd2;
+    --accent: #a85a1c;
+    --accent-soft: #f3e3d3;
+    --ct: #2b66a8;
+    --ct-soft: #dde9f4;
+    --t: #a85a1c;
+    --t-soft: #f3e3d3;
+    --good: #2e7d4f;
+    --bad: #b23a3a;
+    --code-bg: #eceee8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #13161a;
+      --surface: #1b1f25;
+      --surface2: #232830;
+      --ink: #e7e9ec;
+      --muted: #98a1ac;
+      --line: #343b45;
+      --accent: #e08b45;
+      --accent-soft: #3a2b1d;
+      --ct: #74abe3;
+      --ct-soft: #1d2c3d;
+      --t: #e08b45;
+      --t-soft: #3a2b1d;
+      --good: #6cba8d;
+      --bad: #e07a7a;
+      --code-bg: #232830;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #13161a;
+    --surface: #1b1f25;
+    --surface2: #232830;
+    --ink: #e7e9ec;
+    --muted: #98a1ac;
+    --line: #343b45;
+    --accent: #e08b45;
+    --accent-soft: #3a2b1d;
+    --ct: #74abe3;
+    --ct-soft: #1d2c3d;
+    --t: #e08b45;
+    --t-soft: #3a2b1d;
+    --good: #6cba8d;
+    --bad: #e07a7a;
+    --code-bg: #232830;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+
+  .mono, td.num, .kpi b, .bar-row .pct { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+  header.doc-head { border-bottom: 3px solid var(--ink); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin: 0 0 0.5rem; }
+  h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 0.75rem; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.85rem; color: var(--muted); }
+  .doc-meta b { color: var(--ink); font-weight: 600; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 2.5rem; padding: 0; list-style: none; }
+  nav.toc a {
+    display: inline-block; padding: 0.3rem 0.75rem; font-size: 0.82rem; text-decoration: none;
+    color: var(--ink); border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  }
+  nav.toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+  section { margin-bottom: 3rem; }
+  h2 { font-size: 1.4rem; margin: 0 0 1rem; padding-top: 1rem; border-top: 1px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.5rem; }
+  p { margin: 0.7rem 0; }
+  ul, ol { margin: 0.6rem 0; padding-left: 1.4rem; }
+  li { margin: 0.35rem 0; }
+  strong { font-weight: 650; }
+  .en { color: var(--muted); font-size: 0.9em; }
+
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); padding: 1.1rem 1.3rem; margin: 0 0 2.5rem; }
+  .tldr h2 { border: none; padding-top: 0; margin-top: 0; font-size: 1.1rem; }
+  .tldr ol { margin: 0.5rem 0 0; }
+  .tldr li { margin: 0.55rem 0; }
+
+  .table-scroll { overflow-x: auto; margin: 1rem 0; background: var(--surface); border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.9rem; }
+  th, td { padding: 0.55rem 0.8rem; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--surface2); font-weight: 650; font-size: 0.8rem; letter-spacing: 0.04em; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num { text-align: right; white-space: nowrap; }
+  th.num { text-align: right; }
+
+  .tag { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .tag.ct { background: var(--ct-soft); color: var(--ct); }
+  .tag.t { background: var(--t-soft); color: var(--t); }
+  .tag.eq { background: var(--surface2); color: var(--good); border: 1px solid var(--line); }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1.25rem 0; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); padding: 0.9rem 1rem; }
+  .kpi b { display: block; font-size: 1.45rem; line-height: 1.2; color: var(--accent); }
+  .kpi span { font-size: 0.78rem; color: var(--muted); display: block; margin-top: 0.2rem; line-height: 1.4; }
+
+  .bar-chart { margin: 1rem 0; background: var(--surface); border: 1px solid var(--line); padding: 1rem 1.1rem; }
+  .bar-row { display: grid; grid-template-columns: 84px 1fr 118px; align-items: center; gap: 0.7rem; padding: 0.32rem 0; font-size: 0.85rem; }
+  .bar-row .name { font-weight: 600; }
+  .bar-track { position: relative; height: 16px; background: var(--surface2); overflow: hidden; }
+  .bar-track .ct-fill { position: absolute; inset: 0 auto 0 0; background: var(--ct); }
+  .bar-track .half { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--bg); }
+  .bar-row .pct { font-size: 0.78rem; color: var(--muted); text-align: right; white-space: nowrap; }
+  .legend { display: flex; gap: 1.2rem; font-size: 0.78rem; color: var(--muted); margin-top: 0.6rem; }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 0.35rem; }
+
+  .figure { margin: 1.5rem 0; background: var(--surface); border: 1px solid var(--line); padding: 1rem; overflow-x: auto; }
+  .figure figcaption { font-size: 0.8rem; color: var(--muted); margin-top: 0.6rem; }
+  pre.mermaid { background: transparent; border: none; text-align: center; }
+
+  .callout { background: var(--surface2); border: 1px solid var(--line); padding: 0.85rem 1.1rem; margin: 1rem 0; font-size: 0.92rem; }
+  .callout .label { font-weight: 700; font-size: 0.78rem; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; display: block; margin-bottom: 0.3rem; }
+
+  blockquote { border-left: 3px solid var(--line); margin: 1rem 0; padding: 0.2rem 1rem; color: var(--muted); font-size: 0.92rem; }
+  blockquote footer { font-size: 0.8rem; margin-top: 0.3rem; }
+
+  .map-card { background: var(--surface); border: 1px solid var(--line); padding: 1rem 1.2rem; margin: 1rem 0; }
+  .map-card h3 { margin: 0 0 0.4rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+  .map-card h3 .cn { color: var(--muted); font-size: 0.85rem; font-weight: 400; }
+  .map-card ul { margin: 0.4rem 0; }
+
+  .checklist { list-style: none; padding: 0; margin: 1rem 0; counter-reset: chk; }
+  .checklist li { padding: 0.55rem 0 0.55rem 2.2rem; position: relative; border-bottom: 1px dashed var(--line); counter-increment: chk; }
+  .checklist li::before {
+    content: counter(chk, decimal-leading-zero);
+    position: absolute; left: 0; top: 0.6rem;
+    font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; color: var(--accent); font-weight: 700;
+  }
+
+  .sources { font-size: 0.88rem; }
+  .sources ol { padding-left: 1.3rem; }
+  .sources li { margin: 0.55rem 0; }
+  .sources a { color: var(--ct); text-decoration: none; border-bottom: 1px solid var(--line); word-break: break-all; }
+  .sources a:hover { border-bottom-color: var(--ct); }
+  .src-type { font-size: 0.75rem; color: var(--muted); }
+
+  a { color: var(--ct); }
+  footer.doc-foot { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
+</style>
+
+<header class="doc-head">
+  <p class="eyebrow">Level Design Research · Trigger Echo</p>
+  <h1>经典竞技 FPS 地图的结构与动线设计研究</h1>
+  <div class="doc-meta">
+    <span>研究对象 <b>CS / CS2：dust2 · mirage · inferno · nuke · ancient</b></span>
+    <span>日期 <b>2026-08-11</b></span>
+    <span>来源 <b>11 个（含 2 篇学术论文、1 个 GDC 演讲、作者本人回忆录、社区深度指南）</b></span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#tldr">结论摘要</a>
+  <a href="#s1">三路结构</a>
+  <a href="#s2">Mid 控制</a>
+  <a href="#s3">Choke Point</a>
+  <a href="#s4">Timing 与转点</a>
+  <a href="#s5">对称性</a>
+  <a href="#s6">五图解剖</a>
+  <a href="#s7">落地清单</a>
+  <a href="#sources">来源</a>
+</nav>
+
+<div class="tldr" id="tldr">
+  <h2>结论摘要（TL;DR）</h2>
+  <ol>
+    <li><strong>三路结构是骨架，不是笼子。</strong>经典图 = 3 条主路 + 每队约 4 个 chokepoint + 连接各路的小通道（connector）。本质是管理「信息与转点」，不是简单三分地图。Garozzo（Cache 作者，GDC 2015）：5v5 对局以 4 个 chokepoint 最合理；选项不是越多越好，混乱会摧毁策略意义。</li>
+    <li><strong>Mid 控制 = 控制地图的轴。</strong>谁拿 mid，谁就拥有两侧夹击权、信息优势和更短的转点路径。dust2 的 mid 一分二（短 A + 双门去 B），是全图「一份投入、两个方向回报」的枢纽。</li>
+    <li><strong>Timing 有具体数字。</strong>CT 到达防守 chokepoint 的理想时间是 5–12 秒，且应比 T 稍快以提前落位；两包点间转点 10–15 秒最理想，超过 20 秒 retake 几乎不可能。转点过快 → 地图偏 CT，必须用「高风险捷径」回补平衡（nuke 的天窗/跳板）。</li>
+    <li><strong>实证规律：紧凑 + 短转点 → CT 图；多入口 + 长转点 → T 图。</strong>2024–25 职业数据：Overpass CT 56.4%、Nuke CT 55%、Mirage CT 54.1%；多入口的 Anubis T 56%；三路对称的 Dust2 接近 50/50。首杀（entry kill）转化为回合胜率约 70–75%，所以「首次接触时机」的价值极高。</li>
+    <li><strong>公平 ≠ 几何镜像。</strong>旋转对称（点对称）比镜像对称更友好——换边后视角不翻转；非对称图（inferno/nuke）靠 timing、垂直度与信息差而非几何来平衡。Dust 作者 Johnston 的公平性检验：首次接触区必须对双方都成立，每个优势都必须有几分钟内可落地的反制。</li>
+    <li><strong>按机制约束做设计。</strong>入口宽度要能被一颗烟雾弹封住；掩体高度用 ~56u（半蹲藏身）或 ~72u（站姿遮挡），避开 64u 的 head peek；视线垂直角控制在 ±30° 内；所有目标必须在 chokepoint 后方。</li>
+  </ol>
+</div>
+
+<section id="s1">
+  <h2>一、三路结构：为什么是「三」</h2>
+  <p>Dust2、Mirage、Cache 这类经典图都遵循传统三路布局：三条从进攻方出生点通往目标区的主路，提供远、中、近三种交战距离的机会（Mapcore 社区共识）。但「三路」更精确的表述来自职业选手出身的地图作者 Salvatore "Volcano" Garozzo 与 Shawn Snelling 在 <a href="https://gdcvault.com/play/1021868/Community-Level-Design-for-Competitive">GDC 2015 eSports Summit 的演讲《Community Level Design for Competitive CS:GO》</a>：</p>
+  <ul>
+    <li><strong>4 个 chokepoint，围绕"line of scrimmage"（对抗线）分布。</strong>对抗线即双方出生点之间的中间地带，chokepoint 数量由队伍规模决定——5v5 以 4 个最合适。</li>
+    <li><strong>战略性选项不是越多越好。</strong>过多的机动选项会引入混乱、稀释策略意义；CS 机制惩罚性极强，同时盯防太多危险方向是糟糕体验。</li>
+    <li><strong>垂直度要克制。</strong>CS 玩家使用极低鼠标灵敏度以追求精准射击，快速大幅度的垂直瞄准调整很困难。垂直性的正确用法是服务团队协作（如 boost 架人）。</li>
+  </ul>
+  <p>社区指南《<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=1110438811">The dos and don'ts of Counter-Strike level design</a>》（2017）给出更细的操作规则：<strong>战斗接触点建议 3 个</strong>——2 个太少没有选择，4 个防守不过来；chokepoint 的数量可以多于接触点，例如 dust2 的 mid 在末端分裂为短 A 与双门两条出口，丰富了路线但不增加防守面。</p>
+
+  <h3>入口设计规则（de Wit 2015，经 DiVA 论文整理）</h3>
+  <p>荷兰设计师 Rob de Wit 基于 HLTV 数据对 Dust2/Cache/Mirage/Inferno 四张最流行图做的量化分析，总结出四条入口规律（引自 Karakurt &amp; Willatzen 2020 论文《<a href="https://www.diva-portal.org/smash/get/diva2:1453749/FULLTEXT01.pdf">Competitive Level Design</a>》）：</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>规则</th><th>原因</th></tr></thead>
+      <tbody>
+        <tr><td>每个包点都能被<strong>一颗</strong>烟雾弹完整封锁入口</td><td>机制约束：每人只能携带一颗烟雾弹</td></tr>
+        <tr><td>A 点至少有一个大入口 + 一个小入口</td><td>入口尺寸要有变化：大入口支持集结冲锋（grouped），小入口是单点瓶颈（chokepoint），制造战略变化</td></tr>
+        <tr><td>A 点入口数多于 B 点（不算 mid 连接）</td><td>B 点应更难被攻下、也更适合回防；A 点更开放</td></tr>
+        <tr><td>A 点有 1 条 CT 安全通道；B 点有 2 条 CT 安全通道</td><td>防守方必须能在不被观察的情况下完成布防；B 点两条安全通道允许一名防守者同时看两个入口</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>「路」不是直线，是环</h3>
+  <p>关卡设计博客 CritPoints 的观察：<strong>流行 CS 地图通常是「三个互相叠套的大环 + 若干小环」</strong>。环（loop）让玩家可以相互迂回、重新定位或撤退，避免线性走廊变成纯对枪。dust2 因此被评价为「没有任何绝对 chokepoint」——任何卡点理论上都能被绕，这是它动线耐玩的根源。反面：原版 dust 的 mid 更像死瓶颈，环小且彼此孤立，战术流动性差。</p>
+  <p>另一篇经典教程《<a href="https://www.ongamedesign.net/designing-fps-multiplayer-maps-part-2/">Designing FPS Multiplayer Maps – Part 2</a>》（2008）补充了前期方法：先用「泡泡图」（bubble diagram）画出区域连通关系再动工；每个独立区域要有焦点、支持 4–8 人、多入口；目标模式应<strong>有意限制</strong>路径数量来服务防守与追击——全连通是死亡竞赛的需求，不是爆破模式的需求。</p>
+</section>
+
+<section id="s2">
+  <h2>二、Mid 控制理论</h2>
+  <p>Mid 是地图上连接两侧的中轴区，也是「对抗线」实体化的地方。控制 mid 的收益是三重的：</p>
+  <ul>
+    <li><strong>夹击权</strong>：从侧后方威胁任一包点的防守者（dust2 拿 mid 后可以打短 A 侧身，或穿双门夹 B）；</li>
+    <li><strong>信息优势</strong>：mid 通常是双方最早产生物理接触的区域，谁先占谁先知道对方意图；</li>
+    <li><strong>转点速度</strong>：占 mid 的一方在两点之间换防更短。</li>
+  </ul>
+  <p><strong>dust2 的 mid 是教科书案例：</strong>它本身是一条带长视野的通道（中门对狙），但它的价值在末端——分裂成短 A（通往 A 点侧翼）和双门（通往 B 隧道方向）两个出口。进攻方对 mid 的一次投入，可以在两个包点兑现；防守方若放弃 mid，就要同时担心两个方向的夹击。Steam 指南把「mid 分裂为 A short 与双门」列为 chokepoint 数量应多于接触点的正面例证。</p>
+  <p><strong>ancient 则把 mid 控制做成了整张图的主题</strong>——2024–25 职业数据分析中它被标注为 "Mid control key"，同时也是当期最平衡的图（CT 50.8% / T 49.2%）。</p>
+  <p>Mid 的通用设计模式：mid 连通两个包点方向；mid 的出口本身必须是 chokepoint（双门、窗口这类可被封可被架的收口）；mid 承载全图最长的对狙视线，因此也承载最多的道具交换——它应该是「可以用道具争夺」的区域，而不是纯枪法赌命区。mirage 的 mid（window/connector 看 A、公寓方向连 B）是同一模式的变体。</p>
+</section>
+
+<section id="s3">
+  <h2>三、Choke Point 设计</h2>
+  <ul>
+    <li><strong>所有目标必须在 chokepoint 后方。</strong>包点、下包区不应有任何可以直接走到的开口，攻方必须付出过门代价。</li>
+    <li><strong>包点入口以 3 个为宜</strong>，且要同时考虑下包后的攻防转换：入口方向决定了 post-plant 时双方掩体的朝向。</li>
+    <li><strong>入口尺寸要分大小</strong>：大入口允许五人集结通过，小入口强制单列（de Wit 规则），两类混合才有节奏变化。</li>
+    <li><strong>修掉意外角度。</strong>pixel angle（穿缝视野，如 mirage B 阳台穿过公寓缝隙）、tight angle 属于设计事故，必须封堵或改造。长视线本身可以存在，但要给非狙击方路线或道具反制——dust2 中门对狙成立，正是因为双方都有绕路和烟雾的选择。</li>
+    <li><strong>掩体尺寸按机制定</strong>：避免 64 单位高的 head peek（露头即死又难反制），用 ~56 单位（藏身）或 ~72 单位（完全遮挡）。优先建筑一体化掩体，少用裸箱子；<strong>强力掩体必须有缺陷</strong>——mirage A 点 ninja corner 是好位置，但可被燃烧弹反制，这就是 Johnston 说的「每个优势都有反制」。</li>
+    <li><strong>垂直角度超过 ±30° 会明显降低体验</strong>，CS 应以水平交战为主。nuke 的垂直度是刻意的例外（见第五节），且付出了 CT 过度强势的代价。</li>
+    <li><strong>用声音当地形</strong>：nuke A 点用混凝土与金属格栅区分脚步声、通风管声音暴露进攻方向——材质声纹是免费的信息层设计。</li>
+  </ul>
+  <blockquote>
+    “Dust 的拱门不只是美术框架，它是功能工具——制造紧凑的 chokepoint、切断不必要的视线。没有拱门，这张图就沦为一个普通的死斗竞技场。”
+    <footer>— Dave Johnston，《<a href="https://www.johnsto.co.uk/design/making-dust2">The Making Of: Dust 2</a>》（2003）</footer>
+  </blockquote>
+</section>
+
+<section id="s4">
+  <h2>四、Timing 与转点时间平衡</h2>
+  <p>Timing 是竞技地图平衡里最容易被低估、却最能决定 CT/T 倾向的变量。</p>
+
+  <div class="kpi-row">
+    <div class="kpi"><b>5–12s</b><span>CT 到达防守 chokepoint 的理想时间，且应比 T 稍快、提前落位</span></div>
+    <div class="kpi"><b>10–15s</b><span>两包点之间转点（site-to-site）的理想区间</span></div>
+    <div class="kpi"><b>&gt;20s</b><span>转点超过 20 秒，retake 基本不可能</span></div>
+    <div class="kpi"><b>~3s</b><span>CS 出生点随机化带来的双方跑图时间差，是回合变数的来源</span></div>
+  </div>
+
+  <h3>首次接触（first contact）</h3>
+  <p>Dust 作者 Dave Johnston 在《<a href="https://www.johnsto.co.uk/blog/keeping-cs-maps-fair/">Keeping CS Maps Fair</a>》中给出的公平性检验法：<strong>在脑中预演双方首次接触的位置——如果设计正确，此时两队都应该站在「专门为这一刻设计的区域」里。</strong>他进一步提炼为可预测性原则：</p>
+  <blockquote>
+    “如果你能预测敌人可能出现的位置，就要确保敌人同样能预测你。如果敌人有多个选项，你也必须有。检验方法：在 Hammer 里用镜头走位，代入双方视角——如果让你选首次接触时当哪一边，而你的选择显而易见，那这个区域就需要改。”
+  </blockquote>
+  <p>他还给出平衡的操作定义：<strong>任何优势都必须有「可以在几秒内启用」的明显反制</strong>，双方各自打出优势与反制后局面重新回到均势。实例是 dust 初代 underpass：最初 CT 狙击手单方面屠杀过洞的 T；加了箱子后 T 仍难推进；反复调整到 T 可以几乎全程不被狙击视线穿过通道，才成为公平元素。</p>
+
+  <h3>出生点与回合方差</h3>
+  <p>CS 的出生点是半随机的，不同出生位到关键区域的跑图时间差约 3 秒（Valorant 对比分析指出：Valorant 用购买阶段固定栅栏消除了这个方差，换来的是防守方可以按秒表 pre-aim/pre-fire，回合变得可预测而单调）。<strong>出生点随机性是「同图不同回合」的低成本引擎，值得保留。</strong>反面教材同样是 nuke：出生点距离核心交战区太远，产生大量无意义的跑图时间（Steam 指南的直接批评）。</p>
+
+  <h3>转点时间与阵营倾向的实证关系</h3>
+  <p>2025 年发表的实证研究《<a href="https://www.arcjournals.org/pdfs/ijspe/v11-i2/5.pdf">Impact of Map Architecture on Competitive Balance in Counter-Strike 2</a>》（2024–2025 Tier-1、Top-20 队伍淘汰赛，HLTV 数据）的核心结论：<strong>紧凑 + 转点快的地图系统性偏向 CT；多路径 + 转点长的地图偏向 T。</strong></p>
+  <div class="bar-chart" role="img" aria-label="各地图 CT 胜率条形图">
+    <div class="bar-row"><span class="name">Overpass</span><span class="bar-track"><span class="ct-fill" style="width:56.4%"></span><span class="half"></span></span><span class="pct">CT 56.4 / T 43.6</span></div>
+    <div class="bar-row"><span class="name">Nuke</span><span class="bar-track"><span class="ct-fill" style="width:55%"></span><span class="half"></span></span><span class="pct">CT 55.0 / T 45.0</span></div>
+    <div class="bar-row"><span class="name">Mirage</span><span class="bar-track"><span class="ct-fill" style="width:54.1%"></span><span class="half"></span></span><span class="pct">CT 54.1 / T 45.9</span></div>
+    <div class="bar-row"><span class="name">Ancient</span><span class="bar-track"><span class="ct-fill" style="width:50.8%"></span><span class="half"></span></span><span class="pct">CT 50.8 / T 49.2</span></div>
+    <div class="bar-row"><span class="name">Dust2</span><span class="bar-track"><span class="ct-fill" style="width:49.2%"></span><span class="half"></span></span><span class="pct">CT 49.2 / T 50.8</span></div>
+    <div class="bar-row"><span class="name">Anubis</span><span class="bar-track"><span class="ct-fill" style="width:44%"></span><span class="half"></span></span><span class="pct">CT 44.0 / T 56.0</span></div>
+    <div class="legend"><span><i style="background:var(--ct)"></i>CT 胜率（%）</span><span><i style="background:var(--line)"></i>竖线 = 50% 平衡线</span><span>数据：HLTV 2024-01 ~ 2025-10，Top-20 淘汰赛</span></div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>地图</th><th class="num">CT%</th><th class="num">T%</th><th>架构归因（同研究）</th></tr></thead>
+      <tbody>
+        <tr><td>Overpass</td><td class="num">56.4</td><td class="num">43.6</td><td>紧凑、转点极快，单个 CT 可拖延 + 队友快速回防</td></tr>
+        <tr><td>Nuke</td><td class="num">55.0</td><td class="num">45.0</td><td>双层堆叠 + 瓶颈入口，垂直转点快，声音暴露进攻</td></tr>
+        <tr><td>Mirage</td><td class="num">54.1</td><td class="num">45.9</td><td>开阔但转点短；A 点入口多但都可被 CT 侧位（jungle/connector/CT）交叉覆盖</td></tr>
+        <tr><td>Ancient</td><td class="num">50.8</td><td class="num">49.2</td><td>平衡，Mid 控制是关键</td></tr>
+        <tr><td>Dust2</td><td class="num">49.2</td><td class="num">50.8</td><td>对称三路，B 点双独立入口（隧道 + mid 双门）让防守必须分兵</td></tr>
+        <tr><td>Anubis</td><td class="num">44.0</td><td class="num">56.0</td><td>多入口 + CT 转点长 + 水面消音掩盖进攻脚步</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="mono" style="font-size:0.82rem;color:var(--muted)">另一数据集（Abios，2023-01~2024-01 全部职业赛 16,539 场）：Mirage CT51/T49、Inferno 50/50、Ancient 50/50、Nuke T54、Overpass T54、Anubis CT56。两个样本结论在个别图上相反，但都确认「架构决定倾向、差值通常 ≤12pp」；样本时段与赛事级别不同是分歧主因。</p>
+  <p>同一研究还给出一个对 timing 价值的量化佐证：<strong>拿到回合首杀后的回合转化率约 70–75%</strong>（dust2 上 T 方首杀转化 75–76%，高于 CT 方）——「谁先接触、在什么条件下接触」几乎决定回合走向。</p>
+  <p><strong>转点过快的平衡补丁</strong>：Steam 指南明确——转点时间短会强化 CT，若刻意做短（如 nuke 两层之间），必须提供「高风险路径」给 T 方对冲（nuke 的天窗速降/外场跳板）。测量方法：spectator 模式跑秒表，或使用社区的 Radar-Timing-Tester 工具。</p>
+</section>
+
+<section id="s5">
+  <h2>五、旋转对称 vs 镜像对称</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>对称类型</th><th>定义</th><th>玩家体验</th><th>典型</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>旋转对称</strong><br><span class="en">rotational / point symmetry</span></td>
+          <td>绕地图中心旋转 180° 重合，双方出生点位于对角</td>
+          <td>两队体验完全一致，<strong>换边后视角与角度习惯不翻转</strong>，学习成本低。TF2Maps 等地图社区的共识是它「更好上手」</td>
+          <td>dust2（近似）、多数传统爆破图</td>
+        </tr>
+        <tr>
+          <td><strong>镜像对称</strong><br><span class="en">mirror / reflection</span></td>
+          <td>沿中轴反射重合</td>
+          <td>制造真实的「左 vs 右」差异（顺/逆时针攻点体验不同），但换边后玩家必须在脑中翻转角度与视线关系</td>
+          <td>部分 CTF/据点模式图</td>
+        </tr>
+        <tr>
+          <td><strong>非对称</strong><br><span class="en">asymmetric</span></td>
+          <td>几何不对称，靠 timing、垂直度、信息、道具经济平衡</td>
+          <td>攻防角色差异最大、记忆负担最高；做坏了就是单方向碾压</td>
+          <td>inferno（T 图）、nuke（CT 图）、anubis（T 图）</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>几点研究中的交叉印证：</p>
+  <ul>
+    <li>arcjournals 研究在数据表中把 dust2 直接标注为 <span class="en">"Symmetrical, three routes"</span>，它是六张图里唯一接近 50/50 且首杀转化两侧对称性最好的「结构平衡」样本。</li>
+    <li>早期教程《Designing FPS Multiplayer Maps》的立场：<strong>目标类模式几乎必须依赖对称来保证公平</strong>，非对称目标图可以做成但极难调——这与 CS 非对称图（inferno/nuke）长年依赖版本补丁调平衡的历史吻合。</li>
+    <li>社区（FAForever/GameReplays 等 RTS 与 FPS 地图讨论）的补充视角：<strong>尽早识别出对称类型能降低竞技压力</strong>——对称是玩家「读懂地图」的认知捷径，因此即使做非对称，也应保留局部对称的锚点。</li>
+    <li>Johnston 的公平观提醒：对称只是公平的充分非必要条件。他的检查法（首次接触区对等、优势必有反制、一切可被抵消）适用于任何对称类型。</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <h2>六、五张经典图逐张解剖</h2>
+  <figure class="figure">
+    <pre class="mermaid">
+flowchart LR
+    T(("T 出生点")) -- "上路 · A Long（远距对枪）" --> A[["A 包点"]]
+    T -- "中路 · Mid" --> M{"Mid<br/>（对抗线枢纽）"}
+    M -- "短 A" --> A
+    M -- "双门 → B 隧道方向" --> B[["B 包点"]]
+    T -- "下路 · Tunnels（近距）" --> B
+    C(("CT 出生点")) -- "CT 连接通道" --> M
+    C --> A
+    C --> B
+    style M fill:#f3e3d3,stroke:#a85a1c
+    </pre>
+    <figcaption>图 1 · dust2 的「三路 + mid 分支」拓扑：mid 是唯一连通两个包点方向的中轴，末端分裂为短 A 与双门两个 chokepoint 出口。</figcaption>
+  </figure>
+
+  <div class="map-card">
+    <h3>de_dust2 <span class="cn">2001 · Dave Johnston · 三路/近旋转对称</span> <span class="tag eq">≈50/50</span></h3>
+    <ul>
+      <li>作者自述布局哲学：<strong>"simplicity and concise connectivity"</strong>——继承初代「长了手脚的 8 字形」结构，集中战斗同时保留战术空间；可玩区域约 4000×4000 单位。</li>
+      <li>拱门是功能性 chokepoint + 视线切断器；石路如动脉引导目标方向；地面箭头（Gearbox 的 Brian Martel 建议）是后来加入的导航补丁。</li>
+      <li>B 点 Beta 期重构：打通连接 A 路口的墙洞，牺牲一点风格换取导航与防守点位；CT 出生区过长是 Worldcraft 编辑器边界限制下的历史遗留。</li>
+      <li>Jess Cliffe 定稿了最终出生点与下包位；自 CS 1.1（2001-03）发布后<strong>布局再无改动</strong>——一次做对的证据。</li>
+    </ul>
+  </div>
+  <div class="map-card">
+    <h3>de_mirage <span class="cn">三路标准件 · 社区作者图转正</span> <span class="tag ct">CT 54.1%（24-25）</span></h3>
+    <ul>
+      <li>教科书式三路 + mid（window/connector）：mid 同时威胁 A（jungle、connector 侧射）与 B（公寓方向）。</li>
+      <li>A 点开阔但入口收口（ramp/palace），CT 可从 jungle、connector、CT 出生三个方向交叉覆盖——arcjournals 将其归为「开阔但转点短 → 中度偏 CT」。</li>
+      <li>细节范例：ninja corner 强掩体自带火攻弱点；B 阳台存在 pixel angle 穿公寓缝隙（被列为需修复的设计事故）。</li>
+    </ul>
+  </div>
+  <div class="map-card">
+    <h3>de_inferno <span class="cn">非对称 · 近距离绞杀</span> <span class="tag eq">50/50（23-24 全职业样本）</span></h3>
+    <ul>
+      <li>放弃三路对称，用「香蕉道（banana）」这一单一强 chokepoint 组织全图节奏：进攻方必须先投资道具抢香蕉，防守方用纵深换时间。</li>
+      <li>90° 拐角与窄巷密度高，交战距离短——转点与回防节奏（而非远距离对枪）成为主技能。</li>
+      <li>证明非对称图可以平衡，但需要更精细的 timing 与道具经济调校；历史上长期被讨论偏 T/偏 CT，靠补丁微调维持 50/50。</li>
+    </ul>
+  </div>
+  <div class="map-card">
+    <h3>de_nuke <span class="cn">垂直双层 · 极端 CT 图</span> <span class="tag ct">CT 55%</span></h3>
+    <ul>
+      <li>全池唯一上下堆叠双包点：CT 通过通风管/楼梯/跳板在两层间转点，<strong>垂直转点快于 T 的攻点速度</strong> → 系统性偏 CT（arcjournals：多层 + 瓶颈 = 防守深度）。</li>
+      <li>声音即信息层：通风管脚步、开门声、A 点混凝土 vs 金属格栅材质音，都在向 CT 广播进攻方向。</li>
+      <li>已知缺陷（Steam 指南批评）：出生区长而窄、远离核心区，产生无意义跑图时间——「无用空间」的反面教材。</li>
+      <li>平衡手法：提供天窗速降等高风险捷径补偿进攻方；但垂直度超过 ±30° 的交战仍被普遍认为超出 CS 的舒适区。</li>
+    </ul>
+  </div>
+  <div class="map-card">
+    <h3>de_ancient <span class="cn">2020 · Valve 官方 · mid 控制图</span> <span class="tag eq">50.8/49.2</span></h3>
+    <ul>
+      <li>Operation Broken Fang 加入的官方图，丛林遗迹主题（精神上接替 aztec）。</li>
+      <li>数据研究中被标注 "Mid control key"：中轴争夺直接决定两侧包点的攻防主动权，是「mid 枢纽」模式的现代实现。</li>
+      <li>当期最平衡的图之一——近旋转对称骨架 + 明确的中轴设计 + 不过度的垂直度，三者叠加的结果。</li>
+    </ul>
+  </div>
+
+  <div class="callout">
+    <span class="label">Dust2 vs Cobblestone：一份数据驱动的反面鉴定</span>
+    DiVA 论文用 HLTV 击杀热图对比了「常青树」dust2 与「被淘汰」的 cobblestone，找到三个可测量的设计缺陷指标：<strong>① 随机性</strong>——交火热点分散、无法形成稳定战术结构；<strong>② 视线数量</strong>——cobblestone B 点面向攻方的 sightline 过多，防守方无法用有限掩体抵消；<strong>③ 入口尺寸</strong>——cobblestone 入口过碎，一颗烟雾封不住的缺口太多，攻方选项泛滥反而破坏 flow。dust2 三项全部合格。这组指标可以直接挪用作自研地图的验收测试。
+  </div>
+</section>
+
+<section id="s7">
+  <h2>七、落地检查清单（可直接用于自研竞技图验收）</h2>
+  <ol class="checklist">
+    <li>结构：3 条主路 / 3 个接触区；每队约 4 个 chokepoint 围绕对抗线分布；chokepoint 可多于接触点（一路末端分裂）。</li>
+    <li>Timing：CT 到达各防守 chokepoint 5–12 秒，且 ≤ 对应 T 的到达时间；用 spectate 跑表或 Radar-Timing-Tester 实测。</li>
+    <li>转点：包点间转点 10–15 秒；若 &lt;10 秒（偏 CT），必须为进攻方设计高风险捷径对冲；&gt;20 秒判为失败。</li>
+    <li>首次接触：预演双方第一交火位置——必须对双方同等有利；每个优势配一个几秒内可启用的反制（Johnston 检验法）。</li>
+    <li>入口：包点入口约 3 个，大小组合（集结口 + 瓶颈口）；每个入口宽度可被单颗烟雾封锁；A 点入口多于 B 点；CT 到 A 有 1 条、到 B 有 2 条安全通道。</li>
+    <li>Mid：连通两包点方向，出口本身是 chokepoint，提供道具争夺空间；占 mid 有明确回报（夹击/信息/转点）。</li>
+    <li>环与流：主路平滑无阻碍；关键区域有 loop 支持重新定位；全图无「好玩家永远不会去」的死空间。</li>
+    <li>尺寸：走廊宽 128–256u、净高 ≥128u；掩体 56u 或 72u 档，禁止 64u head peek；整体规模参考 dust2 约 4000×4000u。</li>
+    <li>视线：无意外 pixel/tight angle；视线垂直角 ≤ ±30°；长对狙线必须配绕行或道具反制。</li>
+    <li>信息层：用材质声纹/结构声（脚步、门、可穿物）给防守方适度信息；进攻方需有静音路径的选择。</li>
+    <li>数据验收：击杀热图热点集中（非随机）、包点 facing sightline 可被掩体管理、可封烟缺口数量可控（DiVA 三指标）。</li>
+  </ol>
+</section>
+
+<section id="sources" class="sources">
+  <h2>来源（按类型）</h2>
+  <p><strong>论文</strong></p>
+  <ol>
+    <li>Karakurt &amp; Willatzen (2020)：<a href="https://www.diva-portal.org/smash/get/diva2:1453749/FULLTEXT01.pdf">Competitive Level Design — A study on CS:GO Level Design</a>，Uppsala 大学本科论文。dust2 vs cobblestone 热图对比；整理了 Garozzo/Snelling（GDC 2015）、de Wit（2015）、Dan Taylor（2013）的设计理论。<span class="src-type">学术论文</span></li>
+    <li>Zanevskyy, Paskiv &amp; Khudoba (2025)：<a href="https://www.arcjournals.org/pdfs/ijspe/v11-i2/5.pdf">Impact of Map Architecture on Competitive Balance in CS2</a>，IJSPE 11(2)。2024–25 Top-20 淘汰赛 CT/T 胜率与首杀转化；转点长度/垂直度与阵营倾向的因果分析。<span class="src-type">实证研究</span></li>
+  </ol>
+  <p><strong>GDC 演讲 / 作者一手来源</strong></p>
+  <ol start="3">
+    <li>Garozzo &amp; Snelling (GDC 2015 eSports Summit)：<a href="https://gdcvault.com/play/1021868/Community-Level-Design-for-Competitive">Community Level Design for Competitive CS:GO</a>。4 chokepoint / line of scrimmage / 垂直度克制。<span class="src-type">GDC</span></li>
+    <li>Dave Johnston（Dust/Dust2 作者）：<a href="https://www.johnsto.co.uk/design/making-dust2">The Making Of: Dust 2</a>（2003）。8 字形结构、拱门即 chokepoint、迭代史。<span class="src-type">作者回忆录</span></li>
+    <li>Dave Johnston：<a href="https://www.johnsto.co.uk/blog/keeping-cs-maps-fair/">Keeping CS Maps Fair</a>。首次接触公平性、优势-反制对、可预测性原则、underpass 案例。<span class="src-type">作者博客</span></li>
+  </ol>
+  <p><strong>社区深度指南 / 分析</strong></p>
+  <ol start="6">
+    <li>Steam 社区指南（2017）：<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=1110438811">The dos and don'ts of Counter-Strike level design</a>。CT 落位 5–12s、转点 10–15s、尺寸/掩体/声音全套数值。<span class="src-type">社区长文指南</span></li>
+    <li>Celia Wagar：<a href="https://critpoints.net/2018-02-18/good-fps-map-design/">Good FPS Map Design</a>（CritPoints, 2018）。三大环叠套结构、dust2 无绝对 chokepoint。<span class="src-type">设计博客</span></li>
+    <li>On Game Design：<a href="https://www.ongamedesign.net/designing-fps-multiplayer-maps-part-2/">Designing FPS Multiplayer Maps – Part 2</a>（2008）。泡泡图方法、目标模式限制路径、对称性需求。<span class="src-type">设计博客</span></li>
+    <li>Amist：<a href="https://amist.co/design-dive-how-valorant-map-design-differs-from-counter-strike/">How VALORANT Map Design Differs from Counter-Strike</a>（2020）。CS 出生点随机 ±3s 方差、Valorant 固定栅栏的 pre-aim 问题。<span class="src-type">对比分析</span></li>
+    <li>Abios Gaming：<a href="https://abiosgaming.com/press/cs2-map-winrates/">Win Rates on CS2 Maps</a>（2023-24 职业赛 16,539 场 CT/T 胜率）。<span class="src-type">数据统计</span></li>
+    <li>Mapcore 社区：<a href="https://www.mapcore.org/forums/thread/18466-what-makes-a-good-cs-go-competitive-map/">What makes a good CS:GO Competitive map?</a> 与 <a href="https://www.mapcore.org/forums/thread/18489-csgo-good-map-rotation-times/">Good map rotation times</a>。三路布局与远/中/近交战距离、转点时间讨论。<span class="src-type">社区论坛</span></li>
+    <li>对称性讨论：<a href="https://tf2maps.net/threads/mirror-symmetry.20258/">TF2Maps: Mirror symmetry</a>、<a href="https://forum.faforever.com/topic/7289/suggestion-for-mapgen-clearer-distinction-between-rotational-vs-mirror-symmetry">FAForever: rotational vs mirror</a>。旋转对称更易上手的社区共识。<span class="src-type">社区论坛</span></li>
+  </ol>
+</section>
+
+<footer class="doc-foot">
+  Trigger Echo · M2 地图设计调研 · 2026-08-11。所有数值均标注来源与样本口径；两组职业数据（2023-24 与 2024-25）在个别图上结论相反属正常样本差异，引用时注意时段。
+</footer>

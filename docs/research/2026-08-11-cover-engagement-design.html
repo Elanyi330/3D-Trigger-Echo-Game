@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>掩体系统与对抗点位设计研究 — Trigger Echo</title>
+<style>
+/* ============ 主题 tokens：light 为基准 ============ */
+:root{
+  --paper:#ECEBE4;
+  --panel:#F5F4EE;
+  --ink:#24262B;
+  --ink-soft:#5B5E63;
+  --line:#C8C6BB;
+  --grid:#DDD9CE;
+  --accent:#D9480F;          /* 安全橙：危险/强调标记 */
+  --steel:#3D5A80;           /* 钢蓝：防守方/几何构造 */
+  --good:#2F7D46;
+  --bad:#B3362B;
+  --code-bg:#E2E0D6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#181B20;
+    --panel:#20242B;
+    --ink:#E4E2D9;
+    --ink-soft:#9DA0A6;
+    --line:#3A3F47;
+    --grid:#252A31;
+    --accent:#FF7A3D;
+    --steel:#8FB3D9;
+    --good:#72C08D;
+    --bad:#E0715F;
+    --code-bg:#2A2F37;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#181B20;
+  --panel:#20242B;
+  --ink:#E4E2D9;
+  --ink-soft:#9DA0A6;
+  --line:#3A3F47;
+  --grid:#252A31;
+  --accent:#FF7A3D;
+  --steel:#8FB3D9;
+  --good:#72C08D;
+  --bad:#E0715F;
+  --code-bg:#2A2F37;
+}
+
+/* ============ 基础 ============ */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:-apple-system,"SF Pro Text",BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:16px;
+  line-height:1.75;
+}
+.wrap{
+  max-width:52rem;
+  margin:0 auto;
+  padding:3rem 1.4rem 5rem;
+}
+::selection{background:var(--accent);color:var(--paper)}
+a{color:var(--steel);text-decoration:none;border-bottom:1px solid var(--line)}
+a:hover{border-bottom-color:var(--steel)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ============ 页眉 ============ */
+.eyebrow{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 .9rem;
+}
+h1{
+  font-size:clamp(1.9rem,4.6vw,2.7rem);
+  line-height:1.22;margin:0 0 1rem;font-weight:800;
+  text-wrap:balance;
+}
+.meta{
+  display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.78rem;color:var(--ink-soft);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:.7rem 0;margin:1.4rem 0 2.2rem;
+}
+.meta b{color:var(--ink);font-weight:600}
+
+/* ============ 摘要 ============ */
+.summary{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-left:4px solid var(--accent);
+  padding:1.2rem 1.4rem;margin:0 0 2.4rem;border-radius:3px;
+}
+.summary h2{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 .7rem;font-weight:600;
+}
+.summary ul{margin:0;padding-left:1.15rem}
+.summary li{margin:.28rem 0}
+
+/* ============ 目录 ============ */
+.toc{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));
+  gap:.45rem .9rem;margin:0 0 2.8rem;
+  font-size:.9rem;
+}
+.toc a{
+  display:block;padding:.45rem .7rem;border:1px solid var(--line);
+  border-bottom:1px solid var(--line);border-radius:3px;color:var(--ink);
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.8rem;
+}
+.toc a:hover{border-color:var(--steel);color:var(--steel)}
+.toc .n{color:var(--accent);margin-right:.5em}
+
+/* ============ 章节 ============ */
+section{margin:0 0 3.2rem}
+h2.sec{
+  display:flex;align-items:baseline;gap:.8rem;
+  font-size:1.42rem;font-weight:800;margin:0 0 1.1rem;
+  border-bottom:2px solid var(--ink);padding-bottom:.45rem;
+}
+h2.sec .n{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.85rem;color:var(--accent);font-weight:700;flex:none;
+}
+h3{font-size:1.05rem;margin:1.6rem 0 .6rem;font-weight:700}
+p{margin:.7rem 0}
+ul,ol{padding-left:1.35rem;margin:.6rem 0}
+li{margin:.32rem 0}
+strong{color:var(--ink)}
+code{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.85em;background:var(--code-bg);
+  padding:.08em .35em;border-radius:3px;
+}
+
+/* ============ 数值规范框 ============ */
+.spec{
+  border:1px dashed var(--line);border-radius:3px;
+  padding:.9rem 1.2rem;margin:1.1rem 0;background:var(--panel);
+  font-size:.92rem;
+}
+.spec .t{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--steel);font-weight:700;display:block;margin-bottom:.45rem;
+}
+.spec table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.spec th,.spec td{
+  text-align:left;padding:.4rem .7rem;border-bottom:1px solid var(--line);
+  vertical-align:top;font-size:.88rem;
+}
+.spec th{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-soft);font-weight:600;
+}
+.table-scroll{overflow-x:auto}
+
+/* ============ 好/坏对照 ============ */
+.judge{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+@media (max-width:640px){.judge{grid-template-columns:1fr}}
+.judge .cell{
+  border:1px solid var(--line);border-radius:3px;
+  padding:.85rem 1rem;font-size:.9rem;background:var(--panel);
+}
+.judge .cell .tag{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;
+  font-weight:700;display:block;margin-bottom:.35rem;
+}
+.judge .good .tag{color:var(--good)}
+.judge .bad .tag{color:var(--bad)}
+.judge .good{border-top:3px solid var(--good)}
+.judge .bad{border-top:3px solid var(--bad)}
+
+/* ============ 图示 ============ */
+figure{margin:1.4rem 0}
+figure .figbox{
+  border:1px solid var(--line);border-radius:3px;background:var(--panel);
+  padding:1rem;overflow-x:auto;
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:22px 22px;
+}
+figure svg{display:block;max-width:100%;height:auto;margin:0 auto;color:var(--ink)}
+figcaption{
+  font-size:.82rem;color:var(--ink-soft);margin-top:.6rem;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  line-height:1.6;
+}
+figcaption b{color:var(--ink)}
+
+/* ============ 关键论点横幅 ============ */
+.axiom{
+  border-left:4px solid var(--steel);background:var(--panel);
+  padding:.75rem 1.1rem;margin:1.1rem 0;font-size:.95rem;border-radius:0 3px 3px 0;
+}
+.axiom .who{
+  display:block;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.7rem;color:var(--ink-soft);margin-top:.3rem;letter-spacing:.06em;
+}
+
+/* ============ 清单 ============ */
+.checklist{list-style:none;padding-left:0;margin:.8rem 0}
+.checklist li{
+  padding:.5rem .8rem .5rem 2.1rem;position:relative;
+  border-bottom:1px solid var(--line);font-size:.92rem;
+}
+.checklist li::before{
+  content:"";position:absolute;left:.6rem;top:.92rem;width:.7rem;height:.7rem;
+  border:2px solid var(--accent);border-radius:2px;
+}
+
+/* ============ 来源 ============ */
+.src{counter-reset:src;padding-left:0;list-style:none}
+.src li{
+  counter-increment:src;
+  padding:.55rem 0 .55rem 2.4rem;position:relative;
+  border-bottom:1px solid var(--line);font-size:.88rem;
+}
+.src li::before{
+  content:"[" counter(src,decimal-leading-zero) "]";
+  position:absolute;left:0;top:.6rem;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.72rem;color:var(--accent);
+}
+.src .pub{color:var(--ink-soft);font-size:.8rem}
+
+footer{
+  margin-top:3.5rem;padding-top:1rem;border-top:1px solid var(--line);
+  font-size:.8rem;color:var(--ink-soft);
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Trigger Echo · Level Design Research · No.03</p>
+  <h1>掩体系统与对抗点位设计研究</h1>
+  <p style="color:var(--ink-soft);margin:0;text-wrap:balance">
+    掩体三级体系 · Peek 几何学 · Headglitch · Sightline 长度控制 · 危险方向数量 ·
+    交叉火力 · CS Boost 位 —— 综合 14 个来源，服务 M2 小图（TDM）布局决策。
+  </p>
+  <div class="meta">
+    <span>日期 <b>2026-08-11</b></span>
+    <span>来源 <b>14 篇</b></span>
+    <span>深度抓取 <b>10 篇全文</b></span>
+    <span>适用 <b>M2 TDM 小图 / 灰盒验收</b></span>
+  </div>
+</header>
+
+<!-- ================= 摘要 ================= -->
+<div class="summary">
+  <h2>// Executive Summary</h2>
+  <ul>
+    <li><strong>掩体必须分级且高度标准化</strong>：低掩体（约 1.0–1.25 m）只能蹲着躲；中掩体可站立射击；高掩体（≥1.75 m）完全阻断视线。CS 的量化禁忌是 64 单位（≈头部高度）的 "head peek"——要么低于头（约 56u），要么高过头（约 72u）。</li>
+    <li><strong>离拐角越远的玩家越占优</strong>：贴角的一方身体先暴露。Peek 方的武器是时机（quick peek），Hold 方的武器是距离（离角远站）。</li>
+    <li><strong>一个交战正面（battlefront）的理想数量是 3</strong>：2 个进攻选择太少，4 个防守顾不过来。每个区域入口"至少 2、最好 3"；整图 3–4 个 chokepoint，每条通道 1 个。</li>
+    <li><strong>Sightline "过长"的判据是武器排他性</strong>：当一条视线只有狙击枪能拿到击杀，它就太长了（Dust2 出生点对出生点是刻意例外，不是反例）。</li>
+    <li><strong>强点必须有代价</strong>：掩体只盖 2/3 入口、boost 位怕火且无退路、偷人点用声音暴露——风险补偿是角度多样性的平衡器。</li>
+    <li><strong>交叉火力的反面同样要设计</strong>：不仅要制造"敌人一次只能面对一个"的双人夹角，也要用 LOS breaker 防止一条视线贯穿全图形成霸权交叉火力。</li>
+  </ul>
+</div>
+
+<!-- ================= 目录 ================= -->
+<nav class="toc" aria-label="目录">
+  <a href="#s1"><span class="n">01</span>掩体三级体系</a>
+  <a href="#s2"><span class="n">02</span>Peek 优势与拐角几何</a>
+  <a href="#s3"><span class="n">03</span>Headglitch 与高低差</a>
+  <a href="#s4"><span class="n">04</span>Sightline 长度控制</a>
+  <a href="#s5"><span class="n">05</span>危险方向数量</a>
+  <a href="#s6"><span class="n">06</span>角度多样性与 re-peek</a>
+  <a href="#s7"><span class="n">07</span>交叉火力设计</a>
+  <a href="#s8"><span class="n">08</span>CS Boost 位与非常规位</a>
+  <a href="#s9"><span class="n">09</span>Trigger Echo 落地清单</a>
+  <a href="#sources"><span class="n">10</span>来源列表</a>
+</nav>
+
+<!-- ================= 01 掩体三级体系 ================= -->
+<section id="s1">
+  <h2 class="sec"><span class="n">01</span>掩体三级体系：低 / 中 / 高</h2>
+
+  <p>三个来源（The Level Design Book、Arena HQ 案例、World of Level Design）对掩体分级的定义高度一致，差异只在具体尺寸：</p>
+
+  <ul>
+    <li><strong>低掩体（Low Cover）</strong>：仅蹲伏时提供保护（腰高）。玩家可蹲在后方射击，站起即暴露。效果是保持视线通透——<em>大量低掩体让整张图的 sightline 保持开放，技术型玩家能持续掌握敌人位置</em>（Level Design Book）。</li>
+    <li><strong>中掩体（Mid Cover）</strong>：遮挡约半身，允许站立射击。双方都能越过它对射，本质是"互有暴露的交火邀请"。</li>
+    <li><strong>高掩体 / LOS 墙（High Cover）</strong>：完全阻断视线与火力，<em>只能绕着打、不能越着打</em>（William Lynch）。它切断互动、让玩家脱离战斗节奏。</li>
+  </ul>
+
+  <div class="axiom">
+    "多人游戏中通常低掩体优于高掩体（low cover is generally preferred over high cover）"——高墙限制互动与视野，使玩家脱离战斗节奏。
+    <span class="who">—— Epic Games 观点，转引自 The Level Design Book [01]</span>
+  </div>
+
+  <div class="spec">
+    <span class="t">// 掩体高度量化标准（三个来源对照）</span>
+    <div class="table-scroll">
+    <table>
+      <tr><th>来源</th><th>低掩体</th><th>中掩体</th><th>高掩体</th><th>备注</th></tr>
+      <tr>
+        <td>Level Design Book<br>（引《神秘海域4》标准）</td>
+        <td>1.0 – 1.25 m（腰高）</td>
+        <td>—</td>
+        <td>≥ 1.75 m（站姿头高）</td>
+        <td>≤ 0.5 m 不算掩体</td>
+      </tr>
+      <tr>
+        <td>Arena HQ 案例</td>
+        <td>仅蹲伏受保护</td>
+        <td>遮半身、可站射</td>
+        <td>完全遮蔽、可攀爬</td>
+        <td><strong>避免 2.0–2.5 m 高度</strong>（认知混淆带）；&lt; 2.5 m 一律视为可攀爬</td>
+      </tr>
+      <tr>
+        <td>CS 关卡指南（Source 单位）</td>
+        <td>&lt; 56u（≈1.42 m，低于头）</td>
+        <td>—</td>
+        <td>&gt; 72u（≈1.83 m，高过头）</td>
+        <td><strong>64u（≈1.63 m）head peek 是禁忌</strong></td>
+      </tr>
+    </table>
+    </div>
+  </div>
+
+  <p>Level Design Book 进一步给出掩体的<strong>八个设计维度</strong>：高度（半高/全高）、宽度（窄/宽）、坚固度（软掩体只挡视线不挡子弹，如草丛；硬掩体两者都挡）、朝向（定向掩体有侧翼盲区；独立掩体 360° 可交战但要防守所有方向）、垂直性、角落形状（尖角能藏更多角度，圆角/长曲线难躲）、持久性（动态/静态）、作者权（设计师预设 vs 玩家自建）。</p>
+
+  <p>一个与 CS 直接相关的推论：在 CS 里，<strong>薄墙是"软掩体"</strong>——穿射机制把 wallbang 变成一种"下注机制"（betting mechanic），玩家用弹药和噪音换信息（Level Design Book · Map balance）。</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 720 300" role="img" aria-label="掩体三级高度侧视图：低掩体与中掩体可被越过射击，高掩体阻断视线，头部高度掩体造成 headglitch 禁忌区">
+        <defs>
+          <marker id="arr1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <!-- 地面 -->
+        <line x1="20" y1="250" x2="700" y2="250" stroke="currentColor" stroke-width="2"/>
+        <!-- 射手 -->
+        <circle cx="58" cy="112" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="58" y1="121" x2="58" y2="185" stroke="currentColor" stroke-width="2"/>
+        <line x1="58" y1="185" x2="48" y2="250" stroke="currentColor" stroke-width="2"/>
+        <line x1="58" y1="185" x2="68" y2="250" stroke="currentColor" stroke-width="2"/>
+        <text x="58" y="272" text-anchor="middle" font-size="11" fill="currentColor">射手（视线 ≈1.55m）</text>
+        <!-- 视线射线 -->
+        <line x1="70" y1="112" x2="672" y2="112" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr1)"/>
+        <!-- 低掩体 1.0-1.25m -->
+        <rect x="180" y="150" width="26" height="100" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="193" y="272" text-anchor="middle" font-size="11" fill="currentColor">低 1.0–1.25m</text>
+        <text x="193" y="288" text-anchor="middle" font-size="10" fill="currentColor">可越过射击 ✓</text>
+        <!-- 中掩体 ~1.5m -->
+        <rect x="320" y="128" width="26" height="122" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="333" y="272" text-anchor="middle" font-size="11" fill="currentColor">中 ~1.5m</text>
+        <text x="333" y="288" text-anchor="middle" font-size="10" fill="currentColor">可越过射击 ✓</text>
+        <!-- head peek 禁忌 64u -->
+        <rect x="452" y="118" width="26" height="132" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <line x1="440" y1="118" x2="490" y2="118" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="465" y="272" text-anchor="middle" font-size="11" fill="var(--accent)">64u ≈ 头部高度</text>
+        <text x="465" y="288" text-anchor="middle" font-size="10" fill="var(--accent)">headglitch 禁忌区 ✗</text>
+        <!-- 高掩体 ≥1.75m -->
+        <rect x="580" y="85" width="26" height="165" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="606" y1="112" x2="620" y2="98" stroke="var(--accent)" stroke-width="2"/>
+        <line x1="606" y1="98" x2="620" y2="112" stroke="var(--accent)" stroke-width="2"/>
+        <text x="593" y="272" text-anchor="middle" font-size="11" fill="currentColor">高 ≥1.75m</text>
+        <text x="593" y="288" text-anchor="middle" font-size="10" fill="currentColor">视线被阻断 ⊘</text>
+        <!-- 高度刻度 -->
+        <line x1="688" y1="250" x2="688" y2="85" stroke="currentColor" stroke-width="1"/>
+        <text x="20" y="40" font-size="12" fill="currentColor" font-weight="bold">侧视：掩体高度 vs 视线</text>
+        <text x="20" y="58" font-size="10" fill="var(--ink-soft)" opacity=".85">虚线 = 站姿视线；橙叉 = 射线被挡</text>
+      </svg>
+    </div>
+    <figcaption><b>图 1</b> —— 侧视图：低/中掩体可被越过射击（视线通透），高掩体阻断视线；位于头部高度（CS 的 64u）的掩体只露出一个头，是公认最令人沮丧的几何。</figcaption>
+  </figure>
+
+  <h3>反模式</h3>
+  <ul>
+    <li><strong>"掩体盒子"效应</strong>：到处摆放标准化矩形箱子，场景虚假做作（Level Design Book）。CS 指南同样要求掩体融入建筑本身，而非全靠板条箱。</li>
+    <li><strong>高掩体过多 = 迷宫</strong>：动线与寻路混乱，玩家失去对战场整体的感知。</li>
+    <li><strong>防御者不知道威胁来自何方</strong>，掩体就毫无意义——掩体必须面向明确的威胁方向摆放。</li>
+    <li><strong>反复出现的齐腰箱子</strong>：单调的 waist-high box 重复堆砌是典型新手痕迹（Level Design Book）。</li>
+  </ul>
+</section>
+
+<!-- ================= 02 Peek 几何 ================= -->
+<section id="s2">
+  <h2 class="sec"><span class="n">02</span>Peek 优势与拐角几何（Off-angle）</h2>
+
+  <h3>核心几何原理：离拐角越远越占优</h3>
+  <p>这是竞技 FPS 社区反复验证的一条几何事实（r/VALORANT 图解帖 + Dignitas 指南）：</p>
+  <ul>
+    <li><strong>贴角者先暴露</strong>：你离拐角越近，你的角色模型就越早从拐角边缘"漏"给对方，而你自己的视野还没越过拐角。</li>
+    <li><strong>远角者先看见</strong>："the player further away from any angle in question will always have the upper hand"——远端的防守者先看到推进者的身体边缘（Dignitas）。</li>
+    <li><strong>Peek 方的反制是时机</strong>："a quick peek could catch them off-guard and level the playing field"——快速横拉利用对方的反应空档与网络层的 peeker's advantage 把几何劣势扳平。</li>
+  </ul>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 720 300" role="img" aria-label="俯视拐角几何：远角防守方的视线先触及贴角进攻方，贴角者身体先暴露">
+        <defs>
+          <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <text x="24" y="36" font-size="12" fill="currentColor" font-weight="bold">俯视：拐角两侧谁先暴露？</text>
+        <!-- 墙体 -->
+        <rect x="330" y="20" width="30" height="180" fill="none" stroke="currentColor" stroke-width="2.5"/>
+        <text x="345" y="216" text-anchor="middle" font-size="10" fill="var(--ink-soft)" opacity=".85">墙</text>
+        <!-- 远角防守方 -->
+        <circle cx="560" cy="230" r="10" fill="none" stroke="var(--steel)" stroke-width="2.5"/>
+        <text x="560" y="262" text-anchor="middle" font-size="11" fill="var(--steel)">防守方（离角远）</text>
+        <!-- 防守方视线：擦过墙角(330,200)射向进攻方 -->
+        <line x1="551" y1="224" x2="212" y2="163" stroke="var(--steel)" stroke-width="1.5" stroke-dasharray="7 4" marker-end="url(#arr2)"/>
+        <!-- 近角进攻方 -->
+        <circle cx="200" cy="230" r="10" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <text x="200" y="262" text-anchor="middle" font-size="11" fill="var(--accent)">进攻方（贴角）</text>
+        <!-- 进攻方视线：必须走到更外侧才能看到防守方 -->
+        <line x1="208" y1="222" x2="326" y2="204" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="2 4" marker-end="url(#arr2)"/>
+        <text x="252" y="188" font-size="10" fill="var(--accent)">视线被墙角挡住</text>
+        <!-- 暴露区标注 -->
+        <path d="M 212 163 A 60 60 0 0 1 240 190" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="96" y="150" font-size="10" fill="var(--accent)">身体先漏出</text>
+        <text x="96" y="164" font-size="10" fill="var(--accent)">才被自己看见</text>
+        <line x1="150" y1="152" x2="196" y2="196" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>
+        <!-- 结论标注 -->
+        <text x="430" y="120" font-size="11" fill="var(--steel)">防守方视线先到 →</text>
+        <text x="430" y="136" font-size="11" fill="var(--steel)">先看见对方肩线</text>
+      </svg>
+    </div>
+    <figcaption><b>图 2</b> —— 俯视几何：贴角进攻方（橙）的身体边缘先进入远角防守方（蓝）的视线，而自己的视线还卡在墙角之后。因此 hold 角时应与掩体保持距离；peek 时贴角方吃亏，常用快速横拉补偿。</figcaption>
+  </figure>
+
+  <h3>对关卡设计的含义</h3>
+  <ul>
+    <li><strong>给防守位留"退后空间"</strong>：防守位背后的空间决定了防守者能否站到离角足够远的位置。贴墙的死角位天然劣势。</li>
+    <li><strong>Off-angle = 偏离默认站位的角度</strong>：站在对方预瞄点之外的位置（拐角更深处/更浅处、非常规高度、非常规侧面），让对方的肌肉记忆落空。Boosteria 将 peek 分为 jiggle（信息侦查）、wide swing（大拉）、off-angle 等类型，off-angle 的价值全部建立在"对方没想到"上。</li>
+    <li><strong>切角（slice the pie）依赖尖角</strong>：掩体角落越尖锐，可逐层清理的角度越多；圆润角落减少可隐藏角度（Level Design Book）——所以竞技图的交火拐角几乎都是直角。</li>
+    <li><strong>Dignitas 的操作细节</strong>（可转译为 AI/玩家行为参考）：你比对方更靠近角时切忌慢速移动（"a sitting duck"）；贴角横拉要在出角瞬间停止静步；慢 peek 只用于收集信息。</li>
+  </ul>
+</section>
+
+<!-- ================= 03 Headglitch ================= -->
+<section id="s3">
+  <h2 class="sec"><span class="n">03</span>Headglitch 与高低差射击</h2>
+
+  <h3>什么是 headglitch</h3>
+  <p>标准定义（LevlUp 术语表）：玩家借助掩体使<strong>只有头部露出</strong>、同时保留完整射击能力。它不是 bug，而是<strong>相机高度与掩体高度恰好对齐</strong>产生的几何结果——第一人称相机在眼睛位置，只要掩体顶沿低于相机、高于身体其余部分，你就获得"最小受弹面积 + 完整火力"。</p>
+
+  <div class="judge">
+    <div class="cell good">
+      <span class="tag">✓ 设计者何时故意用它</span>
+      作为<strong>可争夺的地形奖励</strong>：斜坡顶、半墙后、箱顶边缘。它奖励先占位的一方，且通常可被绕侧/道具反制（Apex、BF 系列的高地边缘普遍存在）。
+    </div>
+    <div class="cell bad">
+      <span class="tag">✗ 何时它是失败设计</span>
+      当它<strong>无处不在且无反制</strong>：BF2042 玩家直接质问"为什么掩体要被设计成 headglitch"；BF4 CTE 讨论指出修复 headglitch 会引发 triangulation（三角化暴露）新问题——说明它必须被当作系统级变量调节，而不是事后打补丁。
+    </div>
+  </div>
+
+  <h3>量化规则（来自 CS 关卡指南）</h3>
+  <ul>
+    <li><strong>避开 64 单位（≈1.63 m）的 head peek 高度</strong>——这种战斗"frustrating and unfair"。</li>
+    <li>掩体要么<strong>低于头（约 56u / 1.42 m）</strong>：双方互见上半身，公平对枪；要么<strong>高于头（约 72u / 1.83 m）</strong>：完全遮挡。</li>
+    <li>参考范例：Dust2 A 点的掩体就是按这两档设计的。</li>
+  </ul>
+
+  <h3>高低差射击的规则</h3>
+  <ul>
+    <li><strong>垂直角度控制在 ±30° 以内</strong>：超过这个范围，玩家难以用雷达和声音定位对方楼层/高度（CS 指南）。</li>
+    <li><strong>交火主要应发生在水平面</strong>：水平交火中准星移动距离一致，枪法可比；大俯仰角交火把枪法变成几何抽奖。</li>
+    <li><strong>坡道 sightline 必须允许低位反打</strong>：Cobblestone 地下通道是正面案例——"both parties have the same chances"；Dust1 地下通道是反面案例——上方 CT 能看到进攻方的脚而自己不被看到。</li>
+    <li><strong>楼梯要 clip 成平滑斜面</strong>：磕绊的台阶会破坏交火中的准星控制（CS 指南）。</li>
+    <li><strong>制高点（vantage point）的心理价值</strong>：站得高让人觉得"这里比地面强"，赋予掌控感；多人图中玩家能真正利用制高点，因此<strong>每个制高点都必须设计反制路径</strong>（Practical Guide）。</li>
+  </ul>
+</section>
+
+<!-- ================= 04 Sightline ================= -->
+<section id="s4">
+  <h2 class="sec"><span class="n">04</span>Sightline 长度控制：多远算过长？</h2>
+
+  <p><strong>定义</strong>（Level Design Book · Map balance）：sightline 是"连接玩家相机与视野内重要关卡元素的一条假想的、不被中断的线"。过深的 sightline 让玩家信息过载，过浅则无法规划——<strong>要混合长短，让不同区域提供不同的可见性</strong>。圆角路口提供宽视野，尖锐 T 字口利于切断视线。</p>
+
+  <h3>"过长"的可操作判据</h3>
+  <div class="axiom">
+    当一条 sightline 上<strong>只有狙击步枪能拿到击杀</strong>，它就太长了。例外必须是有意的：Dust2 出生点对出生点的超长视线被保留，是因为"开局早杀不应该由任何步枪随便完成"——它被设计成 AWP 的舞台，且 T 方有中路迂回可以完全避开它。
+    <span class="who">—— The dos and don'ts of Counter-Strike level design [03]</span>
+  </div>
+
+  <h3>控制 sightline 的四个工具</h3>
+  <ol>
+    <li><strong>箱堆/障碍物定点切断</strong>：Dust 作者 Dave Johnston 回顾，中央走廊的每个箱子都"strategically positioned to cut off lines-of-sight"，防止从一端直视另一端（顺带优化渲染性能）。</li>
+    <li><strong>用墙而非掩体断视线</strong>：Arena HQ 案例的经验是"Play with wall positions rather than too many covers to break up lines of sight"——动建筑，别堆箱子。</li>
+    <li><strong>地形弯曲</strong>：Halo Blood Gulch 用弯曲起伏的丘陵遮蔽远处敌人，让横跨全图的视线依然可控（CritPoints）。</li>
+    <li><strong>计时与对称</strong>：Dave Johnston 通过跑图计时确保双方到中央走廊距离相等，从而"精确规定首次交火最可能发生在哪里"——sightline 的强度最终由"谁先到达哪里"决定。</li>
+  </ol>
+
+  <h3>狙击线的反制义务</h3>
+  <ul>
+    <li>任何狙击位都必须可被侧翼包抄（"bushwhack the sniper"），或在狙击位视野内设置 sightline blocker 给非狙击玩家安全区（r/gamedesign 讨论）。</li>
+    <li>狙击通道（sniper alley）与近战通道混合布局，用掩体调节长线的有效性（Level Design Book）。</li>
+    <li>On Game Design 提醒："incredibly long view distances"会削弱技巧性近战的重要性——大图天然稀释遭遇密度，小图"keep the action closer"（Black Shell Media）。</li>
+    <li><strong>意外长视线的修复方法</strong>：移动造成问题的那个拐角本身（哪怕只挪一点），而不是在视线中间硬塞障碍物（CS 指南）。</li>
+    <li><strong>消灭 pixel angle</strong>：错位拐角挤出的像素缝视线会造成"unintuitive gameplay and unfair advantages"（案例：Mirage B 公寓）。</li>
+  </ul>
+</section>
+
+<!-- ================= 05 危险方向 ================= -->
+<section id="s5">
+  <h2 class="sec"><span class="n">05</span>一个交火点该有多少个危险方向？</h2>
+
+  <p>这是调研中数字最密集的问题。不同来源的口径不同，但收敛得非常整齐：</p>
+
+  <div class="spec">
+    <span class="t">// 危险方向数量规范（按作用域分层）</span>
+    <div class="table-scroll">
+    <table>
+      <tr><th>作用域</th><th>推荐值</th><th>来源</th></tr>
+      <tr><td>全图交战正面（battlefront）</td><td><strong>3 个</strong>（2 个进攻选择太少，4 个防守顾不过来）</td><td>CS 关卡指南 [03]</td></tr>
+      <tr><td>单个区域的入口</td><td><strong>至少 2，最好 3</strong></td><td>On Game Design [07]</td></tr>
+      <tr><td>炸弹点/目标点入口</td><td><strong>约 3 个</strong>；入口越多，单个入口应越弱</td><td>CS 关卡指南 [03]</td></tr>
+      <tr><td>全图 chokepoint</td><td><strong>3–4 个</strong>，每条通道 1 个</td><td>Level Design Book [02]</td></tr>
+      <tr><td>单个出生点出口</td><td><strong>3 个，且在不同平面上</strong></td><td>Arena HQ [08]</td></tr>
+      <tr><td>单个掩体位需防守的角度</td><td>例：Dust2 A 点掩体只覆盖 3 个入口中的 2 个</td><td>CS 关卡指南 [03]</td></tr>
+    </table>
+    </div>
+  </div>
+
+  <h3>两个诊断问题（Level Design Book）</h3>
+  <ul>
+    <li>评估一个战术位置时问：<strong>"所有敌方 sightline 能否装进单个防守者的视野内？"</strong>——如果能且该位置没有弱点，它就会变成 camping spot。</li>
+    <li>chokepoint 的分布必须做到<strong>"不可能从一个点覆盖全部"</strong>。</li>
+  </ul>
+
+  <h3>上限警告：路径不是越多越好</h3>
+  <div class="axiom">
+    路径过多会产生 "Guess maps"：敌人可能从任何角度出现，超出合理预测范围——此时信息收集失效，战斗退化为猜拳。Dust2 之所以是教科书，是因为它由"三个互相叠加的大环形循环 + 若干小循环"构成，且<strong>全图只有一处路径在 Z 轴上交叉</strong>：方向多但可学习、可预测。
+    <span class="who">—— Good FPS Map Design, Celia Wagar (CritPoints) [04]</span>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 720 330" role="img" aria-label="交叉火力对比：左图两个防守位夹角覆盖同一入口，进攻方一次只能面对一个；右图单一防守位视野覆盖全部入口，形成 camping spot">
+        <defs>
+          <marker id="arr3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <!-- 左面板 -->
+        <text x="30" y="34" font-size="12" fill="var(--good)" font-weight="bold">✓ 好：双位夹角（交叉火力）</text>
+        <rect x="120" y="60" width="14" height="120" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="226" y="60" width="14" height="120" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="180" y="54" text-anchor="middle" font-size="10" fill="var(--ink-soft)" opacity=".85">入口通道</text>
+        <!-- 进攻方 -->
+        <circle cx="180" cy="270" r="10" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <text x="180" y="298" text-anchor="middle" font-size="11" fill="var(--accent)">进攻方</text>
+        <!-- 进攻方朝向：只面对左侧防守位 -->
+        <line x1="172" y1="262" x2="96" y2="204" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr3)"/>
+        <text x="86" y="248" font-size="10" fill="var(--accent)">只能面对其一</text>
+        <!-- 防守位 L -->
+        <circle cx="84" cy="192" r="9" fill="none" stroke="var(--steel)" stroke-width="2.5"/>
+        <path d="M 84 192 L 150 262 A 96 96 0 0 0 176 226 Z" fill="var(--steel)" opacity=".18" stroke="var(--steel)" stroke-width="1"/>
+        <text x="46" y="176" font-size="10" fill="var(--steel)">防守 A</text>
+        <!-- 防守位 R -->
+        <circle cx="276" cy="192" r="9" fill="none" stroke="var(--steel)" stroke-width="2.5"/>
+        <path d="M 276 192 L 184 226 A 96 96 0 0 0 210 262 Z" fill="var(--steel)" opacity=".18" stroke="var(--steel)" stroke-width="1"/>
+        <text x="288" y="176" font-size="10" fill="var(--steel)">防守 B</text>
+        <!-- 分隔线 -->
+        <line x1="360" y1="30" x2="360" y2="310" stroke="currentColor" stroke-width="1" stroke-dasharray="4 5" opacity=".5"/>
+        <!-- 右面板 -->
+        <text x="392" y="34" font-size="12" fill="var(--bad)" font-weight="bold">✗ 坏：一位看全 = camping spot</text>
+        <rect x="470" y="60" width="14" height="90" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="560" y="60" width="14" height="90" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="650" y="60" width="14" height="90" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="477" y="54" text-anchor="middle" font-size="10" fill="var(--ink-soft)" opacity=".85">入口 1</text>
+        <text x="567" y="54" text-anchor="middle" font-size="10" fill="var(--ink-soft)" opacity=".85">入口 2</text>
+        <text x="657" y="54" text-anchor="middle" font-size="10" fill="var(--ink-soft)" opacity=".85">入口 3</text>
+        <!-- 单个防守位，大 FOV 覆盖全部入口 -->
+        <circle cx="567" cy="255" r="9" fill="none" stroke="var(--bad)" stroke-width="2.5"/>
+        <path d="M 567 255 L 440 90 A 190 190 0 0 1 694 90 Z" fill="var(--bad)" opacity=".15" stroke="var(--bad)" stroke-width="1"/>
+        <text x="567" y="292" text-anchor="middle" font-size="11" fill="var(--bad)">单防守位视野包住全部入口</text>
+        <text x="567" y="308" text-anchor="middle" font-size="10" fill="var(--bad)">且无侧翼威胁 → 必须削弱</text>
+      </svg>
+    </div>
+    <figcaption><b>图 3</b> —— 左：交叉火力的正确形态，两个防守位的视野夹角重叠于入口，进攻方的准星一次只能对准其中一人。右：当所有敌方 sightline 装进单个防守者视野且其无弱点时，该点即为 camping spot，需拆分或开侧翼。</figcaption>
+  </figure>
+
+  <h3>补充规则</h3>
+  <ul>
+    <li><strong>独立掩体要付"角度税"</strong>：360° 可交战意味着要防守所有方向；定向掩体限制可防角度、存在侧翼盲区——两者都是有意的取舍（Level Design Book）。</li>
+    <li><strong>Arena HQ 的表述</strong>：要"Manage the number of attack vectors"防止玩家被围攻，同时让多条路径通向同一地点——危险方向的数量是<strong>被管理</strong>的，不是自然生长的。</li>
+    <li><strong>接近目标点时保证"clarity of attack vectors"</strong>：让玩家能快速判断哪里可以侧袭。</li>
+  </ul>
+</section>
+
+<!-- ================= 06 角度多样性 ================= -->
+<section id="s6">
+  <h2 class="sec"><span class="n">06</span>角度多样性（Angle Variety）与 re-peek</h2>
+
+  <p>角度多样性的本质是<strong>让对方的预瞄、肌肉记忆与信息假设持续失效</strong>。它不是"地图里有很多角度"，而是"同一个交火点，每一回合可以用不同方式 hold"。</p>
+
+  <h3>构成角度多样性的三层手段</h3>
+  <ol>
+    <li><strong>常规位（on-angle）</strong>：默认站位，对方准星预瞄的地方。作用是稳定与可预期。</li>
+    <li><strong>Off-angle</strong>：偏离默认站位一到两个身位、换一侧、换高度。价值完全依赖"对方没想到"，被识破后往往比常规位弱（所以不能每回合重复使用——这就是 re-peek 的节奏问题）。</li>
+    <li><strong>非常规位 / Boost 位</strong>：把对手预期中"头会出现在墙上沿"的概率变成 0%（详见第 08 节）。</li>
+  </ol>
+
+  <p><strong>Re-peek 的设计含义</strong>：同一个角度反复 peek 会被读timing；关卡能做的不是禁止，而是<strong>提供足够多的等价选项</strong>，让"换一个角度再来"永远可行。CS 指南的"奖励冒险行为以使打法多样"（reward risky plays to make gameplay diverse）就是这个原则的官方表述。</p>
+
+  <h3>风险补偿：强点的价格</h3>
+  <ul>
+    <li><strong>暴露缺口</strong>：强力掩体位必须对至少一个入口不设防——Dust2 A 点掩体只覆盖 3 个入口中的 2 个。</li>
+    <li><strong>道具死地</strong>：强力躲藏点应是"被道具命中即死的陷阱"——如 Mirage A 点的 ninja corner。</li>
+    <li><strong>声音代价</strong>：用声音而非伤害平衡路线——金属探测器之类的触发音会向对手暴露强力位置的占用（CS 指南）。</li>
+    <li><strong>路线取舍</strong>：快路承受跌落伤害/暴露，慢路安全（CS 指南）；"强力武器放在脆弱位置"这类 risk/reward 诱导是经典手法（On Game Design）。</li>
+  </ul>
+
+  <div class="axiom">
+    反面教材："unassailable ambush spots"（不可反制的伏击点）——站在被伏击一方的体验"is not fun at all"。任何角度多样性的设计都要先回答：被这个角度杀死的人，下一回合能做什么？
+    <span class="who">—— Designing FPS Multiplayer Maps Part 2 [07]</span>
+  </div>
+</section>
+
+<!-- ================= 07 交叉火力 ================= -->
+<section id="s7">
+  <h2 class="sec"><span class="n">07</span>交叉火力（Crossfire）设计</h2>
+
+  <p>交叉火力 = 两个（或更多）防守位从不同几何角度覆盖同一片区域，使进攻方的准星与掩体<strong>一次只能解决其中一个威胁</strong>。它是把"危险方向数量"从抽象数字变成具体火力优势的手法。</p>
+
+  <h3>设计要点</h3>
+  <ul>
+    <li><strong>夹角而非平行</strong>：两个位置的射界应形成夹角（理想接近直角），进攻方面对 A 时 B 在其视野外（见图 3 左）。</li>
+    <li><strong>chokepoint 必须分散</strong>：布局要确保"不可能从一个点覆盖全部 chokepoint"（Level Design Book），否则单点防守瓦解整图。</li>
+    <li><strong>交叉火力也可以太强——要设计它的反面</strong>：Arena HQ 案例专门用"一个或多个 LOS breaker"来"block the crossfire between the two ends of the map"。先分析全图重要 sightline，再决定阻断谁、留给远程玩法哪条线。<strong>优先移动墙体位置，而不是堆更多掩体。</strong></li>
+    <li><strong>中央高张力点</strong>：Arena HQ 在中心放 vantage point 作为"point of tension (= chokepoint)"，中心位掩体刻意稀少以宣告"这里是危险的地方"——占据它收益高、暴露高，玩家必须"accept the risk"。</li>
+    <li><strong>Post-plant 视角反转</strong>（CS 特有但原则通用）：下包后攻守互换，掩体必须同时服务"初始进攻"和"回防"两个方向的交火（CS 指南）。</li>
+    <li><strong>掩体 vs 高地的路线级交叉</strong>：一条路给好掩体，另一条路给好高地——开阔易守但火力优势，这是路线层面的 risk/reward 交叉（On Game Design）。</li>
+  </ul>
+
+  <div class="axiom">
+    Dust2 的中路在会合点后分叉为 A short 与双门：先让双方在一点相遇，再在相遇点之后分裂出路线——"create routes without disrupting balance"。交叉火力要建立在双方都到得了的 battlefront 上，而不是单方面火力投射区。
+    <span class="who">—— CS 关卡指南 [03]</span>
+  </div>
+</section>
+
+<!-- ================= 08 CS Boost 位 ================= -->
+<section id="s8">
+  <h2 class="sec"><span class="n">08</span>CS 的 Boost 位与非常规位</h2>
+
+  <p><strong>定义</strong>（Refrag）：boost 指队友蹲下/叠人把玩家抬上常规跳跃到不了的位置，获得非常规视角。它之所以有效，是三个机制的叠加：</p>
+  <ol>
+    <li><strong>时机差</strong>：在对手跑进点位的瞬间抢先开火（"catch Ts as they're running onto site"）；</li>
+    <li><strong>Off-angle</strong>：站在对方预瞄清单之外的位置（"horrible off-angle"）；</li>
+    <li><strong>预期违背</strong>：对方"expect your head to be hovering over the wall"的概率是 0%——准星高度假设被直接作废。</li>
+  </ol>
+
+  <div class="spec">
+    <span class="t">// 代表性 boost 位（Refrag 指南）</span>
+    <div class="table-scroll">
+    <table>
+      <tr><th>地图</th><th>点位</th><th>特点 / 风险</th></tr>
+      <tr><td>Inferno</td><td>Newbox</td><td>需三人配合；怕 NADR 火</td></tr>
+      <tr><td>Inferno</td><td>CT boost</td><td>可以越过常规 CT 烟观察</td></tr>
+      <tr><td>Inferno</td><td>Porch</td><td>"CT 防守军火库的基础组成"</td></tr>
+      <tr><td>Nuke</td><td>Fake Vent</td><td>可站上背侧；被火淋到也不会真烧伤；<strong>无退路</strong></td></tr>
+      <tr><td>Nuke</td><td>Ramp 高箱</td><td>克制快速 Rush Ramp</td></tr>
+      <tr><td>Dust2</td><td>Cat boost</td><td>开局数秒内抓无防备的 T 拿 early pick</td></tr>
+      <tr><td>Dust2</td><td>Window boost</td><td>"absolute nightmare to deal with"</td></tr>
+      <tr><td>Train</td><td>Bomb Train</td><td>gimmick play，退路极少（fallback minimal）</td></tr>
+      <tr><td>Train</td><td>Popdog</td><td>T 方用来侦查 A 点，极吃时机</td></tr>
+      <tr><td>Cache</td><td>A main 箱上 boost</td><td>CS 官方指南点名的"risky but rewarding"范例</td></tr>
+    </table>
+    </div>
+  </div>
+
+  <h3>使用时机与代价</h3>
+  <ul>
+    <li>常见于 <strong>swing round（比分波动局）与低经济局</strong>——用信息/位置优势补偿装备劣势。</li>
+    <li>代价模式高度一致：<strong>怕道具（火/雷）、无退路、暴露后必死</strong>。这正是第 06 节风险补偿原则的活教材。</li>
+  </ul>
+
+  <h3>设计侧的结论（CS 官方指南）</h3>
+  <ul>
+    <li><strong>允许有意的团队 boost，但避免过度复杂</strong>伤害游戏流。</li>
+    <li><strong>小装饰物与栏杆必须 non-solid</strong>：防止挡雷和<strong>意外 boost 位</strong>；游戏区内的实体 prop 必须有正确 hitbox（反例：老 Inferno 的卡车有诡异穿模视线）。</li>
+    <li><strong>用 clip 消灭破坏平衡的 boost 与 C4 死角</strong>——非常规位应该是<strong>被选择保留</strong>的，不是几何漏洞漏出来的。</li>
+    <li>对 Trigger Echo 的推论：方块手/方块世界里"叠人 boost"天然存在（方块可搭可站），要么显式设计并平衡，要么用规则禁止——<strong>不能装作它不存在</strong>。</li>
+  </ul>
+</section>
+
+<!-- ================= 09 落地清单 ================= -->
+<section id="s9">
+  <h2 class="sec"><span class="n">09</span>Trigger Echo · M2 小图落地清单</h2>
+  <p>把以上结论压缩为灰盒（blockout）阶段可直接验收的检查项。单位请按项目内方块尺度换算（建议先定义 1 个标准方块 = 1 m 的映射）。</p>
+
+  <ul class="checklist">
+    <li><strong>掩体三档高度已标准化</strong>：低（蹲躲，约 1.0–1.25 m）/ 中（站射遮半身）/ 高（≥1.75 m 全阻断），并避开 ≈1.6 m 的 headglitch 禁忌档（CS 的 64u 教训）。</li>
+    <li><strong>没有"只能绕不能越"的高墙迷宫</strong>：高掩体占比受控，交火区以低/中掩体为主（Epic 原则）。</li>
+    <li><strong>每个交火点危险方向 = 2–3 个</strong>：整图 battlefront 目标 3 个；每个区域入口至少 2、最好 3；整图 chokepoint 3–4 个。</li>
+    <li><strong>单点诊断通过</strong>：不存在"一个位置视野包住所有入口且无侧翼威胁"的 camping spot；Dust2 A 点式暴露缺口（3 入口只盖 2）存在于每个强点。</li>
+    <li><strong>无武器排他 sightline</strong>：没有"只有狙击枪能杀人"的视线；若有 AWP 式长线，旁边必须有可迂回的路径与低位反打能力（Cobblestone 坡道标准，非 Dust1 式只看脚）。</li>
+    <li><strong>垂直角度 ≤ ±30°</strong>，主交火发生在水平面；楼梯/坡道做平滑处理。</li>
+    <li><strong>拐角几何检查</strong>：防守位有退后空间（离角远站可行）；交火拐角用直角以支持切角；无 pixel angle。</li>
+    <li><strong>角度多样性</strong>：每个 chokepoint 至少提供 常规位 + 1 个 off-angle；off-angle/强点全部带代价（道具死地 / 声音暴露 / 无退路）。</li>
+    <li><strong>交叉火力双向治理</strong>：至少设计 1 组夹角交叉火力；同时确认没有贯穿全图的霸权视线（用墙体位置断，不靠堆箱子）。</li>
+    <li><strong>叠人/boost 行为有明确决策</strong>：要么设计并平衡（risky-but-rewarding），要么规则/几何禁止。</li>
+    <li><strong>首次交火位置可预测</strong>：双方到首个 battlefront 的路径时间对称（Dave Johnston 计时法）。</li>
+    <li><strong>不是 Guess map</strong>：所有入口方向可学习、可记忆，路径结构能口头复述（"三个大环 + 小环"标准）。</li>
+  </ul>
+</section>
+
+<!-- ================= 10 来源 ================= -->
+<section id="sources">
+  <h2 class="sec"><span class="n">10</span>来源列表</h2>
+  <ol class="src">
+    <li><a href="https://book.leveldesignbook.com/process/combat/cover">Cover — The Level Design Book (Robert Yang)</a><br><span class="pub">掩体八维度、《神秘海域4》高度标准、Epic "低优于高"、切蛋糕战术。深度抓取全文。</span></li>
+    <li><a href="https://book.leveldesignbook.com/process/combat/balance">Map balance — The Level Design Book</a><br><span class="pub">sightline 定义、软/硬/半掩体、CS 穿射=下注机制、3–4 chokepoint、camping 诊断问题。深度抓取全文。</span></li>
+    <li><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=1110438811">The dos and don'ts of Counter-Strike level design — Steam Community</a><br><span class="pub">64u head peek 禁忌、3 个 battlefront、±30° 垂直、3 入口、10–15s 轮转、风险补偿、boost 治理。数字密度最高的来源，深度抓取全文。</span></li>
+    <li><a href="https://critpoints.net/2018-02-18/good-fps-map-design/">Good FPS Map Design — Celia Wagar, CritPoints</a><br><span class="pub">循环结构、Dust2 三环分析、Guess map 警告。深度抓取全文。</span></li>
+    <li><a href="https://medium.com/ironequal/practical-guide-on-first-person-level-design-e187e45c744c">Practical Guide on First Person Level Design — IronEqual/Medium</a><br><span class="pub">cover vs occlusion、vantage point、30 秒安全区、反模式清单。深度抓取全文。</span></li>
+    <li><a href="https://blackshellmedia.com/2017/01/importance-small-scale-fps-level-design-mainstream-development/">Importance of Small Scale FPS Level Design — Black Shell Media</a><br><span class="pub">小图遭遇密度、垂直 sightline、动态破坏。深度抓取全文。</span></li>
+    <li><a href="https://www.ongamedesign.net/designing-fps-multiplayer-maps-part-2/">Designing FPS Multiplayer Maps – Part 2 — On Game Design</a><br><span class="pub">区域入口 2–3 个、4–8 人交战区、unassailable ambush spots、风险/奖励路线。深度抓取全文。</span></li>
+    <li><a href="https://timothe-garenaux.com/arena-hq">Arena HQ 案例 — Timothé Garenaux</a><br><span class="pub">低/中/高掩体三档、2–2.5m 混淆带、LOS breaker 反交叉火力、attack vector 管理。深度抓取全文。</span></li>
+    <li><a href="https://refrag.gg/blog/best-cs2-boost-spots-2/">Getting Boosted: The Best Boost Spots in CS2 — Refrag</a><br><span class="pub">boost 三机制（时机/off-angle/预期违背）、各图点位与风险。深度抓取全文。</span></li>
+    <li><a href="https://dignitas.gg/articles/perfect-your-peeking-and-angles-in-valorant">Perfect Your Peeking and Angles in VALORANT — Dignitas</a><br><span class="pub">"离角远者占优"、quick peek 扳平机制。深度抓取全文。</span></li>
+    <li><a href="https://www.johnsto.co.uk/design/making-dust/">The Making Of: Dust — Dave Johnston</a><br><span class="pub">箱子定点断视线、计时决定首交点、B 点位置迭代史。深度抓取全文。</span></li>
+    <li><a href="https://www.reddit.com/r/VALORANT/comments/g29wic/heres_an_illustration_to_explain_how_the_distance/">r/VALORANT — 拐角距离与暴露几何图解帖</a><br><span class="pub">贴角者模型先暴露的几何证明（经搜索摘要引用）。</span></li>
+    <li><a href="https://www.levlup.com/en-gb/blogs/glossary-uk/headglitch-uk">Headglitch 术语定义 — LevlUp Glossary</a><br><span class="pub">只露头、保留完整射击能力的标准定义。</span></li>
+    <li><a href="https://forums.ea.com/discussions/battlefield-2042-general-discussion-en/why-is-cover-designed-to-head-glitch/7131322">Why is cover designed to head glitch? — EA Forums；另见 r/Battlefield_4_CTE 关于修复 headglitch 引发 triangulation 问题的讨论</a><br><span class="pub">headglitch 作为系统级设计变量的社区争议证据。</span></li>
+  </ol>
+</section>
+
+<footer>
+  TRIGGER ECHO · LD RESEARCH 03 · 2026-08-11 · 掩体与对抗点位 · 引用格式见各节角标
+</footer>
+
+</div>
+</body>
+</html>
