@@ -86,8 +86,10 @@ const CLOCK := [
 ]
 # ---- 任务 3：坡道（生成器产出）+ 祭坛台微台阶（手写）----
 # GDScript const 不允许函数调用，故表为 static var（外部访问方式 V3.RAMPS 不变）。
+# 西坡道 z_from/z_to = 东坡道的 180° 旋转像 z∈[-2.5,3.5]（任务 8 对称修复，2026-08-11；
+# 原参数 (2.5,-3.5) 与东坡道同跨度，破坏全局旋转对称）；末级 z∈[-2.5,-1.75] 仍落 W 栏豁口。
 static var RAMPS: Array = _ramp_steps(3.5, 6.5, -3.5, 2.5, 0.6, 3.0, "RampE", 8) \
-		+ _ramp_steps(-6.5, -3.5, 2.5, -3.5, 0.6, 3.0, "RampW", 8) \
+		+ _ramp_steps(-6.5, -3.5, 3.5, -2.5, 0.6, 3.0, "RampW", 8) \
 		+ [
 	# 祭坛台微台阶（N/S 缘各两级，供 AI 行走登台；坐广场地面，盒底 0，不在台面上）
 	{"name": "MicroN1", "kind": "cover", "center": Vector3(0, 0.15, -5.45), "size": Vector3(2, 0.3, 0.3)},
@@ -327,6 +329,28 @@ static func all_solids() -> Array:
 	return out
 
 
-## 可踏足/可刷怪表面清单（任务 8 填充——每项 {"name": String, "center": Vector3, "size": Vector3, "top_y": float}，center.y = top_y）
+## 可踏足/可刷怪表面清单（任务 8）——每项 {"name": String, "center": Vector3（y=top_y）,
+## "size": Vector3（面尺寸，y=0.1）, "top_y": float}。直书表：name 与 all_solids() 中
+## 对应实体一致（Corridor→CorridorSlab、Altar→AltarPlatform 的别名映射由消费侧持有）。
 static func standable_surfaces() -> Array:
-	return []
+	return [
+		# 钟楼回廊（撒点排除基座区 x/z∈[-2,2]——WaveSpawner 侧拒绝采样）
+		{"name": "Corridor", "center": Vector3(0, 3.0, 0), "size": Vector3(7, 0.1, 7), "top_y": 3.0},
+		{"name": "WestTower", "center": Vector3(-18.5, 2.5, 0), "size": Vector3(4, 0.1, 4), "top_y": 2.5},
+		{"name": "EastTower", "center": Vector3(18.5, 2.5, 0), "size": Vector3(4, 0.1, 4), "top_y": 2.5},
+		# 祭坛台面（撒点排除基座/坡道/斜板投影——WaveSpawner 侧拒绝采样）
+		{"name": "Altar", "center": Vector3(0, 0.6, 0), "size": Vector3(14, 0.1, 10), "top_y": 0.6},
+		# 市集带摊阁×4（名称对应 GATES 实体，南半坐标随生成器 180° 旋转）
+		{"name": "BeltN_PavE", "center": Vector3(6, 1.2, 11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "BeltN_PavW", "center": Vector3(-6, 1.2, 11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "BeltS_PavE", "center": Vector3(-6, 1.2, -11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "BeltS_PavW", "center": Vector3(6, 1.2, -11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		# 东/西市街摊阁
+		{"name": "EastPavilion", "center": Vector3(18.5, 1.2, 10), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "WestPavilion", "center": Vector3(-18.5, 1.2, -10), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		# 角场摊阁×4
+		{"name": "CornerNW_Pav", "center": Vector3(-26, 1.2, 21.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "CornerNE_Pav", "center": Vector3(26, 1.2, 21.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "CornerSE_Pav", "center": Vector3(26, 1.2, -21.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		{"name": "CornerSW_Pav", "center": Vector3(-26, 1.2, -21.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+	]

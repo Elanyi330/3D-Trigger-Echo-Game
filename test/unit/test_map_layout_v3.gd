@@ -185,17 +185,23 @@ func test_solids_inside_bounds() -> void:
 		assert_true(bb[1].z <= V3.BOUND_Z + 1.0, "%s max.z in bounds" % d["name"])
 
 
-# ---- 4. standable_surfaces(): 当前为空；schema 四键循环为任务 8 预埋 ----
-func test_standable_surfaces_schema() -> void:
+# ---- 4. standable_surfaces() 数量与 schema（任务 8 C.2）：14 面 / 四键齐全 /
+#         name 全图唯一 / center.y == top_y ----
+func test_standable_surfaces_count_schema() -> void:
 	var surfaces := V3.standable_surfaces()
-	assert_eq(surfaces.size(), 0, "standable_surfaces() 当前为空（任务 8 填充）")
+	assert_eq(surfaces.size(), 14, "standable_surfaces() 共 14 个刷怪面")
+	var seen := {}
 	for s0 in surfaces:
 		var s: Dictionary = s0
 		assert_true(s.has("name"), "standable 项含 name 键")
 		assert_true(s.has("center"), "standable 项含 center 键")
 		assert_true(s.has("size"), "standable 项含 size 键")
 		assert_true(s.has("top_y"), "standable 项含 top_y 键")
-		if s.has("name") and s.has("center") and s.has("top_y"):
+		if s.has("name"):
+			var nm: String = s["name"]
+			assert_false(seen.has(nm), "standable 面 name %s 全图唯一" % nm)
+			seen[nm] = true
+		if s.has("center") and s.has("top_y"):
 			assert_almost_eq((s["center"] as Vector3).y, s["top_y"], 0.001,
 				"%s center.y == top_y" % s["name"])
 
@@ -1374,3 +1380,118 @@ func test_outer_absolute_specs() -> void:
 		assert_almost_eq(s.x, es.x, 0.001, "%s size.x == %s" % [nm, es.x])
 		assert_almost_eq(s.y, es.y, 0.001, "%s size.y == %s" % [nm, es.y])
 		assert_almost_eq(s.z, es.z, 0.001, "%s size.z == %s" % [nm, es.z])
+
+
+# ==== 任务 8：v3 组装 + standable_surfaces + 宏观断言 ====
+
+# 几何指纹键：(round2(center.x), round2(center.z), round2(size.xyz))——round×100 取整
+# 消浮点噪声（容差 0.01），int 编码天然归一 -0.0。
+func _geo_key(cx: float, cz: float, s: Vector3) -> String:
+	return "%d|%d|%d|%d|%d" % [
+		roundi(cx * 100.0), roundi(cz * 100.0),
+		roundi(s.x * 100.0), roundi(s.y * 100.0), roundi(s.z * 100.0)]
+
+
+# ---- 51. 全局 180° 旋转对称（宏观）：all_solids() 几何多重集在 (x,z)→(−x,−z) 下不变。
+#         对每个实体逐一断言：池中存在某实体（可同名可异名）指纹匹配 (−x,−z,同 size)；
+#         旋转是对合，指纹类供需相等时贪心消耗必成功。报出无对应体的实体名+坐标 ----
+func test_global_rotation_symmetry() -> void:
+	var solids := V3.all_solids()
+	var pool := {}  # 指纹 -> 剩余可用计数
+	for e0 in solids:
+		var e: Dictionary = e0
+		var c: Vector3 = e["center"]
+		var fp := _geo_key(c.x, c.z, e["size"])
+		pool[fp] = int(pool.get(fp, 0)) + 1
+	var missing := []
+	for e0 in solids:
+		var e: Dictionary = e0
+		var c: Vector3 = e["center"]
+		var s: Vector3 = e["size"]
+		var want := _geo_key(-c.x, -c.z, s)
+		if int(pool.get(want, 0)) <= 0:
+			missing.append("%s center=(%.3f,%.3f,%.3f) size=(%.3f,%.3f,%.3f) 无 (−x,−z) 对应体" % [
+				e["name"], c.x, c.y, c.z, s.x, s.y, s.z])
+		else:
+			pool[want] = int(pool[want]) - 1
+	assert_true(missing.is_empty(),
+		"全局旋转对称破缺（%d 实体无对应）:\n%s" % [missing.size(), "\n".join(missing)])
+
+
+# ---- 52. standable 面顶高档：全部 top_y ∈ {0.6, 1.2, 2.5, 3.0}（容差 0.001）----
+func test_standable_tops() -> void:
+	var allowed := [0.6, 1.2, 2.5, 3.0]
+	for s0 in V3.standable_surfaces():
+		var s: Dictionary = s0
+		var ok := false
+		for a0 in allowed:
+			if absf(float(s["top_y"]) - float(a0)) <= 0.001:
+				ok = true
+				break
+		assert_true(ok, "%s top_y=%s ∈ {0.6, 1.2, 2.5, 3.0}" % [s["name"], s["top_y"]])
+
+
+# ---- 53. standable 面 name 在 all_solids() 中有同名实体（别名显式映射：
+#         Corridor→CorridorSlab、Altar→AltarPlatform，西/东望楼即台体本名）；
+#         且该实体顶面 == 面 top_y ----
+func test_standable_names_exist() -> void:
+	var alias := {"Corridor": "CorridorSlab", "Altar": "AltarPlatform"}
+	var solids := V3.all_solids()
+	var surfaces := V3.standable_surfaces()
+	assert_eq(surfaces.size(), 14, "standable_surfaces() 共 14 面（前置）")
+	for s0 in surfaces:
+		var s: Dictionary = s0
+		var nm: String = s["name"]
+		var ent_name: String = alias.get(nm, nm)
+		var ent := _find(solids, ent_name)
+		assert_false(ent.is_empty(),
+			"standable 面 %s 在 all_solids() 有实体 %s" % [nm, ent_name])
+		if ent.is_empty():
+			continue
+		var top: float = (ent["center"] as Vector3).y + (ent["size"] as Vector3).y * 0.5
+		assert_almost_eq(top, float(s["top_y"]), 0.001,
+			"%s 实体顶面 == 面 top_y %s" % [ent_name, s["top_y"]])
+
+
+# ---- 54. 实体预算（2026-08-11 裁决）：all_solids() ≤ 220 ----
+func test_entity_budget() -> void:
+	assert_lte(V3.all_solids().size(), 220,
+		"all_solids() 实体数 ≤ 220（2026-08-11 裁决预算）")
+
+
+# ---- 55. 手雷遮挡物覆盖：遮挡物 = size.y ≥ 2.2−0.01 的实体，数量 ≥8；
+#         7 探针点各在 GRENADE_RADIUS+0.5 半径内 ≥1 遮挡物（探针→实体 center 欧氏距离）----
+func test_grenade_blockers() -> void:
+	var blockers := []
+	for e0 in V3.all_solids():
+		var e: Dictionary = e0
+		if (e["size"] as Vector3).y >= 2.2 - 0.01:
+			blockers.append(e)
+	assert_gte(blockers.size(), 8, "遮挡物（size.y ≥ 2.19）数量 ≥ 8")
+	var probes := [
+		Vector3(0, 0, 0), Vector3(0, 0, 11.5), Vector3(0, 0, -11.5),
+		Vector3(18.5, 0, 0), Vector3(-18.5, 0, 0),
+		Vector3(0, 0, 21.5), Vector3(0, 0, -21.5),
+	]
+	var radius: float = V3.GRENADE_RADIUS + 0.5
+	for p0 in probes:
+		var p: Vector3 = p0
+		var near := 0
+		for b0 in blockers:
+			var b: Dictionary = b0
+			if p.distance_to(b["center"] as Vector3) <= radius:
+				near += 1
+		assert_gte(near, 1,
+			"探针点 %s 半径 %.2f 内 ≥1 遮挡物（center 距离）" % [p, radius])
+
+
+# ---- 56. all_solids() 全部 name 唯一（为 T9/WaveSpawner/记录器引用安全预埋）----
+func test_no_duplicate_names() -> void:
+	var seen := {}
+	var dups := []
+	for e0 in V3.all_solids():
+		var nm: String = (e0 as Dictionary)["name"]
+		if seen.has(nm):
+			dups.append(nm)
+		seen[nm] = true
+	assert_true(dups.is_empty(), "all_solids() 存在重名实体: %s" % ", ".join(dups))
