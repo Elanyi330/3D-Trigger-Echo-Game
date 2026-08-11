@@ -28,6 +28,7 @@ var _head: Node3D
 var _manager: WeaponManager
 var _view: WeaponView
 var _spawner: WaveSpawner
+var _recorder: JumpRecorder
 var _spawn_serial := 0   # 敌人名序号（同面一敌一名会撞名——Godot 撞名会重置为 @Class@id）
 
 
@@ -48,6 +49,13 @@ func _ready() -> void:
 	_setup_hud()
 	# 波次刷怪（WaveSpawner：每波 5 敌刷在可踏足面，全灭 1.5s 后下一波）
 	_setup_wave_spawner()
+	# 跳跃记录（任务 15）：记录跳建筑操作供 AI 学习；地图哈希不符自动清空旧记录。
+	# 必须在 Player 入树之后 add_child——Godot 4.7 _physics_process 按树序执行，
+	# recorder 排玩家之后才能在 move_and_slide 之后读当帧状态。
+	_recorder = JumpRecorder.new()
+	_recorder.name = "JumpRecorder"
+	add_child(_recorder)
+	_recorder.setup(_player, LAYOUT.all_solids(), "回声祭坛v3")
 
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
 func _setup_weapons() -> void:
