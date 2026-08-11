@@ -1090,3 +1090,205 @@ func test_backstreets_no_overlap() -> void:
 					and (b["name"] as String).begins_with("CampS_Wall")))
 			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb) or camp_wall_pair,
 				"%s vs %s: AABB 重叠（非垂直相接/同营墙段角部豁免）" % [a["name"], b["name"]])
+
+
+# ==== 任务 7：外环 + 角场 ====
+
+# ---- 42. OUTER 总数 24：外环视线打断树 4 + 角场 5×4 ----
+func test_outer_counts() -> void:
+	assert_eq(V3.OUTER.size(), 24, "OUTER 实体总数 == 24（外环树 4 + 角场 5×4）")
+	var ring_count := 0
+	var corner_count := 0
+	for e0 in V3.OUTER:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		if nm.begins_with("OuterRing_"):
+			ring_count += 1
+		elif nm.begins_with("Corner"):
+			corner_count += 1
+	assert_eq(ring_count, 4, "外环视线打断树恰 4 棵")
+	assert_eq(corner_count, 20, "角场实体恰 20 个（5 实体 × 4 角）")
+
+
+# ---- 43. 角场摊阁：顶 1.2 ≤ JUMPABLE_MAX（可跳）；台阶顶 0.6 ----
+func test_corner_pav_jumpable() -> void:
+	for corner in ["CornerNW", "CornerNE", "CornerSE", "CornerSW"]:
+		var pav := _find(V3.OUTER, corner + "_Pav")
+		var stp := _find(V3.OUTER, corner + "_PavStep")
+		assert_false(pav.is_empty(), "OUTER 含 %s_Pav" % corner)
+		assert_false(stp.is_empty(), "OUTER 含 %s_PavStep" % corner)
+		if pav.is_empty() or stp.is_empty():
+			continue
+		var pb := _aabb(pav)
+		var sb := _aabb(stp)
+		assert_almost_eq(pb[1].y, 1.2, 0.001, "%s_Pav 顶 == 1.2" % corner)
+		assert_lte(pb[1].y, V3.JUMPABLE_MAX, "%s_Pav 顶 ≤ JUMPABLE_MAX（可跳）" % corner)
+		assert_almost_eq(sb[1].y, 0.6, 0.001, "%s_PavStep 台阶顶 == 0.6" % corner)
+
+
+# ---- 44. 角场面接触：PavStep↔Pav / Box1↔Pav / Box2↔Pav 缝 == 0（容差 0.01，四角含旋转镜像）----
+func test_corner_face_contacts() -> void:
+	for corner in ["CornerNW", "CornerNE", "CornerSE", "CornerSW"]:
+		var pav := _find(V3.OUTER, corner + "_Pav")
+		var stp := _find(V3.OUTER, corner + "_PavStep")
+		var b1 := _find(V3.OUTER, corner + "_Box1")
+		var b2 := _find(V3.OUTER, corner + "_Box2")
+		assert_false(pav.is_empty(), "OUTER 含 %s_Pav" % corner)
+		assert_false(stp.is_empty(), "OUTER 含 %s_PavStep" % corner)
+		assert_false(b1.is_empty(), "OUTER 含 %s_Box1" % corner)
+		assert_false(b2.is_empty(), "OUTER 含 %s_Box2" % corner)
+		if pav.is_empty() or stp.is_empty() or b1.is_empty() or b2.is_empty():
+			continue
+		var pb := _aabb(pav)
+		var sb := _aabb(stp)
+		var b1b := _aabb(b1)
+		var b2b := _aabb(b2)
+		# PavStep 贴摊阁缘（z 向；maxf 双向取缝，旋转角自动覆盖）
+		var gap_step: float = maxf(pb[0].z - sb[1].z, sb[0].z - pb[1].z)
+		assert_almost_eq(gap_step, 0.0, 0.01, "%s_PavStep↔Pav 缝 == 0" % corner)
+		# Box1 贴摊阁另一缘（z 向）
+		var gap_b1: float = maxf(pb[0].z - b1b[1].z, b1b[0].z - pb[1].z)
+		assert_almost_eq(gap_b1, 0.0, 0.01, "%s_Box1↔Pav 缝 == 0" % corner)
+		# Box2 贴摊阁侧缘（x 向）
+		var gap_b2: float = maxf(pb[0].x - b2b[1].x, b2b[0].x - pb[1].x)
+		assert_almost_eq(gap_b2, 0.0, 0.01, "%s_Box2↔Pav 缝 == 0" % corner)
+
+
+# ---- 45. 旋转对称：20 角场实体逐一有旋转对应体（_rot_pair 已扩展 Corner 前缀映射），
+#         center 互为 (-x,-z)、size 相同 ----
+func test_corner_rotation_pairs() -> void:
+	var corners := []
+	for e0 in V3.OUTER:
+		var e: Dictionary = e0
+		if (e["name"] as String).begins_with("Corner"):
+			corners.append(e)
+	assert_eq(corners.size(), 20, "角场实体共 20 个")
+	for e0 in corners:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		var want := _rot_pair(nm)
+		var w := _find(V3.OUTER, want)
+		assert_false(w.is_empty(), "%s 有旋转对应体 %s" % [nm, want])
+		if w.is_empty():
+			continue
+		var cn: Vector3 = e["center"]
+		var cs: Vector3 = w["center"]
+		var sn: Vector3 = e["size"]
+		var ss: Vector3 = w["size"]
+		assert_almost_eq(cs.x, -cn.x, 0.001, "%s/%s center.x 互为 -x" % [nm, want])
+		assert_almost_eq(cs.y, cn.y, 0.001, "%s/%s center.y 相同" % [nm, want])
+		assert_almost_eq(cs.z, -cn.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
+		assert_lt((sn - ss).length(), 0.001, "%s/%s size 相同" % [nm, want])
+
+
+# ---- 46. 外环树：4 棵在 (±26.5, ±12)；距边界墙内沿 x=±30 ≥3.0；距长墙外沿 x=±23.5 ≥3.0 ----
+# 间距按树 center.x 到墙面的距离度量（基准数据 26.5−23.5 == 3.0 恰为 center 距；
+# 若按 AABB 边缘度量则为 2.65，与 brief 数据矛盾——见任务报告 concern）。
+func test_outer_ring_trees() -> void:
+	var specs := [
+		["OuterRing_TreeNW", -26.5, 12.0],
+		["OuterRing_TreeNE", 26.5, 12.0],
+		["OuterRing_TreeSW", -26.5, -12.0],
+		["OuterRing_TreeSE", 26.5, -12.0],
+	]
+	for spec0 in specs:
+		var spec: Array = spec0
+		var nm: String = spec[0]
+		var ent := _find(V3.OUTER, nm)
+		assert_false(ent.is_empty(), "OUTER 含 %s" % nm)
+		if ent.is_empty():
+			continue
+		assert_eq(ent["kind"], "bigtree", "%s kind == bigtree" % nm)
+		var c: Vector3 = ent["center"]
+		assert_almost_eq(c.x, spec[1], 0.001, "%s center.x == %s" % [nm, spec[1]])
+		assert_almost_eq(c.z, spec[2], 0.001, "%s center.z == %s" % [nm, spec[2]])
+		# 距最近边界墙内沿（x=±BOUND_X）≥ 3.0
+		var d_bound: float = minf(absf(c.x - V3.BOUND_X), absf(c.x + V3.BOUND_X))
+		assert_true(d_bound >= 3.0 - 0.001,
+			"%s 距边界墙内沿 %.3f ≥ 3.0" % [nm, d_bound])
+		# 距最近长墙外沿（x=±23.5）≥ 3.0
+		var d_wall: float = minf(absf(c.x - 23.5), absf(c.x + 23.5))
+		assert_true(d_wall >= 3.0 - 0.001,
+			"%s 距长墙外沿 %.3f ≥ 3.0" % [nm, d_wall])
+
+
+# ---- 47. 角场净空：界内 x∈[-30,30] z∈[-29,29]；摊阁↔最近营影壁净距 ≥1.2；角场树↔最近背街树净距 ≥1.2 ----
+func test_corner_clearance() -> void:
+	var corners := []
+	for e0 in V3.OUTER:
+		var e: Dictionary = e0
+		if (e["name"] as String).begins_with("Corner"):
+			corners.append(e)
+	assert_eq(corners.size(), 20, "角场实体共 20 个")
+	for e0 in corners:
+		var e: Dictionary = e0
+		var bb := _aabb(e)
+		assert_true(bb[0].x >= -V3.BOUND_X and bb[1].x <= V3.BOUND_X,
+			"%s 界内 x∈[-30,30]" % e["name"])
+		assert_true(bb[0].z >= -V3.BOUND_Z and bb[1].z <= V3.BOUND_Z,
+			"%s 界内 z∈[-29,29]" % e["name"])
+	# 参照物：营影壁 6 块 + 背街大树 4 棵（BACKSTREETS 既有数据）
+	var screens := []
+	var back_trees := []
+	for e0 in V3.BACKSTREETS:
+		var e: Dictionary = e0
+		if (e["name"] as String).contains("_Screen_"):
+			screens.append(_aabb(e))
+		if e["kind"] == "bigtree":
+			back_trees.append(_aabb(e))
+	assert_eq(screens.size(), 6, "BACKSTREETS 影壁共 6 块（参照集）")
+	assert_eq(back_trees.size(), 4, "BACKSTREETS 背街大树共 4 棵（参照集）")
+	# 角场摊阁 ↔ 最近营影壁水平净距 ≥ 1.2（实际 15+，宽松断言）
+	for corner in ["CornerNW", "CornerNE", "CornerSE", "CornerSW"]:
+		var pav := _find(V3.OUTER, corner + "_Pav")
+		assert_false(pav.is_empty(), "OUTER 含 %s_Pav" % corner)
+		if pav.is_empty():
+			continue
+		var pb := _aabb(pav)
+		var nd := INF
+		for sb0 in screens:
+			nd = minf(nd, _xz_net_dist(pb, sb0))
+		assert_true(nd >= 1.2 - 0.001,
+			"%s_Pav ↔ 最近营影壁净距 %.3f ≥ 1.2" % [corner, nd])
+	# 角场大树 ↔ 最近背街大树净距 ≥ 1.2
+	for corner in ["CornerNW", "CornerNE", "CornerSE", "CornerSW"]:
+		var tree := _find(V3.OUTER, corner + "_Tree")
+		assert_false(tree.is_empty(), "OUTER 含 %s_Tree" % corner)
+		if tree.is_empty():
+			continue
+		var tb := _aabb(tree)
+		var nd := INF
+		for bt0 in back_trees:
+			nd = minf(nd, _xz_net_dist(tb, bt0))
+		assert_true(nd >= 1.2 - 0.001,
+			"%s_Tree ↔ 最近背街大树净距 %.3f ≥ 1.2" % [corner, nd])
+
+
+# ---- 48. OUTER 内部两两 AABB 无重叠（豁免垂直相接 ±0.01，面接触由 _overlap eps 判定不算重叠）；
+#         OUTER × 其余实体无重叠（同上豁免 + bigtree 叠墙铁律豁免）----
+func test_outer_no_overlap() -> void:
+	assert_eq(V3.OUTER.size(), 24, "OUTER 实体共 24 个")
+	for i in range(V3.OUTER.size()):
+		for j in range(i + 1, V3.OUTER.size()):
+			var a: Dictionary = V3.OUTER[i]
+			var b: Dictionary = V3.OUTER[j]
+			var ba := _aabb(a)
+			var bb := _aabb(b)
+			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
+				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
+	# OUTER × all_solids() 中非 OUTER 实体
+	var outer_names := {}
+	for e0 in V3.OUTER:
+		outer_names[(e0 as Dictionary)["name"]] = true
+	for e0 in V3.OUTER:
+		var a: Dictionary = e0
+		var ba := _aabb(a)
+		for o0 in V3.all_solids():
+			var b: Dictionary = o0
+			if outer_names.has(b["name"]):
+				continue
+			var bb := _aabb(b)
+			# bigtree 叠墙铁律豁免：任一方为 bigtree 时不判重叠（沿用项目铁律）
+			var bigtree_exempt: bool = a["kind"] == "bigtree" or b["kind"] == "bigtree"
+			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb) or bigtree_exempt,
+				"%s vs %s: AABB 重叠（非垂直相接/bigtree 豁免）" % [a["name"], b["name"]])
