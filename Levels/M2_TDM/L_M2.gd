@@ -1,7 +1,7 @@
 # Levels/M2_TDM/L_M2.gd
-# M2 TDM 小图主场景控制器：灰盒地图 + 玩家（MovementController）+ 武器系统 + 随机敌人撒点。
-# 验收目标（用户 2026-08-10）：①玩家可逛遍全图无 bug；②可踏足位置随机撒敌人，验证射击角度与空气墙。
-# 武器装配移植自 L_Main.gd（同一套 WeaponManager + WeaponView + 输入路由 + HUD）。
+# M2 TDM 小图主场景控制器：灰盒地图 + 玩家（MovementController）+ 武器系统 + WaveSpawner 波次刷怪。
+# 验收目标（用户 2026-08-10）：①玩家可逛遍全图无 bug；②可踏足位置波次刷敌人（每波 5 个，全灭 1.5s 后下一波），
+# 验证射击角度与空气墙。武器装配移植自 L_Main.gd（同一套 WeaponManager + WeaponView + 输入路由 + HUD）。
 extends Node3D
 
 const WEAPON_RES := [
@@ -21,14 +21,14 @@ const VISUALS := preload("res://Levels/M2_TDM/map_visuals.gd")
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 
-@export var enemy_count := 10   # 随机撒敌人数量（验收可调）
 @export var range_mode := true  # 测试模式：枪械备弹无限（弹匣有限正常换弹）+ 手雷无限（投完切回主武器但可再切回投）
 
 var _player: CharacterBody3D
 var _head: Node3D
 var _manager: WeaponManager
 var _view: WeaponView
-var _enemies: Array[Enemy] = []
+var _spawner: WaveSpawner
+var _spawn_serial := 0   # 敌人名序号（同面一敌一名会撞名——Godot 撞名会重置为 @Class@id）
 
 
 func _ready() -> void:
@@ -46,8 +46,8 @@ func _ready() -> void:
 	_head = _player.get_node("Head")
 	_setup_weapons()
 	_setup_hud()
-	# 随机敌人撒点（可踏足位置抽样）
-	_spawn_random_enemies()
+	# 波次刷怪（WaveSpawner：每波 5 敌刷在可踏足面，全灭 1.5s 后下一波）
+	_setup_wave_spawner()
 
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
 func _setup_weapons() -> void:
@@ -85,9 +85,10 @@ func _setup_weapons() -> void:
 	_view.setup(_manager, _player)
 
 
-# ---- HUD（弹药/准星/命中标记，移植自 L_Main.gd）----
+# ---- HUD（弹药/准星/命中标记/波次，移植自 L_Main.gd）----
 var _ammo_label: Label
 var _weapon_label: Label
+var _wave_label: Label
 var _hitmarker: Label
 
 
@@ -138,6 +139,15 @@ func _setup_hud() -> void:
 	_weapon_label.add_theme_constant_override("outline_size", 8)
 	layer.add_child(_weapon_label)
 	_weapon_label.position = Vector2(30, vp.y - 70)
+	# 波次（左上角：「波次 N · 剩余 X」，WaveSpawner 信号驱动）
+	_wave_label = Label.new()
+	_wave_label.text = "波次 1 · 剩余 %d" % WaveSpawner.WAVE_SIZE
+	_wave_label.add_theme_font_size_override("font_size", 28)
+	_wave_label.add_theme_color_override("font_color", Color(0.55, 0.85, 1))
+	_wave_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_wave_label.add_theme_constant_override("outline_size", 8)
+	layer.add_child(_wave_label)
+	_wave_label.position = Vector2(30, 24)
 	# 弹药/切枪信号刷新
 	_manager.weapon_ammo_updated.connect(_on_ammo_updated)
 	_manager.weapon_switched.connect(_on_weapon_switched)
@@ -175,38 +185,44 @@ func _refresh_hud() -> void:
 	_weapon_label.text = res.weapon_name
 
 
-# ---- 随机敌人撒点（T10：v3 standable_surfaces() 数据驱动；T12 WaveSpawner 前的过渡形态）----
-func _spawn_random_enemies() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var surfaces: Array = LAYOUT.standable_surfaces().duplicate()
-	surfaces.shuffle()
-	# 每面 ≤2 敌、尽量分散：先每面 1 个（ shuffled 顺序），第二轮再补第 2 个
-	var slots: Array = []
-	for s in surfaces:
-		slots.append(s)
-	var second: Array = surfaces.duplicate()
-	second.shuffle()
-	for s in second:
-		slots.append(s)
-	for i in mini(enemy_count, slots.size()):
-		var surf: Dictionary = slots[i]
-		var e := Enemy.new()
-		e.name = "Enemy%d" % i
-		add_child(e)
-		# Enemy 是 StaticBody（原点=脚底）：y = 面 top_y，面内随机偏移（各轴 ±(size/2−0.5)）
-		var c: Vector3 = surf["center"]
-		var sz: Vector3 = surf["size"]
-		var ox := rng.randf_range(-(sz.x * 0.5 - 0.5), sz.x * 0.5 - 0.5)
-		var oz := rng.randf_range(-(sz.z * 0.5 - 0.5), sz.z * 0.5 - 0.5)
-		e.global_position = Vector3(c.x + ox, surf["top_y"], c.z + oz)
-		# 朝向：面向广场中心 (0,0,0) ±30° 随机（Godot -Z 前向：yaw = atan2(-dir.x, -dir.z)）
-		var dir := Vector3(-e.global_position.x, 0.0, -e.global_position.z)
-		if dir.length_squared() < 0.01:
-			dir = Vector3(0, 0, -1)
-		dir = dir.normalized()
-		e.rotation.y = atan2(-dir.x, -dir.z) + rng.randf_range(-PI / 6.0, PI / 6.0)
-		_enemies.append(e)
+# ---- 波次刷怪（T12：WaveSpawner 装配；取代 T10 的临时 standable shuffle 撒点）----
+func _setup_wave_spawner() -> void:
+	_spawner = WaveSpawner.new()
+	_spawner.name = "WaveSpawner"
+	add_child(_spawner)
+	_spawner.setup(LAYOUT.standable_surfaces(), _spawn_enemy, LAYOUT.spawn_exclusions())
+	_spawner.wave_started.connect(_on_wave_started)
+	_spawner.enemies_left.connect(_on_enemies_left)
+	_spawner.start()
+
+
+## spawn_fn 闭包：实例化 Enemy 并放到位（pos.y 已含面 top_y——Enemy 原点在脚底）。
+## 朝向沿用 T10：面向广场中心 (0,0,0) ±30°（Godot -Z 前向：yaw = atan2(-dir.x, -dir.z)）。
+func _spawn_enemy(surface: Dictionary, pos: Vector3) -> Node:
+	var e := Enemy.new()
+	e.name = "Enemy%d_%s" % [_spawn_serial, str(surface["name"])]
+	_spawn_serial += 1
+	add_child(e)
+	e.global_position = pos
+	var dir := Vector3(-pos.x, 0.0, -pos.z)
+	if dir.length_squared() < 0.01:  # 退化兜底：中心位无朝向，默认朝 -Z
+		dir = Vector3(0, 0, -1)
+	dir = dir.normalized()
+	e.rotation.y = atan2(-dir.x, -dir.z) + randf_range(-PI / 6.0, PI / 6.0)
+	return e
+
+
+func _on_wave_started(n: int) -> void:
+	_update_wave_label(n, WaveSpawner.WAVE_SIZE)
+
+
+func _on_enemies_left(count: int) -> void:
+	_update_wave_label(_spawner.current_wave(), count)
+
+
+func _update_wave_label(wave_n: int, left: int) -> void:
+	if _wave_label:
+		_wave_label.text = "波次 %d · 剩余 %d" % [wave_n, left]
 
 
 func _input(event: InputEvent) -> void:
