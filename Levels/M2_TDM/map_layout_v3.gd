@@ -31,9 +31,60 @@ const WALLS := [
 	{"name": "WallEast",  "kind": "wall", "center": Vector3(30.5, 2.0, 0),   "size": Vector3(1, 4, 58)},
 ]
 
+# ---- 中央广场：祭坛台 + 斜板 + rim 围墙（任务 2，设计 §3.2/§3.3）----
+const PLAZA := [
+	# 祭坛台（台面 y=0.6，x∈[-7,7] z∈[-5,5]）
+	{"name": "AltarPlatform", "kind": "cover", "center": Vector3(0, 0.3, 0), "size": Vector3(14, 0.6, 10)},
+	# 斜板 4 块（建筑元素，高 2.1：坐台面底 0.6、顶 2.7 齐回廊板底——控制器裁决 A1，2026-08-11；A/B 南对 + A2/B2 = 180° 旋转）
+	{"name": "AltarSlabA", "kind": "cover", "center": Vector3(-1.5, 1.65, -2.8), "size": Vector3(3, 2.1, 0.4)},
+	{"name": "AltarSlabB", "kind": "cover", "center": Vector3(2.6, 1.65, -1.5), "size": Vector3(0.4, 2.1, 3)},
+	{"name": "AltarSlabA2", "kind": "cover", "center": Vector3(1.5, 1.65, 2.8), "size": Vector3(3, 2.1, 0.4)},
+	{"name": "AltarSlabB2", "kind": "cover", "center": Vector3(-2.6, 1.65, 1.5), "size": Vector3(0.4, 2.1, 3)},
+	# rim 围墙（3m 高厚 1m）：N 边 z=9.5 四段 3 豁——中豁 x∈[2,4.5]（错轴）/侧豁 x∈[-9,-6.5]∪[6.5,9]
+	{"name": "RimN1", "kind": "wall", "center": Vector3(-11.25, 1.5, 9.5), "size": Vector3(4.5, 3, 1)},
+	{"name": "RimN2", "kind": "wall", "center": Vector3(-2.25, 1.5, 9.5), "size": Vector3(8.5, 3, 1)},
+	{"name": "RimN3", "kind": "wall", "center": Vector3(5.5, 1.5, 9.5), "size": Vector3(2, 3, 1)},
+	{"name": "RimN4", "kind": "wall", "center": Vector3(11.25, 1.5, 9.5), "size": Vector3(4.5, 3, 1)},
+	# S 边 z=-9.5 = 180° 旋转（中豁 x∈[-4.5,-2]，侧豁相同）
+	{"name": "RimS1", "kind": "wall", "center": Vector3(-11.25, 1.5, -9.5), "size": Vector3(4.5, 3, 1)},
+	{"name": "RimS2", "kind": "wall", "center": Vector3(-5.5, 1.5, -9.5), "size": Vector3(2, 3, 1)},
+	{"name": "RimS3", "kind": "wall", "center": Vector3(2.25, 1.5, -9.5), "size": Vector3(8.5, 3, 1)},
+	{"name": "RimS4", "kind": "wall", "center": Vector3(11.25, 1.5, -9.5), "size": Vector3(4.5, 3, 1)},
+	# E/W 边 x=±14 各两段，留街口 z∈[-2,2]（4m）
+	{"name": "RimE_T", "kind": "wall", "center": Vector3(14, 1.5, 6), "size": Vector3(1, 3, 8)},
+	{"name": "RimE_B", "kind": "wall", "center": Vector3(14, 1.5, -6), "size": Vector3(1, 3, 8)},
+	{"name": "RimW_T", "kind": "wall", "center": Vector3(-14, 1.5, 6), "size": Vector3(1, 3, 8)},
+	{"name": "RimW_B", "kind": "wall", "center": Vector3(-14, 1.5, -6), "size": Vector3(1, 3, 8)},
+]
+
+# ---- 钟楼（任务 2，设计 §3.2）：基座/回廊/栏板/组合柱/伞顶/钟饰 ----
+const CLOCK := [
+	# 钟基座（坐台面 0.6，顶 2.7）
+	{"name": "Pedestal", "kind": "cover", "center": Vector3(0, 1.65, 0), "size": Vector3(4, 2.1, 4)},
+	# 回廊板（底 2.7、行走面 3.0，四边出挑 1.5m）
+	{"name": "CorridorSlab", "kind": "cover", "center": Vector3(0, 2.85, 0), "size": Vector3(7, 0.3, 7)},
+	# 回廊栏板（0.9 高 0.2 厚，坐回廊面 3.0）：N/S 中豁 1.5m；E 豁 z∈[1.5,3.5]、W 豁 z∈[-3.5,-1.5]（坡道落点）
+	# RailE/RailW 闭端各缩 0.2 避免与 S/N 栏板角部体积相撞——控制器裁决 B1，2026-08-11（豁口宽度/位置不变）
+	{"name": "RailN_W", "kind": "cover", "center": Vector3(-2.125, 3.45, 3.4), "size": Vector3(2.75, 0.9, 0.2)},
+	{"name": "RailN_E", "kind": "cover", "center": Vector3(2.125, 3.45, 3.4), "size": Vector3(2.75, 0.9, 0.2)},
+	{"name": "RailS_W", "kind": "cover", "center": Vector3(-2.125, 3.45, -3.4), "size": Vector3(2.75, 0.9, 0.2)},
+	{"name": "RailS_E", "kind": "cover", "center": Vector3(2.125, 3.45, -3.4), "size": Vector3(2.75, 0.9, 0.2)},
+	{"name": "RailE", "kind": "cover", "center": Vector3(3.4, 3.45, -0.9), "size": Vector3(0.2, 0.9, 4.8)},
+	{"name": "RailW", "kind": "cover", "center": Vector3(-3.4, 3.45, 0.9), "size": Vector3(0.2, 0.9, 4.8)},
+	# 组合柱 ×4（角柱掩体 + 伞顶支柱，底 3.0 顶 7.1）
+	{"name": "Pillar_NE", "kind": "cover", "center": Vector3(2.9, 5.05, 2.9), "size": Vector3(0.5, 4.1, 0.5)},
+	{"name": "Pillar_NW", "kind": "cover", "center": Vector3(-2.9, 5.05, 2.9), "size": Vector3(0.5, 4.1, 0.5)},
+	{"name": "Pillar_SE", "kind": "cover", "center": Vector3(2.9, 5.05, -2.9), "size": Vector3(0.5, 4.1, 0.5)},
+	{"name": "Pillar_SW", "kind": "cover", "center": Vector3(-2.9, 5.05, -2.9), "size": Vector3(0.5, 4.1, 0.5)},
+	# 伞顶 4 板（厚 0.4，底面 7.1；中央 x/z∈[-1.5,1.5] 开敞 = 雷口）
+	{"name": "UmbrellaN", "kind": "cover", "center": Vector3(0, 7.3, 2.75), "size": Vector3(8, 0.4, 2.5)},
+	{"name": "UmbrellaS", "kind": "cover", "center": Vector3(0, 7.3, -2.75), "size": Vector3(8, 0.4, 2.5)},
+	{"name": "UmbrellaW", "kind": "cover", "center": Vector3(-2.75, 7.3, 0), "size": Vector3(2.5, 0.4, 3)},
+	{"name": "UmbrellaE", "kind": "cover", "center": Vector3(2.75, 7.3, 0), "size": Vector3(2.5, 0.4, 3)},
+	# 钟饰（无碰撞 weenie，顶 ~9.5）
+	{"name": "BellDecor", "kind": "decor", "center": Vector3(0, 8.6, 0), "size": Vector3(1.2, 1.8, 1.2)},
+]
 # ---- 空表占位（后续任务填充）----
-const PLAZA := []        # 任务2：祭坛台/斜板/rim
-const CLOCK := []        # 任务2：钟楼（基座/回廊/栏板/伞顶）
 const RAMPS := []        # 任务3：坡道/微台阶
 const STREETS := []      # 任务4：东/西市街
 const GATES := []        # 任务5：钟门/市集带
