@@ -18,7 +18,7 @@ const WEAPON_MODELS := [
 ]
 const GREYBOX := preload("res://Levels/M2_TDM/map_greybox.gd")
 const VISUALS := preload("res://Levels/M2_TDM/map_visuals.gd")
-const LAYOUT := preload("res://Levels/M2_TDM/map_layout.gd")
+const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 
 @export var enemy_count := 10   # 随机撒敌人数量（验收可调）
@@ -175,39 +175,38 @@ func _refresh_hud() -> void:
 	_weapon_label.text = res.weapon_name
 
 
-# ---- 随机敌人撒点 ----
+# ---- 随机敌人撒点（T10：v3 standable_surfaces() 数据驱动；T12 WaveSpawner 前的过渡形态）----
 func _spawn_random_enemies() -> void:
-	var spots := _sample_standable_spots()
-	for i in mini(enemy_count, spots.size()):
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var surfaces: Array = LAYOUT.standable_surfaces().duplicate()
+	surfaces.shuffle()
+	# 每面 ≤2 敌、尽量分散：先每面 1 个（ shuffled 顺序），第二轮再补第 2 个
+	var slots: Array = []
+	for s in surfaces:
+		slots.append(s)
+	var second: Array = surfaces.duplicate()
+	second.shuffle()
+	for s in second:
+		slots.append(s)
+	for i in mini(enemy_count, slots.size()):
+		var surf: Dictionary = slots[i]
 		var e := Enemy.new()
 		e.name = "Enemy%d" % i
 		add_child(e)
-		# Enemy 是 StaticBody（原点=地面），直接放地面 y=0；不要加胶囊中心偏移（会悬空）
-		e.global_position = spots[i]
-		e.rotation.y = randf() * TAU
+		# Enemy 是 StaticBody（原点=脚底）：y = 面 top_y，面内随机偏移（各轴 ±(size/2−0.5)）
+		var c: Vector3 = surf["center"]
+		var sz: Vector3 = surf["size"]
+		var ox := rng.randf_range(-(sz.x * 0.5 - 0.5), sz.x * 0.5 - 0.5)
+		var oz := rng.randf_range(-(sz.z * 0.5 - 0.5), sz.z * 0.5 - 0.5)
+		e.global_position = Vector3(c.x + ox, surf["top_y"], c.z + oz)
+		# 朝向：面向广场中心 (0,0,0) ±30° 随机（Godot -Z 前向：yaw = atan2(-dir.x, -dir.z)）
+		var dir := Vector3(-e.global_position.x, 0.0, -e.global_position.z)
+		if dir.length_squared() < 0.01:
+			dir = Vector3(0, 0, -1)
+		dir = dir.normalized()
+		e.rotation.y = atan2(-dir.x, -dir.z) + rng.randf_range(-PI / 6.0, PI / 6.0)
 		_enemies.append(e)
-
-
-# 可踏足位置抽样：地图各区域的站立点（灰盒数据驱动，避免出生在墙内/墙上）
-func _sample_standable_spots() -> Array[Vector3]:
-	var spots: Array[Vector3] = []
-	# 西街沿线
-	for z in [-10, -5, 0, 5, 10]:
-		spots.append(Vector3(-12, 0, z))
-	# 东街沿线
-	for z in [-10, -4, 3, 9]:
-		spots.append(Vector3(12, 0, z))
-	# 中街北/南
-	spots.append(Vector3(0, 0, -12))
-	spots.append(Vector3(0, 0, 12))
-	# 大厅内
-	for x in [-5, 0, 5]:
-		for z in [-4, 0, 4]:
-			spots.append(Vector3(x, 0, z))
-	# 出生区前
-	spots.append(Vector3(-2, 0, 22))
-	spots.append(Vector3(-2, 0, -22))
-	return spots
 
 
 func _input(event: InputEvent) -> void:

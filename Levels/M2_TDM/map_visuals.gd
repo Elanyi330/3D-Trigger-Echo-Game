@@ -25,7 +25,7 @@ const DECOR := {
 	},
 }
 
-const LAYOUT := preload("res://Levels/M2_TDM/map_layout.gd")
+const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 
 var _built := false
 

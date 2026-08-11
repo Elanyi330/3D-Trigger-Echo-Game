@@ -1,11 +1,11 @@
 # Levels/M2_TDM/map_greybox.gd
-# M2 TDM 灰盒生成器：从 map_layout.gd 数据表程序化生成可玩场景（T2）。
+# M2 TDM 灰盒生成器：从 map_layout_v3.gd 数据表程序化生成可玩场景（T2；T10 切 v3）。
 # 生成 StaticBody3D 墙/地面/掩体 + MeshInstance3D 灰盒视觉。
 # 用法：作为场景根节点（MapGreybox），或实例化后 add_child。
 class_name MapGreybox
 extends Node3D
 
-const LAYOUT := preload("res://Levels/M2_TDM/map_layout.gd")
+const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 
 # 灰盒材质：墙/地面/掩体/屋顶 分色便于识别
 const MAT_WALL := Color(0.55, 0.55, 0.6)
