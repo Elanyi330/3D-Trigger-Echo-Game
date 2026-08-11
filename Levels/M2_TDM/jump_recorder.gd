@@ -140,7 +140,9 @@ func _physics_process(delta: float) -> void:
 	if col != null:
 		floor_y = col.get_position().y  # 接触点 y = 踩踏面高度
 		floor_name = _collider_name(col)
-	if on_floor:
+	# 地面信息守卫（终审 M3）：仅当找到法线 y>FLOOR_NORMAL_Y 的碰撞才覆盖；
+	# on_floor 但无合格碰撞的理论分支保留上次地面信息，防 0/"" 误分类。
+	if on_floor and col != null:
 		_last_floor_y = floor_y
 		_last_floor_name = floor_name
 

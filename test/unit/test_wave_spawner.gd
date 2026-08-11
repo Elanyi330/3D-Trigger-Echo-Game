@@ -324,3 +324,80 @@ func test_alive_count() -> void:
 	spawned[1].take_damage(999.0)
 	await wait_physics_frames(2)
 	assert_eq(int(s.alive_count()), 3, "杀 2 后 alive_count() == 3")
+
+
+# ---- 9. 兜底合法性（终审 M2）：预计算兜底点避开排除矩形 ----
+# 旧兜底直取面中心——若面中心落在 exclusions 内（如 Altar 中心在 Pedestal 排除区），
+# 兜底点即落入禁区。修复：setup() 对每面拒绝采样（仅 exclusions）预计算一个合法兜底点
+# 存 _fallback[面名]（失败不存）；波次兜底优先用预计算点，无预计算点才退回面中心。
+# 本用例两段验证：
+#   (a) 字典属性——排除矩形覆盖各假面中心区域时，_fallback 预计算点不在排除矩形内；
+#   (b) 行为可达——构造小面 F（面内两点距离 ≤ 对角线 0.85 < MIN_SPACING=2 → 第二敌
+#       正常采样必败）+ 排除矩形覆盖面中心，两面总容量 4 < WAVE_SIZE=5 → F 必满 2 敌，
+#       其第二敌必走兜底分支：断言兜底敌用的正是预计算点且不在排除矩形内。
+func test_fallback_avoids_exclusions() -> void:
+	var s := _make_spawner()
+	if s == null:
+		return
+	_hook_spawner_signals(s)
+	# (a) 排除矩形覆盖每面中心区域（模拟 Altar 中心在 Pedestal 排除区的形态），
+	# 但均留有面内合法余量 → 预计算应全部成功
+	var exclusions := {
+		"A": [{"x_min": -2.0, "x_max": 2.0, "z_min": -2.0, "z_max": 2.0}],
+		"B": [{"x_min": 19.0, "x_max": 21.0, "z_min": -1.0, "z_max": 1.0}],
+		"C": [{"x_min": -21.0, "x_max": -19.0, "z_min": 9.0, "z_max": 11.0}],
+	}
+	s.setup(SURFACES, _spawn_fn, exclusions)
+	var fb_v: Variant = s.get("_fallback")
+	assert_true(fb_v is Dictionary, "setup 后应预计算 _fallback 字典（面名→合法兜底点）")
+	if not (fb_v is Dictionary):
+		return
+	var fb: Dictionary = fb_v
+	assert_eq(fb.size(), SURFACES.size(), "每面（留有合法余量）都应有预计算兜底点")
+	for s0 in SURFACES:
+		var surf: Dictionary = s0
+		var nm: String = str(surf["name"])
+		assert_true(fb.has(nm), "面 %s 应有预计算兜底点" % nm)
+		if not fb.has(nm):
+			continue
+		var p: Vector3 = fb[nm]
+		assert_almost_eq(p.y, float(surf["top_y"]), 0.001, "兜底点 y == 面 top_y（面 %s）" % nm)
+		for r0 in exclusions[nm]:
+			var r: Dictionary = r0
+			var inside: bool = p.x >= float(r["x_min"]) and p.x <= float(r["x_max"]) \
+					and p.z >= float(r["z_min"]) and p.z <= float(r["z_max"])
+			assert_false(inside, "面 %s 兜底点 (%.3f, %.3f) 不得落在排除矩形内" % [nm, p.x, p.z])
+
+	# (b) 行为可达：小面 F（1.6×1.6 → 面内最大距离 0.6*sqrt(2)≈0.85 < MIN_SPACING）
+	var tiny := {"name": "F", "center": Vector3(0, 1.2, 0), "size": Vector3(1.6, 0.1, 1.6), "top_y": 1.2}
+	var far := {"name": "G", "center": Vector3(50, 0.6, 0), "size": Vector3(10, 0.1, 10), "top_y": 0.6}
+	var s2 := _make_spawner()
+	if s2 == null:
+		return
+	_hook_spawner_signals(s2)
+	var excl_f := {"F": [{"x_min": -0.3, "x_max": 0.1, "z_min": -0.3, "z_max": 0.3}]}
+	s2.setup([tiny, far], _spawn_fn, excl_f, 5.0)  # 大延迟防第 2 波干扰
+	s2.start()
+	var ok: bool = await _wait_until_bool(func(): return spawned.size() == 4, 3.0)
+	assert_true(ok, "总容量 4（两面各 ≤2）< WAVE_SIZE=5 → 应刷满 4 敌")
+	if spawned.size() != 4:
+		return
+	var fb2_v: Variant = s2.get("_fallback")
+	assert_true(fb2_v is Dictionary and (fb2_v as Dictionary).has("F"),
+			"面 F 应有预计算兜底点（排除矩形仅覆盖中心条带，留有余量）")
+	if not (fb2_v is Dictionary and (fb2_v as Dictionary).has("F")):
+		return
+	var fp: Vector3 = (fb2_v as Dictionary)["F"]
+	var on_f: Array = []
+	for stub in spawned:
+		if stub.surface_name == "F":
+			on_f.append(stub)
+	assert_eq(on_f.size(), 2, "面 F 应满 MAX_PER_SURFACE=2（第二敌必走兜底分支）")
+	var hit_fb := false
+	for stub0 in on_f:
+		var p2: Vector3 = stub0.spawn_pos
+		var inside2: bool = p2.x >= -0.3 and p2.x <= 0.1 and p2.z >= -0.3 and p2.z <= 0.3
+		assert_false(inside2, "面 F 敌人 (%.3f, %.3f) 不得落在排除矩形内（旧代码兜底取面中心将违规）" % [p2.x, p2.z])
+		if p2.distance_to(fp) < 0.001:
+			hit_fb = true
+	assert_true(hit_fb, "兜底敌应使用预计算合法点 _fallback[\"F\"]")

@@ -7,8 +7,9 @@
 #
 # 撒点算法：面洗牌 → 每面每波 ≤ MAX_PER_SURFACE → 面内 center±(size/2−SPAWN_MARGIN)
 # 随机采样 → 拒绝采样（该面的 exclusions 矩形 + 与本波已刷敌水平距离 < MIN_SPACING）
-# → 单敌单面重试上限 MAX_SAMPLES 次，失败换下一面；全部失败兜底：任意合法面中心。
-# 波次组合多样性由面洗牌保证。
+# → 单敌单面重试上限 MAX_SAMPLES 次，失败换下一面；全部失败兜底：优先用 setup 时
+# 每面预计算的合法兜底点 _fallback[面名]（仅对 exclusions 拒绝采样），无预计算点
+# 才退回面中心（最终兜底）。波次组合多样性由面洗牌保证。
 class_name WaveSpawner
 extends Node
 
@@ -26,6 +27,7 @@ const MAX_SAMPLES := 50       # 单敌单面拒绝采样重试上限
 var _surfaces: Array = []
 var _spawn_fn: Callable
 var _exclusions: Dictionary = {}
+var _fallback: Dictionary = {}   # 面名 → setup 预计算的合法兜底点（终审 M2 修复）
 var _respawn_delay: float = RESPAWN_DELAY
 var _current_wave := 0
 var _alive := 0
@@ -42,6 +44,32 @@ func setup(surfaces: Array, spawn_fn: Callable, exclusions: Dictionary = {},
 	_spawn_fn = spawn_fn
 	_exclusions = exclusions
 	_respawn_delay = respawn_delay
+	_precompute_fallbacks()
+
+
+## 每面预计算一个合法兜底点：面内 center±(size/2−SPAWN_MARGIN) 拒绝采样（仅对
+## exclusions，MAX_SAMPLES 次尝试），成功存 _fallback[面名]，失败不存（波次兜底
+## 退回面中心最终保底）。终审 M2 修复：旧兜底直取面中心——如 Altar 中心落在
+## Pedestal 排除区内，兜底点会落入禁区。
+func _precompute_fallbacks() -> void:
+	_fallback = {}
+	for s0 in _surfaces:
+		var s: Dictionary = s0
+		var nm: String = str(s["name"])
+		var rects: Array = []
+		if _exclusions.has(nm):
+			rects = _exclusions[nm]
+		var c: Vector3 = s["center"]
+		var sz: Vector3 = s["size"]
+		var half_x: float = maxf(sz.x * 0.5 - SPAWN_MARGIN, 0.0)
+		var half_z: float = maxf(sz.z * 0.5 - SPAWN_MARGIN, 0.0)
+		for _attempt in range(MAX_SAMPLES):
+			var x: float = c.x + randf_range(-half_x, half_x)
+			var z: float = c.z + randf_range(-half_z, half_z)
+			if _in_any_rect(x, z, rects):
+				continue
+			_fallback[nm] = Vector3(x, float(s["top_y"]), z)
+			break
 
 
 ## 刷第 1 波并启动循环
@@ -84,15 +112,20 @@ func _spawn_wave() -> void:
 				pos = p
 				break
 		if surf.is_empty():
-			# 兜底：任意尚有余量的合法面中心（撒点全部被拒时的保底）
+			# 兜底：任意尚有余量的合法面——优先用 setup 预计算的合法兜底点
+			# （已对 exclusions 拒绝采样）；无预计算点才退回面中心（最终保底，
+			# 此时整面被排除区覆盖，中心亦属禁区，接受降级）
 			for s0 in order:
 				var s2: Dictionary = s0
 				var nm2: String = str(s2["name"])
 				if int(counts.get(nm2, 0)) >= MAX_PER_SURFACE:
 					continue
-				var c: Vector3 = s2["center"]
 				surf = s2
-				pos = Vector3(c.x, float(s2["top_y"]), c.z)
+				if _fallback.has(nm2):
+					pos = _fallback[nm2]
+				else:
+					var c: Vector3 = s2["center"]
+					pos = Vector3(c.x, float(s2["top_y"]), c.z)
 				break
 		if surf.is_empty():
 			continue  # 面总容量不足 WAVE_SIZE（14 面场景下不会发生）

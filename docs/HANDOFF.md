@@ -67,7 +67,7 @@
   2. **大树允许与建筑墙体重叠**（bigtree 碰撞小，测试/窄缝扫描豁免）
   3. **第一人称 ViewModel 绝不重做**
   4. **地图布局每改动一次必须重置全部跳跃记录**——由布局哈希自动执行（详见 §二 ⚠️ 铁律块），勿手动保留旧记录
-- **M2 布局教训**（设计文档 §十四）：室内屋顶 ≥4.5m；室内隔断 1.4m 不可跳；可跳高台两级微台阶；柱贴墙；树 decor 无碰撞；**无 <1.2m 窄缝**（scan_gaps.py 扫描）。
+- **M2 布局教训**（设计文档 §十四）：室内屋顶 ≥4.5m；室内隔断 1.4m 不可跳；可跳高台两级微台阶；柱贴墙；树 decor 无碰撞；**无 <1.2m 窄缝**（scan_gaps_v3.py 扫描）。
 - **方法论**：Superpowers 流程；**TDD 先写失败测试**；**验证（跑测试/渲染亲眼看）后才声明完成**。
 
 ## 六、可复用的验证工具
@@ -80,13 +80,12 @@
   - `tools/probe_timing.gd`（首交火 timing 门控 t∈[4,6.5]s，基线 4.93s）
   - `tools/scan_gaps_v3.py`（窄缝扫描 v3，无 <1.2m；项目内正式工具）
   - `tools/dump_v3_solids.gd`（导出 v3 实体清单供外部分析）
-- **M2 v2 探针（历史，v2 退役但工具留存）**：
-  - `tools/probe_walk.gd`（漫游可达）
-  - `tools/probe_jump_smooth.gd`（跳跃流畅）
-  - `tools/probe_global.gd`（全图网格扫描）
-  - `tools/probe_step_climb.gd`（台阶走通）
-  - `tools/probe_doors_walk.gd`（过门 16/16）
-  - `tools/scan_gaps.py`（窄缝扫描 v1，bigtree 豁免）
+- **历史探针（M2 T1 前置验证历史工具，独立不依赖布局）**：
+  - `tools/probe_jump.gd`（实测跳跃能力：站立跳高/助跑跳远）
+  - `tools/probe_platform.gd`（实测可跳上的平台高度：中心峰值判据）
+  - `tools/probe_holes.gd`（弹孔贴花 headless 验证：AK 全扫逐发命中/洞节点数）
+  - `tools/probe_holes_scene.gd`（弹孔贴花窗口截图验证：实际渲染贴花数）
+  - `tools/probe_skeleton.gd`（Soldier_Echo 骨骼检查：骨骼/rest pose/手位置）
 - 通道/外侧探针在 `/tmp/probe_paths4.gd`、`/tmp/probe_outer.gd`（未入库，重开需重建）
 
 ---
