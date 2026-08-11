@@ -95,7 +95,53 @@ static var RAMPS: Array = _ramp_steps(3.5, 6.5, -3.5, 2.5, 0.6, 3.0, "RampE", 8)
 	{"name": "MicroS1", "kind": "cover", "center": Vector3(0, 0.15, 5.45), "size": Vector3(2, 0.3, 0.3)},
 	{"name": "MicroS2", "kind": "cover", "center": Vector3(0, 0.3, 5.15), "size": Vector3(2, 0.6, 0.3)},
 ]
-const STREETS := []      # 任务4：东/西市街
+# ---- 任务 4：东/西市街（长墙 + 水塔 + 摊位簇 + 摊阁 + 塔坡道）----
+# 塔坡道为生成器产出，GDScript const 不允许函数调用，故表为 static var（同 RAMPS）。
+static var STREETS: Array = [
+	# 长墙（高 3 厚 1；豁口 z∈[5.5,8]∪[-8,-5.5] 各 2.5m 通外环）
+	{"name": "EastWall_S", "kind": "wall", "center": Vector3(23, 1.5, -11), "size": Vector3(1, 3, 6)},
+	{"name": "EastWall_M", "kind": "wall", "center": Vector3(23, 1.5, 0), "size": Vector3(1, 3, 11)},
+	{"name": "EastWall_N", "kind": "wall", "center": Vector3(23, 1.5, 11), "size": Vector3(1, 3, 6)},
+	{"name": "WestWall_S", "kind": "wall", "center": Vector3(-23, 1.5, -11), "size": Vector3(1, 3, 6)},
+	{"name": "WestWall_M", "kind": "wall", "center": Vector3(-23, 1.5, 0), "size": Vector3(1, 3, 11)},
+	{"name": "WestWall_N", "kind": "wall", "center": Vector3(-23, 1.5, 11), "size": Vector3(1, 3, 6)},
+	# 西望楼：台体（顶 2.5）+ 栏板（北向 2m 豁口朝坡道落点）+ 台上箱
+	{"name": "WestTower", "kind": "wall", "center": Vector3(-18.5, 1.25, 0), "size": Vector3(4, 2.5, 4)},
+	{"name": "WestTowerRailN_1", "kind": "cover", "center": Vector3(-20, 2.95, 1.9), "size": Vector3(1, 0.9, 0.2)},
+	{"name": "WestTowerRailN_2", "kind": "cover", "center": Vector3(-17, 2.95, 1.9), "size": Vector3(1, 0.9, 0.2)},
+	{"name": "WestTowerRailS", "kind": "cover", "center": Vector3(-18.5, 2.95, -1.9), "size": Vector3(4, 0.9, 0.2)},
+	{"name": "WestTowerRailE", "kind": "cover", "center": Vector3(-16.6, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
+	{"name": "WestTowerRailW", "kind": "cover", "center": Vector3(-20.4, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
+	{"name": "WestTowerBox", "kind": "cover", "center": Vector3(-17.5, 2.95, -1), "size": Vector3(0.8, 0.9, 0.8)},
+	# 东水塔 = 180° 旋转（南向豁口）
+	{"name": "EastTower", "kind": "wall", "center": Vector3(18.5, 1.25, 0), "size": Vector3(4, 2.5, 4)},
+	{"name": "EastTowerRailS_1", "kind": "cover", "center": Vector3(20, 2.95, -1.9), "size": Vector3(1, 0.9, 0.2)},
+	{"name": "EastTowerRailS_2", "kind": "cover", "center": Vector3(17, 2.95, -1.9), "size": Vector3(1, 0.9, 0.2)},
+	{"name": "EastTowerRailN", "kind": "cover", "center": Vector3(18.5, 2.95, 1.9), "size": Vector3(4, 0.9, 0.2)},
+	{"name": "EastTowerRailW", "kind": "cover", "center": Vector3(16.6, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
+	{"name": "EastTowerRailE", "kind": "cover", "center": Vector3(20.4, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
+	{"name": "EastTowerBox", "kind": "cover", "center": Vector3(17.5, 2.95, 1), "size": Vector3(0.8, 0.9, 0.8)},
+	# 摊位簇（2.2 板 + 0.9 箱×2，板箱同坐地面缝 1.8 ≥ 1.5——项目级 boost 规则）
+	{"name": "EastClusterN_Panel", "kind": "cover", "center": Vector3(18.5, 1.1, 7), "size": Vector3(3, 2.2, 0.4)},
+	{"name": "EastClusterN_Box1", "kind": "cover", "center": Vector3(17, 0.45, 4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "EastClusterN_Box2", "kind": "cover", "center": Vector3(20, 0.45, 4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "EastClusterS_Panel", "kind": "cover", "center": Vector3(18.5, 1.1, -7), "size": Vector3(3, 2.2, 0.4)},
+	{"name": "EastClusterS_Box1", "kind": "cover", "center": Vector3(17, 0.45, -4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "EastClusterS_Box2", "kind": "cover", "center": Vector3(20, 0.45, -4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "WestClusterS_Panel", "kind": "cover", "center": Vector3(-18.5, 1.1, -7), "size": Vector3(3, 2.2, 0.4)},
+	{"name": "WestClusterS_Box1", "kind": "cover", "center": Vector3(-17, 0.45, -4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "WestClusterS_Box2", "kind": "cover", "center": Vector3(-20, 0.45, -4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "WestClusterN_Panel", "kind": "cover", "center": Vector3(-18.5, 1.1, 7), "size": Vector3(3, 2.2, 0.4)},
+	{"name": "WestClusterN_Box1", "kind": "cover", "center": Vector3(-17, 0.45, 4.5), "size": Vector3(1, 0.9, 1)},
+	{"name": "WestClusterN_Box2", "kind": "cover", "center": Vector3(-20, 0.45, 4.5), "size": Vector3(1, 0.9, 1)},
+	# 摊阁（翼引力锚：顶 1.2 可跳 + 台阶顶 0.6 贴缘无缝）
+	{"name": "EastPavilion", "kind": "cover", "center": Vector3(18.5, 0.6, 10), "size": Vector3(2.5, 1.2, 2.5)},
+	{"name": "EastPavilionStep", "kind": "cover", "center": Vector3(18.5, 0.3, 12.0), "size": Vector3(1.5, 0.6, 1.5)},
+	{"name": "WestPavilion", "kind": "cover", "center": Vector3(-18.5, 0.6, -10), "size": Vector3(2.5, 1.2, 2.5)},
+	{"name": "WestPavilionStep", "kind": "cover", "center": Vector3(-18.5, 0.3, -12.0), "size": Vector3(1.5, 0.6, 1.5)},
+] \
+		+ _ramp_steps(-21, -18.5, 8.2, 2.0, 0.0, 2.5, "WestTowerRamp", 10) \
+		+ _ramp_steps(18.5, 21, -8.2, -2.0, 0.0, 2.5, "EastTowerRamp", 10)
 const GATES := []        # 任务5：钟门/市集带
 const BACKSTREETS := []  # 任务6：背街/营
 const OUTER := []        # 任务7：外环/角场

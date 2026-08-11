@@ -428,3 +428,262 @@ func test_micro_steps() -> void:
 		var bb := _aabb(s2)
 		assert_almost_eq(bb[1].y, 0.6, 0.001, "MicroS2 顶面 == 0.6（=台面）")
 		assert_almost_eq(bb[0].z, 5.0, 0.001, "MicroS2 贴台缘 z == 5.0")
+
+
+# ==== 任务 4：东/西市街 ====
+
+# 收集 table 中 name 以 prefix 开头的实体的 x 跨度
+func _x_spans_in(table: Array, prefix: String) -> Array:
+	var spans := []
+	for e0 in table:
+		var e: Dictionary = e0
+		if (e["name"] as String).begins_with(prefix):
+			var bb := _aabb(e)
+			spans.append([bb[0].x, bb[1].x])
+	return spans
+
+
+# 收集 table 中 name 以 prefix 开头的实体的 z 跨度
+func _z_spans_in(table: Array, prefix: String) -> Array:
+	var spans := []
+	for e0 in table:
+		var e: Dictionary = e0
+		if (e["name"] as String).begins_with(prefix):
+			var bb := _aabb(e)
+			spans.append([bb[0].z, bb[1].z])
+	return spans
+
+
+# 180° 旋转命名映射：前缀 East→West，其余部分方向字符 N↔S / E↔W 互换。
+# 仅轮换"非单词首字母"的方向字符（后随字符非小写），避免误伤 "Step" 等词首 S。
+func _rot_pair(nm: String) -> String:
+	var rest := nm.trim_prefix("East")
+	var out := ""
+	for i in rest.length():
+		var ch := rest[i]
+		var word_head: bool = i + 1 < rest.length() and rest[i + 1] >= "a" and rest[i + 1] <= "z"
+		if not word_head:
+			match ch:
+				"N": ch = "S"
+				"S": ch = "N"
+				"E": ch = "W"
+				"W": ch = "E"
+		out += ch
+	return "West" + out
+
+
+# ---- 18. 长墙：东/西各 3 段尺寸位置 + 豁口 z∈[5.5,8]∪[-8,-5.5] 无覆盖 ----
+func test_street_longwalls() -> void:
+	var specs := [
+		["EastWall_S", Vector3(23, 1.5, -11), Vector3(1, 3, 6)],
+		["EastWall_M", Vector3(23, 1.5, 0), Vector3(1, 3, 11)],
+		["EastWall_N", Vector3(23, 1.5, 11), Vector3(1, 3, 6)],
+		["WestWall_S", Vector3(-23, 1.5, -11), Vector3(1, 3, 6)],
+		["WestWall_M", Vector3(-23, 1.5, 0), Vector3(1, 3, 11)],
+		["WestWall_N", Vector3(-23, 1.5, 11), Vector3(1, 3, 6)],
+	]
+	for spec0 in specs:
+		var spec: Array = spec0
+		var nm: String = spec[0]
+		var ent := _find(V3.STREETS, nm)
+		assert_false(ent.is_empty(), "STREETS 含 %s" % nm)
+		if ent.is_empty():
+			continue
+		assert_eq(ent["kind"], "wall", "%s kind == wall" % nm)
+		var c: Vector3 = ent["center"]
+		var s: Vector3 = ent["size"]
+		var ec: Vector3 = spec[1]
+		var es: Vector3 = spec[2]
+		assert_almost_eq(c.x, ec.x, 0.001, "%s center.x == %s" % [nm, ec.x])
+		assert_almost_eq(c.y, ec.y, 0.001, "%s center.y == %s" % [nm, ec.y])
+		assert_almost_eq(c.z, ec.z, 0.001, "%s center.z == %s" % [nm, ec.z])
+		assert_almost_eq(s.x, es.x, 0.001, "%s size.x == %s" % [nm, es.x])
+		assert_almost_eq(s.y, es.y, 0.001, "%s size.y == %s" % [nm, es.y])
+		assert_almost_eq(s.z, es.z, 0.001, "%s size.z == %s" % [nm, es.z])
+	for side in ["EastWall", "WestWall"]:
+		var merged := _merge_spans(_z_spans_in(V3.STREETS, side))
+		assert_false(merged.is_empty(), "STREETS 含 %s* 段" % side)
+		for gap in [[5.5, 8.0], [-8.0, -5.5]]:
+			var g: Array = gap
+			assert_false(_span_intersects(merged, g[0], g[1]),
+				"%s 豁口 z∈[%s,%s] 无长墙覆盖" % [side, g[0], g[1]])
+		for seg in [[-14.0, -8.0], [-5.5, 5.5], [8.0, 14.0]]:
+			var s: Array = seg
+			assert_true(_span_covers(merged, s[0], s[1]),
+				"%s 段 z∈[%s,%s] 有长墙覆盖" % [side, s[0], s[1]])
+
+
+# ---- 19. 水塔：台体顶 2.5 / size (4,2.5,4)；西塔栏板北豁 x∈[-19.5,-17.5]；台上箱底 = 2.5 ----
+func test_towers() -> void:
+	for spec0 in [["WestTower", "wall"], ["EastTower", "wall"]]:
+		var spec: Array = spec0
+		var nm: String = spec[0]
+		var ent := _find(V3.STREETS, nm)
+		assert_false(ent.is_empty(), "STREETS 含 %s" % nm)
+		if ent.is_empty():
+			continue
+		assert_eq(ent["kind"], spec[1], "%s kind == %s（台体）" % [nm, spec[1]])
+		var s: Vector3 = ent["size"]
+		assert_almost_eq(s.x, 4.0, 0.001, "%s size.x == 4" % nm)
+		assert_almost_eq(s.y, 2.5, 0.001, "%s size.y == 2.5" % nm)
+		assert_almost_eq(s.z, 4.0, 0.001, "%s size.z == 4" % nm)
+		var bb := _aabb(ent)
+		assert_almost_eq(bb[1].y, 2.5, 0.001, "%s 台顶 == 2.5" % nm)
+	# 西塔栏板北向豁口 = RailN_1/RailN_2 段间缝 x∈[-19.5,-17.5]（2m，朝坡道落点）
+	var railn := _merge_spans(_x_spans_in(V3.STREETS, "WestTowerRailN"))
+	assert_false(railn.is_empty(), "STREETS 含 WestTowerRailN* 栏板")
+	assert_false(_span_intersects(railn, -19.5, -17.5),
+		"西塔栏板北豁 x∈[-19.5,-17.5] 无覆盖")
+	assert_true(_span_covers(railn, -20.5, -19.5),
+		"西塔栏板北段 x∈[-20.5,-19.5] 有覆盖")
+	assert_true(_span_covers(railn, -17.5, -16.5),
+		"西塔栏板北段 x∈[-17.5,-16.5] 有覆盖")
+	# 台上箱垂直坐台顶：盒底 == 2.5
+	for bn in ["WestTowerBox", "EastTowerBox"]:
+		var ent := _find(V3.STREETS, bn)
+		assert_false(ent.is_empty(), "STREETS 含 %s" % bn)
+		if ent.is_empty():
+			continue
+		var bb := _aabb(ent)
+		assert_almost_eq(bb[0].y, 2.5, 0.001, "%s 箱底 == 2.5（坐台顶）" % bn)
+
+
+# ---- 20. 塔坡道：各 10 级 / 顶面 0.25..2.5 等差 / 宽 2.5 / 末级贴台缘 / 坡度 ≤22.6° ----
+func test_tower_ramps() -> void:
+	for prefix in ["WestTowerRamp", "EastTowerRamp"]:
+		var z_lo := INF
+		var z_hi := -INF
+		for n in range(1, 11):
+			var ent := _find(V3.STREETS, "%sStep%d" % [prefix, n])
+			assert_false(ent.is_empty(), "STREETS 含 %sStep%d" % [prefix, n])
+			if ent.is_empty():
+				continue
+			var s: Vector3 = ent["size"]
+			var bb := _aabb(ent)
+			assert_almost_eq(s.x, 2.5, 0.001, "%sStep%d 级宽 == 2.5" % [prefix, n])
+			assert_almost_eq(bb[1].y, 0.25 * n, 0.001,
+				"%sStep%d 顶面 == %s（等差）" % [prefix, n, 0.25 * n])
+			z_lo = minf(z_lo, bb[0].z)
+			z_hi = maxf(z_hi, bb[1].z)
+		var last := _find(V3.STREETS, "%sStep10" % prefix)
+		if not last.is_empty():
+			var bb := _aabb(last)
+			assert_almost_eq(bb[1].y, 2.5, 0.001, "%sStep10 顶面 == 2.5" % prefix)
+			if prefix == "WestTowerRamp":
+				assert_true(bb[0].z <= 2.01 and bb[1].z >= 1.99,
+					"WestTowerRampStep10 z 范围含 z=2.0±0.01（贴台体北缘）")
+			else:
+				assert_true(bb[0].z <= -1.99 and bb[1].z >= -2.01,
+					"EastTowerRampStep10 z 范围含 z=-2.0±0.01（贴台体南缘）")
+		var run: float = z_hi - z_lo
+		assert_almost_eq(run, 6.2, 0.001, "%s 总跑 == 6.2" % prefix)
+		if z_hi > z_lo:
+			var angle: float = rad_to_deg(atan(2.5 / run))
+			assert_lte(angle, 22.6, "%s 坡度 %.2f° ≤ 22.6°" % [prefix, angle])
+
+
+# ---- 21. 摊阁：顶 1.2 ≤ JUMPABLE_MAX / 台阶顶 0.6 / 台阶贴摊阁缘缝 == 0 ----
+func test_pavilions() -> void:
+	for pair0 in [["EastPavilion", "EastPavilionStep"], ["WestPavilion", "WestPavilionStep"]]:
+		var pair: Array = pair0
+		var pav := _find(V3.STREETS, pair[0])
+		var stp := _find(V3.STREETS, pair[1])
+		assert_false(pav.is_empty(), "STREETS 含 %s" % pair[0])
+		assert_false(stp.is_empty(), "STREETS 含 %s" % pair[1])
+		if pav.is_empty() or stp.is_empty():
+			continue
+		var pb := _aabb(pav)
+		var sb := _aabb(stp)
+		assert_almost_eq(pb[1].y, 1.2, 0.001, "%s 顶 == 1.2" % pair[0])
+		assert_lte(pb[1].y, V3.JUMPABLE_MAX, "%s 顶 ≤ JUMPABLE_MAX（可跳）" % pair[0])
+		assert_almost_eq(sb[1].y, 0.6, 0.001, "%s 台阶顶 == 0.6" % pair[1])
+		var gap: float = maxf(pb[0].z - sb[1].z, sb[0].z - pb[1].z)
+		assert_almost_eq(gap, 0.0, 0.01, "%s/%s 贴缘缝 == 0" % [pair[0], pair[1]])
+
+
+# ---- 22. 市街带界：STREETS 全部实体 x∈[-23.5,-14]∪[14,23.5]、z∈[-14.5,14.5] ----
+func test_streets_bounds() -> void:
+	assert_false(V3.STREETS.is_empty(), "STREETS 非空")
+	for e0 in V3.STREETS:
+		var e: Dictionary = e0
+		var bb := _aabb(e)
+		var in_west: bool = bb[0].x >= -23.51 and bb[1].x <= -13.99
+		var in_east: bool = bb[0].x >= 13.99 and bb[1].x <= 23.51
+		assert_true(in_west or in_east,
+			"%s x 带 ∈[-23.5,-14]∪[14,23.5]（容差 0.01）" % e["name"])
+		assert_true(bb[0].z >= -14.51 and bb[1].z <= 14.51,
+			"%s z 带 ∈[-14.5,14.5]（容差 0.01）" % e["name"])
+
+
+# ---- 23. 旋转对称：每个 East* 实体有 West* 对应体，center 互为 (-x,-z)、size 相同 ----
+func test_streets_rotation_pairs() -> void:
+	assert_false(V3.STREETS.is_empty(), "STREETS 非空")
+	var east_count := 0
+	for e0 in V3.STREETS:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		if not nm.begins_with("East"):
+			continue
+		east_count += 1
+		var want := _rot_pair(nm)
+		var w := _find(V3.STREETS, want)
+		assert_false(w.is_empty(), "%s 有旋转对应体 %s" % [nm, want])
+		if w.is_empty():
+			continue
+		var ce: Vector3 = e["center"]
+		var cw: Vector3 = w["center"]
+		var se: Vector3 = e["size"]
+		var sw: Vector3 = w["size"]
+		assert_almost_eq(cw.x, -ce.x, 0.001, "%s/%s center.x 互为 -x" % [nm, want])
+		assert_almost_eq(cw.y, ce.y, 0.001, "%s/%s center.y 相同" % [nm, want])
+		assert_almost_eq(cw.z, -ce.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
+		assert_lt((se - sw).length(), 0.001, "%s/%s size 相同" % [nm, want])
+	assert_eq(east_count, 28, "East* 实体共 28 个（墙3+塔1+栏板5+箱1+坡道10+簇6+阁2）")
+
+
+# ---- 24. boost 间距显式断言：4 块 Cluster Panel 与最近箱缝 ≥1.5；摊阁与最近 Panel 缝 ≥1.5 ----
+func test_streets_boost_spacing() -> void:
+	var cboxes := []
+	for e0 in V3.STREETS:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		if nm.contains("Cluster") and nm.contains("Box"):
+			cboxes.append(_aabb(e))
+	assert_eq(cboxes.size(), 8, "STREETS 含 8 个摊位簇箱")
+	var panels := ["EastClusterN_Panel", "EastClusterS_Panel", "WestClusterN_Panel", "WestClusterS_Panel"]
+	for pn in panels:
+		var ent := _find(V3.STREETS, pn)
+		assert_false(ent.is_empty(), "STREETS 含 %s" % pn)
+		if ent.is_empty():
+			continue
+		var pb := _aabb(ent)
+		var nd := INF
+		for bb0 in cboxes:
+			nd = minf(nd, _xz_net_dist(pb, bb0))
+		assert_true(nd >= 1.5 - 0.01, "%s 与最近箱缝 %.3f ≥ 1.5（容差 0.01）" % [pn, nd])
+	for pv in ["EastPavilion", "WestPavilion"]:
+		var ent := _find(V3.STREETS, pv)
+		assert_false(ent.is_empty(), "STREETS 含 %s" % pv)
+		if ent.is_empty():
+			continue
+		var pb := _aabb(ent)
+		var nd := INF
+		for pn in panels:
+			var pe := _find(V3.STREETS, pn)
+			if pe.is_empty():
+				continue
+			nd = minf(nd, _xz_net_dist(pb, _aabb(pe)))
+		assert_true(nd >= 1.5 - 0.01, "%s 与最近 Panel 缝 %.3f ≥ 1.5（容差 0.01）" % [pv, nd])
+
+
+# ---- 25. STREETS 内部两两 AABB 无重叠（豁免垂直相接 ±0.01）----
+func test_streets_no_overlap() -> void:
+	assert_false(V3.STREETS.is_empty(), "STREETS 非空")
+	for i in range(V3.STREETS.size()):
+		for j in range(i + 1, V3.STREETS.size()):
+			var a: Dictionary = V3.STREETS[i]
+			var b: Dictionary = V3.STREETS[j]
+			var ba := _aabb(a)
+			var bb := _aabb(b)
+			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
+				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
