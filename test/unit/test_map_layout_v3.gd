@@ -380,7 +380,7 @@ func test_ramp_e_landing() -> void:
 			"RampWStep8 z 范围与回廊 W 豁 z∈[-3.5,-1.5] 相交")
 
 
-# ---- 15. 坡道与基座缝 == 1.5（精确）+ 全部坡道盒与 Pedestal AABB 无重叠 ----
+# ---- 15. 坡道与基座缝 == 1.6（精确；任务 9 A2 外移 0.1 后）+ 全部坡道盒与 Pedestal AABB 无重叠 ----
 func test_ramp_pedestal_gap() -> void:
 	var pedestal := _find(V3.CLOCK, "Pedestal")
 	assert_false(pedestal.is_empty(), "CLOCK 含 Pedestal")
@@ -399,8 +399,8 @@ func test_ramp_pedestal_gap() -> void:
 		elif nm.begins_with("RampW"):
 			w_max = maxf(w_max, bb[1].x)
 			assert_false(_overlap(bb, ped_bb), "%s 与 Pedestal AABB 无重叠" % nm)
-	assert_almost_eq(e_min - ped_bb[1].x, 1.5, 0.001, "东坡道 x_min − 基座 x_max == 1.5")
-	assert_almost_eq(ped_bb[0].x - w_max, 1.5, 0.001, "基座 x_min − 西坡道 x_max == 1.5")
+	assert_almost_eq(e_min - ped_bb[1].x, 1.6, 0.001, "东坡道 x_min − 基座 x_max == 1.6")
+	assert_almost_eq(ped_bb[0].x - w_max, 1.6, 0.001, "基座 x_min − 西坡道 x_max == 1.6")
 
 
 # ---- 16. boost 组合禁令门禁（项目级硬规则）：遍历 all_solids() 全实体对 ----
@@ -850,7 +850,9 @@ func test_wing_side_gap() -> void:
 					region[0], region[1], region[2], region[3], e["name"]])
 
 
-# ---- 31. 市集带摊阁：顶 1.2 可跳 / 台阶顶 0.6 / 贴摊阁缘缝 0 / 贴翼墙缝 0 / 与门柱 x 缝 1.25 ----
+# ---- 31. 市集带摊阁（任务 9 A4 重布后）：顶 1.2 可跳 / 尺寸 2.0×1.8 / 贴 rim 面 |z|=10 /
+#         台阶顶 0.6 贴摊阁缘缝 0 / 台阶↔翼墙 z 缝 0.95（台阶顶 0.6≤0.95 非阻挡体，合法）/
+#         摊阁↔门柱 z 缝恰 1.2 ----
 func test_belt_pavilions() -> void:
 	for tags0 in [["BeltN", "GateN"], ["BeltS", "GateS"]]:
 		var tags: Array = tags0
@@ -867,19 +869,26 @@ func test_belt_pavilions() -> void:
 			assert_false(pillar.is_empty(), "GATES 含 %s_Pillar%s" % [gate, lr])
 			if pav.is_empty() or stp.is_empty() or wing.is_empty() or pillar.is_empty():
 				continue
+			var ps: Vector3 = pav["size"]
 			var pb := _aabb(pav)
 			var sb := _aabb(stp)
 			var wb := _aabb(wing)
 			var plb := _aabb(pillar)
 			assert_almost_eq(pb[1].y, 1.2, 0.001, "%s_Pav%s 顶 == 1.2" % [belt, lr])
 			assert_lte(pb[1].y, V3.JUMPABLE_MAX, "%s_Pav%s 顶 ≤ JUMPABLE_MAX（可跳）" % [belt, lr])
+			assert_almost_eq(ps.x, 2.0, 0.001, "%s_Pav%s size.x == 2.0（A4 缩为 2.0×1.8）" % [belt, lr])
+			assert_almost_eq(ps.z, 1.8, 0.001, "%s_Pav%s size.z == 1.8（A4 缩为 2.0×1.8）" % [belt, lr])
+			# 摊阁内缘面贴 rim N/S 面 |z|=10（BeltN 南面 z=10 / BeltS 北面 z=-10）
+			var rim_face: float = minf(absf(pb[0].z), absf(pb[1].z))
+			assert_almost_eq(rim_face, 10.0, 0.001, "%s_Pav%s 贴 rim 面 |z| == 10" % [belt, lr])
 			assert_almost_eq(sb[1].y, 0.6, 0.001, "%s_PavStep%s 台阶顶 == 0.6" % [belt, lr])
 			var gap_pav: float = maxf(sb[0].z - pb[1].z, pb[0].z - sb[1].z)
 			assert_almost_eq(gap_pav, 0.0, 0.01, "%s_PavStep%s 与摊阁 z 贴缘缝 == 0" % [belt, lr])
 			var gap_wing: float = maxf(sb[0].z - wb[1].z, wb[0].z - sb[1].z)
-			assert_almost_eq(gap_wing, 0.0, 0.01, "%s_PavStep%s 与翼墙 z 贴缘缝 == 0" % [belt, lr])
-			var gap_pillar: float = maxf(sb[0].x - plb[1].x, plb[0].x - sb[1].x)
-			assert_almost_eq(gap_pillar, 1.25, 0.01, "%s_PavStep%s 与门柱 x 缝 == 1.25" % [belt, lr])
+			assert_almost_eq(gap_wing, 0.95, 0.01,
+				"%s_PavStep%s 与翼墙 z 缝 == 0.95（台阶顶 0.6 非阻挡体，窄缝规则不适用）" % [belt, lr])
+			var gap_pillar: float = maxf(pb[0].z - plb[1].z, plb[0].z - pb[1].z)
+			assert_almost_eq(gap_pillar, 1.2, 0.01, "%s_Pav%s 与门柱 z 缝 == 1.2" % [belt, lr])
 
 
 # ---- 32. 旋转对称：每个 GateN_*/BeltN_* 有 GateS_*/BeltS_* 对应体，center 互为 (-x,-z)、size 相同 ----
@@ -1451,6 +1460,12 @@ func test_standable_names_exist() -> void:
 		var top: float = (ent["center"] as Vector3).y + (ent["size"] as Vector3).y * 0.5
 		assert_almost_eq(top, float(s["top_y"]), 0.001,
 			"%s 实体顶面 == 面 top_y %s" % [ent_name, s["top_y"]])
+		# A6（T8 审查 Minor 补强）：面 center.x/z 与实体 center.x/z 一致
+		# （面 center.y == top_y 已在测试 4 断言，此处只校 x/z 防平移漂移）
+		var sc: Vector3 = s["center"]
+		var ec: Vector3 = ent["center"]
+		assert_almost_eq(sc.x, ec.x, 0.001, "%s 面 center.x == 实体 center.x" % ent_name)
+		assert_almost_eq(sc.z, ec.z, 0.001, "%s 面 center.z == 实体 center.z" % ent_name)
 
 
 # ---- 54. 实体预算（2026-08-11 裁决）：all_solids() ≤ 220 ----
@@ -1483,6 +1498,24 @@ func test_grenade_blockers() -> void:
 				near += 1
 		assert_gte(near, 1,
 			"探针点 %s 半径 %.2f 内 ≥1 遮挡物（center 距离）" % [p, radius])
+
+
+# ---- 57. 全图无重叠（任务 9 C）：all_solids() 全对（~18k 对）AABB 无重叠。
+#         豁免清单（精确列出，不得扩大）：
+#         a) 垂直相接（顶==底 ±0.01，_v_touch）——面/边接触由 _overlap eps 处理不算重叠
+#         b) bigtree×wall 成对（铁律"大树只许叠墙"，收窄口径与测试 48/T7 一致）----
+func test_full_map_no_overlap() -> void:
+	var solids := V3.all_solids()  # 提到循环外（裁决：避免 N 次拼装）
+	for i in range(solids.size()):
+		var a: Dictionary = solids[i]
+		var ba := _aabb(a)
+		for j in range(i + 1, solids.size()):
+			var b: Dictionary = solids[j]
+			var bb := _aabb(b)
+			var bigtree_exempt: bool = (a["kind"] == "bigtree" and b["kind"] == "wall") \
+				or (a["kind"] == "wall" and b["kind"] == "bigtree")
+			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb) or bigtree_exempt,
+				"%s vs %s: AABB 重叠（非垂直相接/bigtree×wall 豁免）" % [a["name"], b["name"]])
 
 
 # ---- 56. all_solids() 全部 name 唯一（为 T9/WaveSpawner/记录器引用安全预埋）----

@@ -35,11 +35,17 @@ const WALLS := [
 const PLAZA := [
 	# 祭坛台（台面 y=0.6，x∈[-7,7] z∈[-5,5]）
 	{"name": "AltarPlatform", "kind": "cover", "center": Vector3(0, 0.3, 0), "size": Vector3(14, 0.6, 10)},
-	# 斜板 4 块（建筑元素，高 2.1：坐台面底 0.6、顶 2.7 齐回廊板底——控制器裁决 A1，2026-08-11；A/B 南对 + A2/B2 = 180° 旋转）
-	{"name": "AltarSlabA", "kind": "cover", "center": Vector3(-1.5, 1.65, -2.8), "size": Vector3(3, 2.1, 0.4)},
-	{"name": "AltarSlabB", "kind": "cover", "center": Vector3(2.6, 1.65, -1.5), "size": Vector3(0.4, 2.1, 3)},
-	{"name": "AltarSlabA2", "kind": "cover", "center": Vector3(1.5, 1.65, 2.8), "size": Vector3(3, 2.1, 0.4)},
-	{"name": "AltarSlabB2", "kind": "cover", "center": Vector3(-2.6, 1.65, 1.5), "size": Vector3(0.4, 2.1, 3)},
+	# 斜板 4 块（建筑元素，高 2.1：底 0.6 坐台面、顶 2.7 齐回廊板底——任务 9 A1 贴基座修复，
+	# 2026-08-11。brief 原文 center.y=1.7，但 y=1.7 时顶 2.75 侵入回廊板底 2.7（重叠 0.05）
+	# 且底 0.65 浮空、boost 门禁 22 对违规；size 2.1 介于台面 0.6 与回廊底 2.7 之间的
+	# 唯一无冲突 center.y = 1.65（x/z 均按 brief 执行）。已记入报告待控制器确认。
+	# 残留窄缝修复：贴基座后 A/A2 与坡道 Step8 夹 0.6m 缝（z 投影进入坡道带），
+	# A/A2 center.x ±1.5→±0.9 内收，缝恰 1.2 合法（L 形互保/面接触/对称保持）。
+	# A/B 南对 + A2/B2 = 180° 旋转）
+	{"name": "AltarSlabA", "kind": "cover", "center": Vector3(-0.9, 1.65, -2.2), "size": Vector3(3, 2.1, 0.4)},
+	{"name": "AltarSlabB", "kind": "cover", "center": Vector3(2.2, 1.65, -1.5), "size": Vector3(0.4, 2.1, 3)},
+	{"name": "AltarSlabA2", "kind": "cover", "center": Vector3(0.9, 1.65, 2.2), "size": Vector3(3, 2.1, 0.4)},
+	{"name": "AltarSlabB2", "kind": "cover", "center": Vector3(-2.2, 1.65, 1.5), "size": Vector3(0.4, 2.1, 3)},
 	# rim 围墙（3m 高厚 1m）：N 边 z=9.5 四段 3 豁——中豁 x∈[2,4.5]（错轴）/侧豁 x∈[-9,-6.5]∪[6.5,9]
 	{"name": "RimN1", "kind": "wall", "center": Vector3(-11.25, 1.5, 9.5), "size": Vector3(4.5, 3, 1)},
 	{"name": "RimN2", "kind": "wall", "center": Vector3(-2.25, 1.5, 9.5), "size": Vector3(8.5, 3, 1)},
@@ -71,11 +77,12 @@ const CLOCK := [
 	{"name": "RailS_E", "kind": "cover", "center": Vector3(2.125, 3.45, -3.4), "size": Vector3(2.75, 0.9, 0.2)},
 	{"name": "RailE", "kind": "cover", "center": Vector3(3.4, 3.45, -0.9), "size": Vector3(0.2, 0.9, 4.8)},
 	{"name": "RailW", "kind": "cover", "center": Vector3(-3.4, 3.45, 0.9), "size": Vector3(0.2, 0.9, 4.8)},
-	# 组合柱 ×4（角柱掩体 + 伞顶支柱，底 3.0 顶 7.1）
-	{"name": "Pillar_NE", "kind": "cover", "center": Vector3(2.9, 5.05, 2.9), "size": Vector3(0.5, 4.1, 0.5)},
-	{"name": "Pillar_NW", "kind": "cover", "center": Vector3(-2.9, 5.05, 2.9), "size": Vector3(0.5, 4.1, 0.5)},
-	{"name": "Pillar_SE", "kind": "cover", "center": Vector3(2.9, 5.05, -2.9), "size": Vector3(0.5, 4.1, 0.5)},
-	{"name": "Pillar_SW", "kind": "cover", "center": Vector3(-2.9, 5.05, -2.9), "size": Vector3(0.5, 4.1, 0.5)},
+	# 组合柱 ×4（角柱掩体 + 伞顶支柱，底 3.0 顶 7.1；任务 9 A3：外移至 ±3.05 贴栏板——
+	# 柱面 x/z=±3.3 与 N/S 栏板内缘 z=±3.3、E/W 栏板内缘 x=±3.3 面接触）
+	{"name": "Pillar_NE", "kind": "cover", "center": Vector3(3.05, 5.05, 3.05), "size": Vector3(0.5, 4.1, 0.5)},
+	{"name": "Pillar_NW", "kind": "cover", "center": Vector3(-3.05, 5.05, 3.05), "size": Vector3(0.5, 4.1, 0.5)},
+	{"name": "Pillar_SE", "kind": "cover", "center": Vector3(3.05, 5.05, -3.05), "size": Vector3(0.5, 4.1, 0.5)},
+	{"name": "Pillar_SW", "kind": "cover", "center": Vector3(-3.05, 5.05, -3.05), "size": Vector3(0.5, 4.1, 0.5)},
 	# 伞顶 4 板（厚 0.4，底面 7.1；中央 x/z∈[-1.5,1.5] 开敞 = 雷口）
 	{"name": "UmbrellaN", "kind": "cover", "center": Vector3(0, 7.3, 2.75), "size": Vector3(8, 0.4, 2.5)},
 	{"name": "UmbrellaS", "kind": "cover", "center": Vector3(0, 7.3, -2.75), "size": Vector3(8, 0.4, 2.5)},
@@ -88,8 +95,10 @@ const CLOCK := [
 # GDScript const 不允许函数调用，故表为 static var（外部访问方式 V3.RAMPS 不变）。
 # 西坡道 z_from/z_to = 东坡道的 180° 旋转像 z∈[-2.5,3.5]（任务 8 对称修复，2026-08-11；
 # 原参数 (2.5,-3.5) 与东坡道同跨度，破坏全局旋转对称）；末级 z∈[-2.5,-1.75] 仍落 W 栏豁口。
-static var RAMPS: Array = _ramp_steps(3.5, 6.5, -3.5, 2.5, 0.6, 3.0, "RampE", 8) \
-		+ _ramp_steps(-6.5, -3.5, 3.5, -2.5, 0.6, 3.0, "RampW", 8) \
+# 任务 9 A2（2026-08-11）：坡道外移 0.1（x 3.6..6.6 / -6.6..-3.6）——B 板贴基座后
+# B↔坡道缝恰 1.2；基座↔坡道缝 1.6；坡道↔回廊板缝 0.1 但垂直重叠仅 0.3<0.8 扫描豁免。
+static var RAMPS: Array = _ramp_steps(3.6, 6.6, -3.5, 2.5, 0.6, 3.0, "RampE", 8) \
+		+ _ramp_steps(-6.6, -3.6, 3.5, -2.5, 0.6, 3.0, "RampW", 8) \
 		+ [
 	# 祭坛台微台阶（N/S 缘各两级，供 AI 行走登台；坐广场地面，盒底 0，不在台面上）
 	{"name": "MicroN1", "kind": "cover", "center": Vector3(0, 0.15, -5.45), "size": Vector3(2, 0.3, 0.3)},
@@ -108,13 +117,15 @@ static var STREETS: Array = [
 	{"name": "WestWall_M", "kind": "wall", "center": Vector3(-23, 1.5, 0), "size": Vector3(1, 3, 11)},
 	{"name": "WestWall_N", "kind": "wall", "center": Vector3(-23, 1.5, 11), "size": Vector3(1, 3, 6)},
 	# 西望楼：台体（顶 2.5）+ 栏板（北向 2m 豁口朝坡道落点）+ 台上箱
+	# （任务 9 A5：箱居中台顶 (±18.5, 2.95, 0) 四向栏板缝 1.4；brief 原文东箱 x=17.5
+	# 残留 0.4m 窄缝且破旋转对称，扫描后按最小修复归位 18.5，已记入报告）
 	{"name": "WestTower", "kind": "wall", "center": Vector3(-18.5, 1.25, 0), "size": Vector3(4, 2.5, 4)},
 	{"name": "WestTowerRailN_1", "kind": "cover", "center": Vector3(-20, 2.95, 1.9), "size": Vector3(1, 0.9, 0.2)},
 	{"name": "WestTowerRailN_2", "kind": "cover", "center": Vector3(-17, 2.95, 1.9), "size": Vector3(1, 0.9, 0.2)},
 	{"name": "WestTowerRailS", "kind": "cover", "center": Vector3(-18.5, 2.95, -1.9), "size": Vector3(4, 0.9, 0.2)},
 	{"name": "WestTowerRailE", "kind": "cover", "center": Vector3(-16.6, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
 	{"name": "WestTowerRailW", "kind": "cover", "center": Vector3(-20.4, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
-	{"name": "WestTowerBox", "kind": "cover", "center": Vector3(-17.5, 2.95, -1), "size": Vector3(0.8, 0.9, 0.8)},
+	{"name": "WestTowerBox", "kind": "cover", "center": Vector3(-18.5, 2.95, 0), "size": Vector3(0.8, 0.9, 0.8)},
 	# 东水塔 = 180° 旋转（南向豁口）
 	{"name": "EastTower", "kind": "wall", "center": Vector3(18.5, 1.25, 0), "size": Vector3(4, 2.5, 4)},
 	{"name": "EastTowerRailS_1", "kind": "cover", "center": Vector3(20, 2.95, -1.9), "size": Vector3(1, 0.9, 0.2)},
@@ -122,7 +133,7 @@ static var STREETS: Array = [
 	{"name": "EastTowerRailN", "kind": "cover", "center": Vector3(18.5, 2.95, 1.9), "size": Vector3(4, 0.9, 0.2)},
 	{"name": "EastTowerRailW", "kind": "cover", "center": Vector3(16.6, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
 	{"name": "EastTowerRailE", "kind": "cover", "center": Vector3(20.4, 2.95, 0), "size": Vector3(0.2, 0.9, 3.6)},
-	{"name": "EastTowerBox", "kind": "cover", "center": Vector3(17.5, 2.95, 1), "size": Vector3(0.8, 0.9, 0.8)},
+	{"name": "EastTowerBox", "kind": "cover", "center": Vector3(18.5, 2.95, 0), "size": Vector3(0.8, 0.9, 0.8)},
 	# 摊位簇（每簇 1 板 + 1 箱；板箱同坐地面缝恰 1.5——项目级 boost 规则；
 	# 控制器裁决 2026-08-11：簇迁离塔坡道带，N 簇 z=5 / S 簇 z=-11，箱收至 x=±15）
 	{"name": "EastClusterN_Panel", "kind": "cover", "center": Vector3(18.5, 1.1, 5), "size": Vector3(3, 2.2, 0.4)},
@@ -209,23 +220,25 @@ static func _bell_gate(side: int) -> Array:
 
 
 ## 市集带生成器：side=1 北 / side=-1 南。
-## 摊阁（顶 1.2 可跳）+ 摊阁台阶（顶 0.6，北缘贴摊阁 z=12.75、南缘贴翼墙 z=13.5、
-## 与门柱 x 缝 1.25）+ 中央双箱 + 高棚板对（底 4.5，间留 2m 天井 x∈[-1,1]）。
+## 摊阁（2.0×1.8 顶 1.2 可跳，z∈[10,11.8] 贴 rim N 面 z=10，x∈[±2.5,±4.5] 避开翼墙 x≥5、
+## 与门柱 z 缝恰 1.2）+ 摊阁台阶（顶 0.6，贴摊阁北缘 z=11.8）+ 中央双箱（x=±0.5
+## 内收，原 ±2 与台阶缝 0.25——任务 9 A4 重布，2026-08-11）+ 高棚板对（底 4.5，
+## 间留 2m 天井 x∈[-1,1]）。
 static func _market_belt(side: int) -> Array:
 	var tag: String = "BeltN" if side == 1 else "BeltS"
 	return [
 		{"name": tag + "_PavW", "kind": "cover",
-			"center": Vector3(-6 * side, 0.6, 11.5 * side), "size": Vector3(2.5, 1.2, 2.5)},
+			"center": Vector3(-3.5 * side, 0.6, 10.9 * side), "size": Vector3(2.0, 1.2, 1.8)},
 		{"name": tag + "_PavE", "kind": "cover",
-			"center": Vector3(6 * side, 0.6, 11.5 * side), "size": Vector3(2.5, 1.2, 2.5)},
+			"center": Vector3(3.5 * side, 0.6, 10.9 * side), "size": Vector3(2.0, 1.2, 1.8)},
 		{"name": tag + "_PavStepE", "kind": "cover",
-			"center": Vector3(7 * side, 0.3, 13.125 * side), "size": Vector3(1.5, 0.6, 0.75)},
+			"center": Vector3(3.5 * side, 0.3, 12.175 * side), "size": Vector3(1.5, 0.6, 0.75)},
 		{"name": tag + "_PavStepW", "kind": "cover",
-			"center": Vector3(-7 * side, 0.3, 13.125 * side), "size": Vector3(1.5, 0.6, 0.75)},
+			"center": Vector3(-3.5 * side, 0.3, 12.175 * side), "size": Vector3(1.5, 0.6, 0.75)},
 		{"name": tag + "_Box1", "kind": "cover",
-			"center": Vector3(2 * side, 0.45, 12.5 * side), "size": Vector3(1, 0.9, 1)},
+			"center": Vector3(0.5 * side, 0.45, 12.5 * side), "size": Vector3(1, 0.9, 1)},
 		{"name": tag + "_Box2", "kind": "cover",
-			"center": Vector3(-2 * side, 0.45, 12.5 * side), "size": Vector3(1, 0.9, 1)},
+			"center": Vector3(-0.5 * side, 0.45, 12.5 * side), "size": Vector3(1, 0.9, 1)},
 		{"name": tag + "_CanopyW", "kind": "roof",
 			"center": Vector3(-3 * side, 4.7, 10.75 * side), "size": Vector3(4, 0.4, 2.5)},
 		{"name": tag + "_CanopyE", "kind": "roof",
@@ -285,9 +298,9 @@ static func _camp(side: int) -> Array:
 		{"name": tag + "_Screen_" + s_ch, "kind": "wall",
 			"center": Vector3(1 * side, 1.5, 21.75 * side), "size": Vector3(4, 3, 0.5)},
 		{"name": tag + "_Screen_" + w_ch, "kind": "wall",
-			"center": Vector3(-9.5 * side, 1.5, 26.5 * side), "size": Vector3(0.5, 3, 4)},
+			"center": Vector3(-9.5 * side, 1.5, 27.0 * side), "size": Vector3(0.5, 3, 4)},
 		{"name": tag + "_Screen_" + e_ch, "kind": "wall",
-			"center": Vector3(9.5 * side, 1.5, 26.5 * side), "size": Vector3(0.5, 3, 4)},
+			"center": Vector3(9.5 * side, 1.5, 27.0 * side), "size": Vector3(0.5, 3, 4)},
 		{"name": tag + "_Truck", "kind": "cover",
 			"center": Vector3(4.5 * side, 1.1, 21.5 * side), "size": Vector3(3, 2.2, 1)},
 	]
@@ -340,11 +353,11 @@ static func standable_surfaces() -> Array:
 		{"name": "EastTower", "center": Vector3(18.5, 2.5, 0), "size": Vector3(4, 0.1, 4), "top_y": 2.5},
 		# 祭坛台面（撒点排除基座/坡道/斜板投影——WaveSpawner 侧拒绝采样）
 		{"name": "Altar", "center": Vector3(0, 0.6, 0), "size": Vector3(14, 0.1, 10), "top_y": 0.6},
-		# 市集带摊阁×4（名称对应 GATES 实体，南半坐标随生成器 180° 旋转）
-		{"name": "BeltN_PavE", "center": Vector3(6, 1.2, 11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
-		{"name": "BeltN_PavW", "center": Vector3(-6, 1.2, 11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
-		{"name": "BeltS_PavE", "center": Vector3(-6, 1.2, -11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
-		{"name": "BeltS_PavW", "center": Vector3(6, 1.2, -11.5), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
+		# 市集带摊阁×4（名称对应 GATES 实体，南半坐标随生成器 180° 旋转；任务 9 A4 重布）
+		{"name": "BeltN_PavE", "center": Vector3(3.5, 1.2, 10.9), "size": Vector3(2.0, 0.1, 1.8), "top_y": 1.2},
+		{"name": "BeltN_PavW", "center": Vector3(-3.5, 1.2, 10.9), "size": Vector3(2.0, 0.1, 1.8), "top_y": 1.2},
+		{"name": "BeltS_PavE", "center": Vector3(-3.5, 1.2, -10.9), "size": Vector3(2.0, 0.1, 1.8), "top_y": 1.2},
+		{"name": "BeltS_PavW", "center": Vector3(3.5, 1.2, -10.9), "size": Vector3(2.0, 0.1, 1.8), "top_y": 1.2},
 		# 东/西市街摊阁
 		{"name": "EastPavilion", "center": Vector3(18.5, 1.2, 10), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
 		{"name": "WestPavilion", "center": Vector3(-18.5, 1.2, -10), "size": Vector3(2.5, 0.1, 2.5), "top_y": 1.2},
