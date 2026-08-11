@@ -152,8 +152,9 @@ static var GATES: Array = _bell_gate(1) + _market_belt(1) + _bell_gate(-1) + _ma
 static var BACKSTREETS: Array = _backstreet(1) + _camp(1) + _backstreet(-1) + _camp(-1)
 # ---- 任务 7：外环视线打断树 + 角场×4 ----
 # GDScript const 不允许函数调用，故表为 static var（同 RAMPS/STREETS/GATES/BACKSTREETS）。
-# 角场由生成器 _corner_court 产出：NW/NE 用基准偏移（rot=false），
-# SE/SW = 180° 旋转（rot=true，偏移 (dx,dz)→(−dx,−dz)）。
+# 角场由生成器 _corner_court(cx, cz) 产出：偏移按象限符号推导——x 偏移朝地图中心内向、
+# z 偏移 s=sign(cz)（南半 = 北半 180° 旋转）；NE = NW 之 x 镜像（原 brief 显式坐标）。
+# 每角 4 实体 = 摊阁 + 台阶 + Box1 + 大树（裁决轮：删除 Box2，Box1 x 偏移 1.85 真贴缘）。
 static var OUTER: Array = [
 	# 外环视线打断树（bigtree：center.y = 树干半高，数据 AABB y∈[0,2.5]）
 	{"name": "OuterRing_TreeNW", "kind": "bigtree", "center": Vector3(-26.5, 1.25, 12), "size": Vector3(0.7, 2.5, 0.7)},
@@ -161,8 +162,8 @@ static var OUTER: Array = [
 	{"name": "OuterRing_TreeSW", "kind": "bigtree", "center": Vector3(-26.5, 1.25, -12), "size": Vector3(0.7, 2.5, 0.7)},
 	{"name": "OuterRing_TreeSE", "kind": "bigtree", "center": Vector3(26.5, 1.25, -12), "size": Vector3(0.7, 2.5, 0.7)},
 ] \
-		+ _corner_court(-26, 21.5, false) + _corner_court(26, 21.5, false) \
-		+ _corner_court(26, -21.5, true) + _corner_court(-26, -21.5, true)
+		+ _corner_court(-26, 21.5) + _corner_court(26, 21.5) \
+		+ _corner_court(26, -21.5) + _corner_court(-26, -21.5)
 
 
 ## 台阶坡道生成器：沿 z 从 z_from 到 z_to 均分 steps 级整高盒。
@@ -290,12 +291,15 @@ static func _camp(side: int) -> Array:
 	]
 
 
-## 角场生成器：(cx,cz) = 摊阁中心；rot=false 用 NW 基准偏移，rot=true 偏移取反
-## （180° 旋转：(dx,dz)→(−dx,−dz)）。每角 5 实体：摊阁（顶 1.2 可跳）+
-## 台阶（顶 0.6，贴摊阁北缘缝 0）+ Box1（贴摊阁南缘缝 0）+ Box2（贴摊阁西缘缝 0）+ 大树。
-## 前缀按物理象限推导："Corner" + N/S + W/E + "_"。
-static func _corner_court(cx: float, cz: float, rot: bool) -> Array:
-	var s := -1.0 if rot else 1.0
+## 角场生成器：(cx,cz) = 摊阁中心。偏移按象限符号推导（裁决轮：删除 rot 参数）：
+## s  = sign(cz)（北半 +1 / 南半 −1，南半 = 北半 180° 旋转 (dx,dz)→(−dx,−dz)）；
+## mx = cx>0 ? −1 : +1（x 偏移朝地图中心内向，NE/SW = 镜像，原 brief 显式坐标）。
+## 每角 4 实体：摊阁（顶 1.2 可跳）+ 台阶（顶 0.6）+ Box1（顶 0.9）+ 大树。
+## "贴缘"以 NW 基准角描述：台阶贴摊阁北缘缝 0（z 向）、Box1 对角贴摊阁内角
+## （x/z 双缝 0）；NE/SE/SW 的接触缘随符号推导自动镜像/反向。
+static func _corner_court(cx: float, cz: float) -> Array:
+	var mx := -1.0 if cx > 0.0 else 1.0
+	var s := -1.0 if cz < 0.0 else 1.0
 	var tag: String = "Corner" + ("N" if cz > 0.0 else "S") + ("W" if cx < 0.0 else "E") + "_"
 	return [
 		{"name": tag + "Pav", "kind": "cover",
@@ -303,11 +307,9 @@ static func _corner_court(cx: float, cz: float, rot: bool) -> Array:
 		{"name": tag + "PavStep", "kind": "cover",
 			"center": Vector3(cx, 0.3, cz + 2.0 * s), "size": Vector3(1.5, 0.6, 1.5)},
 		{"name": tag + "Box1", "kind": "cover",
-			"center": Vector3(cx + 2.0 * s, 0.45, cz - 1.85 * s), "size": Vector3(1.2, 0.9, 1.2)},
-		{"name": tag + "Box2", "kind": "cover",
-			"center": Vector3(cx - 1.85 * s, 0.45, cz + 1.5 * s), "size": Vector3(1.2, 0.9, 1.2)},
+			"center": Vector3(cx + 1.85 * mx, 0.45, cz - 1.85 * s), "size": Vector3(1.2, 0.9, 1.2)},
 		{"name": tag + "Tree", "kind": "bigtree",
-			"center": Vector3(cx + 3.0 * s, 1.25, cz + 0.5 * s), "size": Vector3(0.7, 2.5, 0.7)},
+			"center": Vector3(cx + 3.0 * mx, 1.25, cz + 0.5 * s), "size": Vector3(0.7, 2.5, 0.7)},
 	]
 
 
