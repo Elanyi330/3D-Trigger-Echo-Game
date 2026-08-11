@@ -690,3 +690,182 @@ func test_streets_no_overlap() -> void:
 			var bb := _aabb(b)
 			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
 				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
+
+
+# ==== 任务 5：钟门 + 市集带 ====
+
+# 实体 AABB 与区域盒是否实质相交（每轴交集 > eps；面/边接触不算侵入）
+func _in_region(bb: Array, x0: float, x1: float, y0: float, y1: float,
+		z0: float, z1: float) -> bool:
+	var eps := 0.0005
+	return bb[0].x + eps < x1 and x0 + eps < bb[1].x \
+		and bb[0].y + eps < y1 and y0 + eps < bb[1].y \
+		and bb[0].z + eps < z1 and z0 + eps < bb[1].z
+
+
+# ---- 26. 门廊净空：两柱间 x∈[-1.25,1.25] 全高带（0..过梁底 4.5）无任何实体 ----
+func test_gate_doorway() -> void:
+	for side0 in [["GateN", 13.0, 16.0], ["GateS", -16.0, -13.0]]:
+		var side: Array = side0
+		var tag: String = side[0]
+		var zw: float = side[1]
+		var zh: float = side[2]
+		var pw := _find(V3.GATES, tag + "_PillarW")
+		var pe := _find(V3.GATES, tag + "_PillarE")
+		assert_false(pw.is_empty(), "GATES 含 %s_PillarW" % tag)
+		assert_false(pe.is_empty(), "GATES 含 %s_PillarE" % tag)
+		if pw.is_empty() or pe.is_empty():
+			continue
+		for e0 in V3.all_solids():
+			var e: Dictionary = e0
+			var bb := _aabb(e)
+			assert_false(_in_region(bb, -1.25, 1.25, 0.0, 4.5, zw, zh),
+				"%s 门廊 2.5m 净空被 %s 侵入" % [tag, e["name"]])
+
+
+# ---- 27. 过梁：底面 4.5 / 顶面 4.9（南北）----
+func test_gate_lintel() -> void:
+	for tag in ["GateN", "GateS"]:
+		var ent := _find(V3.GATES, tag + "_Lintel")
+		assert_false(ent.is_empty(), "GATES 含 %s_Lintel" % tag)
+		if ent.is_empty():
+			continue
+		var bb := _aabb(ent)
+		assert_almost_eq(bb[0].y, 4.5, 0.001, "%s_Lintel 底面 == 4.5" % tag)
+		assert_almost_eq(bb[1].y, 4.9, 0.001, "%s_Lintel 顶面 == 4.9" % tag)
+
+
+# ---- 28. 棚板 vs 过梁：AABB 无重叠且 z 缝 == 0.75（南北）----
+func test_canopy_vs_lintel() -> void:
+	for pair0 in [["GateN", "BeltN"], ["GateS", "BeltS"]]:
+		var pair: Array = pair0
+		var lintel := _find(V3.GATES, pair[0] + "_Lintel")
+		assert_false(lintel.is_empty(), "GATES 含 %s_Lintel" % pair[0])
+		if lintel.is_empty():
+			continue
+		var lb := _aabb(lintel)
+		for cn in [pair[1] + "_CanopyW", pair[1] + "_CanopyE"]:
+			var ent := _find(V3.GATES, cn)
+			assert_false(ent.is_empty(), "GATES 含 %s" % cn)
+			if ent.is_empty():
+				continue
+			var cb := _aabb(ent)
+			assert_false(_overlap(cb, lb), "%s 与过梁 AABB 无重叠" % cn)
+			var gap: float = maxf(cb[0].z - lb[1].z, lb[0].z - cb[1].z)
+			assert_almost_eq(gap, 0.75, 0.01, "%s 与过梁 z 缝 == 0.75" % cn)
+
+
+# ---- 29. 天井：x∈[-1,1] 棚板带 z 区域内无 roof 实体；棚板恰 2 块/带 ----
+func test_canopy_skywell() -> void:
+	for region0 in [[-1.0, 1.0, 9.5, 12.0], [-1.0, 1.0, -12.0, -9.5]]:
+		var region: Array = region0
+		for e0 in V3.all_solids():
+			var e: Dictionary = e0
+			if e["kind"] != "roof":
+				continue
+			var bb := _aabb(e)
+			assert_false(_in_region(bb, region[0], region[1], -INF, INF, region[2], region[3]),
+				"天井区域 x∈[%s,%s] z∈[%s,%s] 出现 roof 实体 %s" % [
+					region[0], region[1], region[2], region[3], e["name"]])
+	var cn_count := 0
+	var cs_count := 0
+	for e0 in V3.GATES:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		if nm.begins_with("BeltN_Canopy"):
+			cn_count += 1
+		if nm.begins_with("BeltS_Canopy"):
+			cs_count += 1
+	assert_eq(cn_count, 2, "北市集带棚板恰 2 块")
+	assert_eq(cs_count, 2, "南市集带棚板恰 2 块")
+
+
+# ---- 30. 翼墙外端侧豁场：过梁底以下通行带内无 GATES wall 实体（北东 + 南镜像）----
+# 区域限高 y∈[0,4.5]（过梁以下皆通路，同门廊判据）；rim 为既知背景不属 GATES，不在检查范围。
+func test_wing_side_gap() -> void:
+	for tag in ["GateN", "GateS"]:
+		for wing in ["_WingW", "_WingE"]:
+			var ent := _find(V3.GATES, tag + wing)
+			assert_false(ent.is_empty(), "GATES 含 %s%s" % [tag, wing])
+	for region0 in [[5.0, 14.0, 9.5, 13.5], [-14.0, -5.0, -13.5, -9.5]]:
+		var region: Array = region0
+		for e0 in V3.GATES:
+			var e: Dictionary = e0
+			if e["kind"] != "wall":
+				continue
+			var bb := _aabb(e)
+			assert_false(_in_region(bb, region[0], region[1], 0.0, 4.5, region[2], region[3]),
+				"侧豁场 x∈[%s,%s] z∈[%s,%s] 出现 wall 实体 %s（≥4m 通路被堵）" % [
+					region[0], region[1], region[2], region[3], e["name"]])
+
+
+# ---- 31. 市集带摊阁：顶 1.2 可跳 / 台阶顶 0.6 / 贴摊阁缘缝 0 / 贴翼墙缝 0 / 与门柱 x 缝 1.25 ----
+func test_belt_pavilions() -> void:
+	for tags0 in [["BeltN", "GateN"], ["BeltS", "GateS"]]:
+		var tags: Array = tags0
+		var belt: String = tags[0]
+		var gate: String = tags[1]
+		for lr in ["W", "E"]:
+			var pav := _find(V3.GATES, belt + "_Pav" + lr)
+			var stp := _find(V3.GATES, belt + "_PavStep" + lr)
+			var wing := _find(V3.GATES, gate + "_Wing" + lr)
+			var pillar := _find(V3.GATES, gate + "_Pillar" + lr)
+			assert_false(pav.is_empty(), "GATES 含 %s_Pav%s" % [belt, lr])
+			assert_false(stp.is_empty(), "GATES 含 %s_PavStep%s" % [belt, lr])
+			assert_false(wing.is_empty(), "GATES 含 %s_Wing%s" % [gate, lr])
+			assert_false(pillar.is_empty(), "GATES 含 %s_Pillar%s" % [gate, lr])
+			if pav.is_empty() or stp.is_empty() or wing.is_empty() or pillar.is_empty():
+				continue
+			var pb := _aabb(pav)
+			var sb := _aabb(stp)
+			var wb := _aabb(wing)
+			var plb := _aabb(pillar)
+			assert_almost_eq(pb[1].y, 1.2, 0.001, "%s_Pav%s 顶 == 1.2" % [belt, lr])
+			assert_lte(pb[1].y, V3.JUMPABLE_MAX, "%s_Pav%s 顶 ≤ JUMPABLE_MAX（可跳）" % [belt, lr])
+			assert_almost_eq(sb[1].y, 0.6, 0.001, "%s_PavStep%s 台阶顶 == 0.6" % [belt, lr])
+			var gap_pav: float = maxf(sb[0].z - pb[1].z, pb[0].z - sb[1].z)
+			assert_almost_eq(gap_pav, 0.0, 0.01, "%s_PavStep%s 与摊阁 z 贴缘缝 == 0" % [belt, lr])
+			var gap_wing: float = maxf(sb[0].z - wb[1].z, wb[0].z - sb[1].z)
+			assert_almost_eq(gap_wing, 0.0, 0.01, "%s_PavStep%s 与翼墙 z 贴缘缝 == 0" % [belt, lr])
+			var gap_pillar: float = maxf(sb[0].x - plb[1].x, plb[0].x - sb[1].x)
+			assert_almost_eq(gap_pillar, 1.25, 0.01, "%s_PavStep%s 与门柱 x 缝 == 1.25" % [belt, lr])
+
+
+# ---- 32. 旋转对称：每个 GateN_*/BeltN_* 有 GateS_*/BeltS_* 对应体，center 互为 (-x,-z)、size 相同 ----
+func test_gates_rotation_pairs() -> void:
+	var north := []
+	for e0 in V3.GATES:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		if nm.begins_with("GateN_") or nm.begins_with("BeltN_"):
+			north.append(e)
+	assert_eq(north.size(), 13, "北半钟门+市集带实体共 13 个（门 5 + 带 8）")
+	for e0 in north:
+		var e: Dictionary = e0
+		var nm: String = e["name"]
+		var want := nm.replace("GateN_", "GateS_").replace("BeltN_", "BeltS_")
+		var w := _find(V3.GATES, want)
+		assert_false(w.is_empty(), "%s 有旋转对应体 %s" % [nm, want])
+		if w.is_empty():
+			continue
+		var cn: Vector3 = e["center"]
+		var cs: Vector3 = w["center"]
+		var sn: Vector3 = e["size"]
+		var ss: Vector3 = w["size"]
+		assert_almost_eq(cs.x, -cn.x, 0.001, "%s/%s center.x 互为 -x" % [nm, want])
+		assert_almost_eq(cs.y, cn.y, 0.001, "%s/%s center.y 相同" % [nm, want])
+		assert_almost_eq(cs.z, -cn.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
+		assert_lt((sn - ss).length(), 0.001, "%s/%s size 相同" % [nm, want])
+
+
+# ---- 33. GATES 内部两两 AABB 无重叠（豁免垂直相接 ±0.01）----
+func test_gates_no_overlap() -> void:
+	assert_eq(V3.GATES.size(), 26, "GATES 实体共 26 个（南/北各 13）")
+	for i in range(V3.GATES.size()):
+		for j in range(i + 1, V3.GATES.size()):
+			var a: Dictionary = V3.GATES[i]
+			var b: Dictionary = V3.GATES[j]
+			var ba := _aabb(a)
+			var bb := _aabb(b)
+			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
+				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])

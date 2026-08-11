@@ -139,7 +139,12 @@ static var STREETS: Array = [
 ] \
 		+ _ramp_steps(-21, -18.5, 8.2, 2.0, 0.0, 2.5, "WestTowerRamp", 10) \
 		+ _ramp_steps(18.5, 21, -8.2, -2.0, 0.0, 2.5, "EastTowerRamp", 10)
-const GATES := []        # 任务5：钟门/市集带
+# ---- 任务 5：钟门 + 市集带（南半 = 北半 180° 旋转：(x,z)→(−x,−z)）----
+# GDScript const 不允许函数调用，故表为 static var（同 RAMPS/STREETS）。
+# 碰撞审计修正：brief 翼墙原文 "size (9,1,3)" 与其自身标注【z∈[13.5,14.5]】矛盾
+# （center z=14 配 size.z=3 → z∈[12.5,15.5]），且会破坏测试 5/6/8 与 boost gate；
+# 按项目墙体惯例 (长, 墙高 3, 厚 1) 取 (9,3,1)（坐地面，同 rim 墙），详见任务报告。
+static var GATES: Array = _bell_gate(1) + _market_belt(1) + _bell_gate(-1) + _market_belt(-1)
 const BACKSTREETS := []  # 任务6：背街/营
 const OUTER := []        # 任务7：外环/角场
 
@@ -164,6 +169,49 @@ static func _ramp_steps(x_min: float, x_max: float, z_from: float, z_to: float,
 			"size": Vector3(x_max - x_min, top - y_from, z_hi - z_lo),
 		})
 	return out
+
+
+## 钟门生成器：side=1 北 / side=-1 南（180° 旋转 = x/z 乘 side）。
+## 双柱间 2.5m 门廊（柱 x 内缘 ±1.25）+ 过梁（底 4.5 顶 4.9）+ 两侧低翼墙。
+static func _bell_gate(side: int) -> Array:
+	var tag: String = "GateN" if side == 1 else "GateS"
+	return [
+		{"name": tag + "_PillarW", "kind": "wall",
+			"center": Vector3(-3.125 * side, 1.5, 14.5 * side), "size": Vector3(3.75, 3, 3)},
+		{"name": tag + "_PillarE", "kind": "wall",
+			"center": Vector3(3.125 * side, 1.5, 14.5 * side), "size": Vector3(3.75, 3, 3)},
+		{"name": tag + "_Lintel", "kind": "wall",
+			"center": Vector3(0, 4.7, 14.5 * side), "size": Vector3(11, 0.4, 3.5)},
+		{"name": tag + "_WingW", "kind": "wall",
+			"center": Vector3(-9.5 * side, 1.5, 14 * side), "size": Vector3(9, 3, 1)},
+		{"name": tag + "_WingE", "kind": "wall",
+			"center": Vector3(9.5 * side, 1.5, 14 * side), "size": Vector3(9, 3, 1)},
+	]
+
+
+## 市集带生成器：side=1 北 / side=-1 南。
+## 摊阁（顶 1.2 可跳）+ 摊阁台阶（顶 0.6，北缘贴摊阁 z=12.75、南缘贴翼墙 z=13.5、
+## 与门柱 x 缝 1.25）+ 中央双箱 + 高棚板对（底 4.5，间留 2m 天井 x∈[-1,1]）。
+static func _market_belt(side: int) -> Array:
+	var tag: String = "BeltN" if side == 1 else "BeltS"
+	return [
+		{"name": tag + "_PavW", "kind": "cover",
+			"center": Vector3(-6 * side, 0.6, 11.5 * side), "size": Vector3(2.5, 1.2, 2.5)},
+		{"name": tag + "_PavE", "kind": "cover",
+			"center": Vector3(6 * side, 0.6, 11.5 * side), "size": Vector3(2.5, 1.2, 2.5)},
+		{"name": tag + "_PavStepE", "kind": "cover",
+			"center": Vector3(7 * side, 0.3, 13.125 * side), "size": Vector3(1.5, 0.6, 0.75)},
+		{"name": tag + "_PavStepW", "kind": "cover",
+			"center": Vector3(-7 * side, 0.3, 13.125 * side), "size": Vector3(1.5, 0.6, 0.75)},
+		{"name": tag + "_Box1", "kind": "cover",
+			"center": Vector3(2 * side, 0.45, 12.5 * side), "size": Vector3(1, 0.9, 1)},
+		{"name": tag + "_Box2", "kind": "cover",
+			"center": Vector3(-2 * side, 0.45, 12.5 * side), "size": Vector3(1, 0.9, 1)},
+		{"name": tag + "_CanopyW", "kind": "roof",
+			"center": Vector3(-3 * side, 4.7, 10.75 * side), "size": Vector3(4, 0.4, 2.5)},
+		{"name": tag + "_CanopyE", "kind": "roof",
+			"center": Vector3(3 * side, 4.7, 10.75 * side), "size": Vector3(4, 0.4, 2.5)},
+	]
 
 
 static func all_solids() -> Array:
