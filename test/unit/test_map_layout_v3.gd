@@ -454,8 +454,9 @@ func _z_spans_in(table: Array, prefix: String) -> Array:
 	return spans
 
 
-# 180° 旋转命名映射：前缀 East↔West（任务 4）、CampN_↔CampS_、BackN_↔BackS_（任务 6），
-# 其余部分方向字符 N↔S / E↔W 互换（W/E 按旋转后物理位置命名）。
+# 180° 旋转命名映射：前缀 East↔West（任务 4）、CampN_↔CampS_、BackN_↔BackS_（任务 6）、
+# CornerNW_↔CornerSE_、CornerNE_↔CornerSW_（任务 7），其余部分方向字符 N↔S / E↔W 互换
+# （W/E 按旋转后物理位置命名）。
 # 仅轮换"后缀方向字符"（后随字符非小写，且前驱字符非大写——前驱大写说明该字符
 # 属于全大写缩写词，如 "LOS" 的词尾 S），避免误伤 "Step" 等词首 S。
 func _rot_pair(nm: String) -> String:
@@ -479,6 +480,18 @@ func _rot_pair(nm: String) -> String:
 	elif nm.begins_with("BackS_"):
 		prefix = "BackN_"
 		rest = nm.trim_prefix("BackS_")
+	elif nm.begins_with("CornerNW_"):
+		prefix = "CornerSE_"
+		rest = nm.trim_prefix("CornerNW_")
+	elif nm.begins_with("CornerSE_"):
+		prefix = "CornerNW_"
+		rest = nm.trim_prefix("CornerSE_")
+	elif nm.begins_with("CornerNE_"):
+		prefix = "CornerSW_"
+		rest = nm.trim_prefix("CornerNE_")
+	elif nm.begins_with("CornerSW_"):
+		prefix = "CornerNE_"
+		rest = nm.trim_prefix("CornerSW_")
 	var out := ""
 	for i in rest.length():
 		var ch := rest[i]
