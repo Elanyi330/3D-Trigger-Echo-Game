@@ -122,7 +122,7 @@ func test_serialize_real_layout() -> void:
 	var solids: Array = V3.all_solids()
 	var text := JumpRecordCore.serialize_solids(solids)
 	var lines := text.split("\n")
-	assert_eq(lines.size(), 197, "真实布局 197 实体 → 197 行（F3 +8 高墙）")
+	assert_eq(lines.size(), 193, "真实布局 193 实体 → 193 行（F3 +4 横脊墙）")
 	var first_name: String = lines[0].get_slice("|", 0)
 	var last_name: String = lines[lines.size() - 1].get_slice("|", 0)
 	assert_true(first_name <= last_name,

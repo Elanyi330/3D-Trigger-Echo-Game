@@ -554,10 +554,20 @@ func test_street_longwalls() -> void:
 	for side in ["EastWall", "WestWall"]:
 		var merged := _merge_spans(_z_spans_in(V3.STREETS, side))
 		assert_false(merged.is_empty(), "STREETS 含 %s* 段" % side)
+		# 豁口净空扫 all_solids()（F3 返工：前缀过滤有盲区——门墙类异名实体封豁
+		# 曾漏检；改为全实体扫查，x 限长墙内侧带，全 y）
+		var x0 := 21.3 if side == "EastWall" else -23.5
+		var x1 := 23.5 if side == "EastWall" else -21.3
 		for gap in [[5.5, 8.0], [-8.0, -5.5]]:
 			var g: Array = gap
-			assert_false(_span_intersects(merged, g[0], g[1]),
-				"%s 豁口 z∈[%s,%s] 无长墙覆盖" % [side, g[0], g[1]])
+			for e0 in V3.all_solids():
+				var e: Dictionary = e0
+				if e["kind"] == "ground":
+					continue  # Ground 为行走面非阻挡体
+				var bb := _aabb(e)
+				assert_false(_in_region(bb, x0, x1, -INF, INF, g[0], g[1]),
+					"%s 豁口 z∈[%s,%s] 被实体 %s 封堵" % [side, g[0], g[1], e["name"]])
+		# 长墙自身 span 断言保留原名精确过滤
 		for seg in [[-14.0, -8.0], [-5.5, 5.5], [8.0, 14.0]]:
 			var s: Array = seg
 			assert_true(_span_covers(merged, s[0], s[1]),
@@ -689,7 +699,7 @@ func test_streets_rotation_pairs() -> void:
 		assert_almost_eq(cw.y, ce.y, 0.001, "%s/%s center.y 相同" % [nm, want])
 		assert_almost_eq(cw.z, -ce.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
 		assert_lt((se - sw).length(), 0.001, "%s/%s size 相同" % [nm, want])
-	assert_eq(east_count, 30, "East* 实体共 30 个（墙3+塔1+栏板5+箱1+坡道10+簇4+阁2+F3高墙4）")
+	assert_eq(east_count, 28, "East* 实体共 28 个（墙3+塔1+栏板5+箱1+坡道10+簇4+阁2+F3横脊墙2）")
 
 
 # ---- 24. boost 间距显式断言：4 块 Cluster Panel ↔ 最近箱缝 ≥1.5；Panel ↔ 最近摊阁缝 ≥1.5 ----
@@ -743,27 +753,67 @@ func test_streets_no_overlap() -> void:
 				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
 
 
-# ---- F3. 东西市街高墙×8（横脊墙 Spur + 缺口门墙 GapWall）：全部 kind=="wall" /
-#         顶 == 3.0 / 在各自市街带内（|x|∈[14,23.5]、|z|≤14）----
+# ---- F3. 东西市街横脊墙×4（F3 审查返工后仅存横脊墙；缺口门墙已删除）：
+#         逐一钉死 name/kind/center/size（±0.01）+ 贴 rim 面缝 == 0
+#         （参照 test_corner_face_contacts 模式）+ 底面 y==0（坐地面）。
+#         市街带界断言由 test_streets_bounds 覆盖，此处不重复。----
 func test_streets_f3_highwalls() -> void:
-	var names := ["EastSpurN", "EastSpurS", "EastGapWallN", "EastGapWallS",
-		"WestSpurN", "WestSpurS", "WestGapWallN", "WestGapWallS"]
-	var found := 0
-	for nm in names:
+	var specs := [
+		["EastSpurN", Vector3(16.0, 1.5, 7.1), Vector3(3.0, 3.0, 0.8)],
+		["EastSpurS", Vector3(16.0, 1.5, -7.1), Vector3(3.0, 3.0, 0.8)],
+		["WestSpurS", Vector3(-16.0, 1.5, -7.1), Vector3(3.0, 3.0, 0.8)],
+		["WestSpurN", Vector3(-16.0, 1.5, 7.1), Vector3(3.0, 3.0, 0.8)],
+	]
+	for spec0 in specs:
+		var spec: Array = spec0
+		var nm: String = spec[0]
 		var ent := _find(V3.STREETS, nm)
 		assert_false(ent.is_empty(), "STREETS 含 %s" % nm)
 		if ent.is_empty():
 			continue
-		found += 1
 		assert_eq(ent["kind"], "wall", "%s kind == wall" % nm)
+		var c: Vector3 = ent["center"]
+		var s: Vector3 = ent["size"]
+		var ec: Vector3 = spec[1]
+		var es: Vector3 = spec[2]
+		assert_almost_eq(c.x, ec.x, 0.01, "%s center.x == %s" % [nm, ec.x])
+		assert_almost_eq(c.y, ec.y, 0.01, "%s center.y == %s" % [nm, ec.y])
+		assert_almost_eq(c.z, ec.z, 0.01, "%s center.z == %s" % [nm, ec.z])
+		assert_almost_eq(s.x, es.x, 0.01, "%s size.x == %s" % [nm, es.x])
+		assert_almost_eq(s.y, es.y, 0.01, "%s size.y == %s" % [nm, es.y])
+		assert_almost_eq(s.z, es.z, 0.01, "%s size.z == %s" % [nm, es.z])
 		var bb := _aabb(ent)
-		assert_almost_eq(bb[1].y, 3.0, 0.001, "%s 顶 == 3.0" % nm)
-		var in_west: bool = bb[0].x >= -23.5 and bb[1].x <= -14.0
-		var in_east: bool = bb[0].x >= 14.0 and bb[1].x <= 23.5
-		assert_true(in_west or in_east, "%s |x| ∈ [14,23.5]（市街带内）" % nm)
-		assert_true(absf(bb[0].z) <= 14.0 and absf(bb[1].z) <= 14.0,
-			"%s |z| ≤ 14（市街带内）" % nm)
-	assert_eq(found, 8, "F3 高墙 8 面齐全")
+		assert_almost_eq(bb[0].y, 0.0, 0.01, "%s 底面 == 0（坐地面）" % nm)
+		# 贴 rim 面：东横脊墙西面 == RimE 内面 x=14.5；西横脊墙东面 == RimW 内面 x=-14.5
+		if nm.begins_with("East"):
+			var gap_w: float = bb[0].x - 14.5
+			assert_almost_eq(gap_w, 0.0, 0.01, "%s 西面贴 rim 面 x=14.5 缝 == 0" % nm)
+		else:
+			var gap_e: float = -14.5 - bb[1].x
+			assert_almost_eq(gap_e, 0.0, 0.01, "%s 东面贴 rim 面 x=-14.5 缝 == 0" % nm)
+
+
+# ---- F3 返工. 4 处长墙豁口净空：豁口区域内 all_solids() 无任何阻挡实体
+#         （全 y；Ground 行走面豁免）——数据级钉住"豁口通外环"（设计 §3.4），
+#         防缺口门墙类封豁实体回归复活。
+#         区域 = 长墙内侧 x 带（留 0.2m 容差边）× 豁口 z 带内缩 0.05 ----
+func test_breach_clearance() -> void:
+	var regions := [
+		[21.3, 23.5, 5.55, 7.95],      # 东·北豁口
+		[21.3, 23.5, -7.95, -5.55],    # 东·南豁口
+		[-23.5, -21.3, 5.55, 7.95],    # 西·北豁口
+		[-23.5, -21.3, -7.95, -5.55],  # 西·南豁口
+	]
+	for r0 in regions:
+		var r: Array = r0
+		for e0 in V3.all_solids():
+			var e: Dictionary = e0
+			if e["kind"] == "ground":
+				continue  # Ground 为行走面非阻挡体
+			var bb := _aabb(e)
+			assert_false(_in_region(bb, r[0], r[1], -INF, INF, r[2], r[3]),
+				"豁口净空区 x∈[%s,%s] z∈[%s,%s] 出现实体 %s（封豁回归）" % [
+					r[0], r[1], r[2], r[3], e["name"]])
 
 
 # ==== 任务 5：钟门 + 市集带 ====

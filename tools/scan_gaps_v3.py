@@ -7,6 +7,8 @@
               允许叠墙，均不参与窄缝判定）；Ground 按名字排除
   垂直重叠  = min(top) - max(bottom) ≥ 0.8（高度重叠不足不会夹人）
   报告条件  = 水平缝 0 < gap < 1.2（面接触 gap==0 合法，≥1.2 可行走）
+已知盲区：角部相接夹点（ox≤EPS 且 oz≤EPS 的盒对）不评估——此类夹点由
+probe_v3_walk 连通性门禁兜底（2026-08-12 F3 事故后确立）。
 用法: python3 tools/scan_gaps_v3.py          # 缺省先自动调用 godot 重新生成 dump
       python3 tools/scan_gaps_v3.py --cached # 直接读已有 /tmp/v3_solids.json
 """

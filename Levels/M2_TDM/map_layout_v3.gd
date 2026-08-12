@@ -149,22 +149,13 @@ static var STREETS: Array = [
 	{"name": "EastPavilionStep", "kind": "cover", "center": Vector3(18.5, 0.3, 12.0), "size": Vector3(1.5, 0.6, 1.5)},
 	{"name": "WestPavilion", "kind": "cover", "center": Vector3(-18.5, 0.6, -10), "size": Vector3(2.5, 1.2, 2.5)},
 	{"name": "WestPavilionStep", "kind": "cover", "center": Vector3(-18.5, 0.3, -12.0), "size": Vector3(1.5, 0.6, 1.5)},
-	# F3 高墙×8（3m 高）：横脊墙 = rim 侧伸入街中（EastSpurN x∈[14.5,17.5] z∈[6.7,7.5]，
-	# 贴 RimE_T 面 x=14.5）；缺口门墙 = 正对外环豁口 z∈[5.5,8]，通行绕门墙两端。
-	# 控制器裁决 2026-08-12（scan_gaps 0.5m 窄缝修复）：与塔坡道同 z 半区的一侧
-	# 门墙贴坡道面——EastGapWallS x∈[21,22] 贴 EastTowerRamp 东面 x=21、
-	# WestGapWallN x∈[-22,-21] 贴 WestTowerRamp 西面 x=-21（缝 0 合法）；
-	# 异侧 EastGapWallN/WestGapWallS 保持 x∈[21.5,22.5]。
-	# 旋转对：EastSpurN↔WestSpurS、EastSpurS↔WestSpurN、EastGapWallN↔WestGapWallS、
-	# EastGapWallS↔WestGapWallN（与 _rot_pair 映射自洽）
+	# F3 高墙×4（3m 高）横脊墙：rim 侧伸入街中，为市街增加博弈空间。
+	# EastSpurN x∈[14.5,17.5] z∈[6.7,7.5]，西面贴 RimE_T 面 x=14.5。
+	# 旋转对：EastSpurN↔WestSpurS、EastSpurS↔WestSpurN（与 _rot_pair 映射自洽）。
 	{"name": "EastSpurN", "kind": "wall", "center": Vector3(16.0, 1.5, 7.1), "size": Vector3(3.0, 3.0, 0.8)},
 	{"name": "EastSpurS", "kind": "wall", "center": Vector3(16.0, 1.5, -7.1), "size": Vector3(3.0, 3.0, 0.8)},
-	{"name": "EastGapWallN", "kind": "wall", "center": Vector3(22.0, 1.5, 6.75), "size": Vector3(1.0, 3.0, 2.5)},
-	{"name": "EastGapWallS", "kind": "wall", "center": Vector3(21.5, 1.5, -6.75), "size": Vector3(1.0, 3.0, 2.5)},
 	{"name": "WestSpurS", "kind": "wall", "center": Vector3(-16.0, 1.5, -7.1), "size": Vector3(3.0, 3.0, 0.8)},
 	{"name": "WestSpurN", "kind": "wall", "center": Vector3(-16.0, 1.5, 7.1), "size": Vector3(3.0, 3.0, 0.8)},
-	{"name": "WestGapWallS", "kind": "wall", "center": Vector3(-22.0, 1.5, -6.75), "size": Vector3(1.0, 3.0, 2.5)},
-	{"name": "WestGapWallN", "kind": "wall", "center": Vector3(-21.5, 1.5, 6.75), "size": Vector3(1.0, 3.0, 2.5)},
 ] \
 		+ _ramp_steps(-21, -18.5, 8.2, 2.0, 0.0, 2.5, "WestTowerRamp", 10) \
 		+ _ramp_steps(18.5, 21, -8.2, -2.0, 0.0, 2.5, "EastTowerRamp", 10)
