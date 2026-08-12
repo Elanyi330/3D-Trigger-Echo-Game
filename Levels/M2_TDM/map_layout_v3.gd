@@ -342,6 +342,13 @@ static func all_solids() -> Array:
 	return out
 
 
+## 玩家出生点（v3）：北营内 (0,1,26.5)——probe_v3_walk/probe_timing 已验证可站立位置。
+## 注：v2 出生点 (0,1,0) 在 v3 布局中位于钟楼基座 Pedestal 实体 AABB 内部
+## （x/z∈[-2,2]、y∈[0.6,2.7]），玩家会嵌在实体里动不了，故迁至北营。
+static func player_spawn() -> Vector3:
+	return Vector3(0, 1.0, 26.5)
+
+
 ## 可踏足/可刷怪表面清单（任务 8）——每项 {"name": String, "center": Vector3（y=top_y）,
 ## "size": Vector3（面尺寸，y=0.1）, "top_y": float}。直书表：name 与 all_solids() 中
 ## 对应实体一致（Corridor→CorridorSlab、Altar→AltarPlatform 的别名映射由消费侧持有）。

@@ -1528,3 +1528,23 @@ func test_no_duplicate_names() -> void:
 			dups.append(nm)
 		seen[nm] = true
 	assert_true(dups.is_empty(), "all_solids() 存在重名实体: %s" % ", ".join(dups))
+
+
+# ---- 58. 玩家出生点（v3 迁移）：不在任何实体 AABB 内（点±0.05 内缩容差判定），
+#         且在北营区域内（|x|≤6、z∈[24.5,28.5]、y∈[0,2]）。
+#         根因：v2 出生点 (0,1,0) 在 v3 为钟楼基座 Pedestal AABB 内部，玩家嵌实体动不了 ----
+func test_player_spawn_clear() -> void:
+	var p: Vector3 = V3.player_spawn()
+	# 北营区域内
+	assert_true(absf(p.x) <= 6.0, "出生点 |x|=%s ≤ 6（北营区域）" % absf(p.x))
+	assert_true(p.z >= 24.5 and p.z <= 28.5, "出生点 z=%s ∈ [24.5,28.5]（北营区域）" % p.z)
+	assert_true(p.y >= 0.0 and p.y <= 2.0, "出生点 y=%s ∈ [0,2]" % p.y)
+	# 不在任何实体 AABB 内：点 ±0.05 范围盒与任一 AABB 相交即失败
+	var tol := 0.05
+	for e0 in V3.all_solids():
+		var e: Dictionary = e0
+		var bb := _aabb(e)
+		var hit: bool = (p.x - tol < bb[1].x) and (bb[0].x < p.x + tol) \
+			and (p.y - tol < bb[1].y) and (bb[0].y < p.y + tol) \
+			and (p.z - tol < bb[1].z) and (bb[0].z < p.z + tol)
+		assert_false(hit, "出生点 %s 在 %s AABB 内（含 0.05 内缩容差）" % [p, e["name"]])

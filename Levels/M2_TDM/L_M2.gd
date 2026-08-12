@@ -43,7 +43,7 @@ func _ready() -> void:
 	_player = load("res://Player/Player.tscn").instantiate()
 	_player.name = "Player"
 	add_child(_player)
-	_player.global_position = Vector3(0, 1.0, 0)  # 大厅北口出生
+	_player.global_position = LAYOUT.player_spawn()
 	_head = _player.get_node("Head")
 	_setup_weapons()
 	_setup_hud()
