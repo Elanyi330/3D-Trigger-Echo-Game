@@ -689,7 +689,7 @@ func test_streets_rotation_pairs() -> void:
 		assert_almost_eq(cw.y, ce.y, 0.001, "%s/%s center.y 相同" % [nm, want])
 		assert_almost_eq(cw.z, -ce.z, 0.001, "%s/%s center.z 互为 -z" % [nm, want])
 		assert_lt((se - sw).length(), 0.001, "%s/%s size 相同" % [nm, want])
-	assert_eq(east_count, 26, "East* 实体共 26 个（墙3+塔1+栏板5+箱1+坡道10+簇4+阁2）")
+	assert_eq(east_count, 30, "East* 实体共 30 个（墙3+塔1+栏板5+箱1+坡道10+簇4+阁2+F3高墙4）")
 
 
 # ---- 24. boost 间距显式断言：4 块 Cluster Panel ↔ 最近箱缝 ≥1.5；Panel ↔ 最近摊阁缝 ≥1.5 ----
@@ -741,6 +741,29 @@ func test_streets_no_overlap() -> void:
 			var bb := _aabb(b)
 			assert_true((not _overlap(ba, bb)) or _v_touch(ba, bb),
 				"%s vs %s: AABB 重叠（非垂直相接豁免）" % [a["name"], b["name"]])
+
+
+# ---- F3. 东西市街高墙×8（横脊墙 Spur + 缺口门墙 GapWall）：全部 kind=="wall" /
+#         顶 == 3.0 / 在各自市街带内（|x|∈[14,23.5]、|z|≤14）----
+func test_streets_f3_highwalls() -> void:
+	var names := ["EastSpurN", "EastSpurS", "EastGapWallN", "EastGapWallS",
+		"WestSpurN", "WestSpurS", "WestGapWallN", "WestGapWallS"]
+	var found := 0
+	for nm in names:
+		var ent := _find(V3.STREETS, nm)
+		assert_false(ent.is_empty(), "STREETS 含 %s" % nm)
+		if ent.is_empty():
+			continue
+		found += 1
+		assert_eq(ent["kind"], "wall", "%s kind == wall" % nm)
+		var bb := _aabb(ent)
+		assert_almost_eq(bb[1].y, 3.0, 0.001, "%s 顶 == 3.0" % nm)
+		var in_west: bool = bb[0].x >= -23.5 and bb[1].x <= -14.0
+		var in_east: bool = bb[0].x >= 14.0 and bb[1].x <= 23.5
+		assert_true(in_west or in_east, "%s |x| ∈ [14,23.5]（市街带内）" % nm)
+		assert_true(absf(bb[0].z) <= 14.0 and absf(bb[1].z) <= 14.0,
+			"%s |z| ≤ 14（市街带内）" % nm)
+	assert_eq(found, 8, "F3 高墙 8 面齐全")
 
 
 # ==== 任务 5：钟门 + 市集带 ====
