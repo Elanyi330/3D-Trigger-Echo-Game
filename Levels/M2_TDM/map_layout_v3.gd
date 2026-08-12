@@ -152,10 +152,14 @@ static var STREETS: Array = [
 	# F3 高墙×4（3m 高）横脊墙：rim 侧伸入街中，为市街增加博弈空间。
 	# EastSpurN x∈[14.5,17.5] z∈[6.7,7.5]，西面贴 RimE_T 面 x=14.5。
 	# 旋转对：EastSpurN↔WestSpurS、EastSpurS↔WestSpurN（与 _rot_pair 映射自洽）。
+	# F8（2026-08-12 用户实测定位）：EastSpurS/WestSpurN 墙头↔塔坡道绕墙通道仅 1.0m 卡顿
+	#   （玩家宽 1.0 零余量），两墙 size.x 3→2（center.x 16→15.5 / -16→-15.5 保持贴 rim 根不动），
+	#   墙头 17.5→16.5 / -17.5→-16.5，留 2.0m 通道；EastSpurN/WestSpurS 不动
+	#   （另两面绕行路径净距充足，用户确认不卡）。
 	{"name": "EastSpurN", "kind": "wall", "center": Vector3(16.0, 1.5, 7.1), "size": Vector3(3.0, 3.0, 0.8)},
-	{"name": "EastSpurS", "kind": "wall", "center": Vector3(16.0, 1.5, -7.1), "size": Vector3(3.0, 3.0, 0.8)},
+	{"name": "EastSpurS", "kind": "wall", "center": Vector3(15.5, 1.5, -7.1), "size": Vector3(2.0, 3.0, 0.8)},
 	{"name": "WestSpurS", "kind": "wall", "center": Vector3(-16.0, 1.5, -7.1), "size": Vector3(3.0, 3.0, 0.8)},
-	{"name": "WestSpurN", "kind": "wall", "center": Vector3(-16.0, 1.5, 7.1), "size": Vector3(3.0, 3.0, 0.8)},
+	{"name": "WestSpurN", "kind": "wall", "center": Vector3(-15.5, 1.5, 7.1), "size": Vector3(2.0, 3.0, 0.8)},
 ] \
 		+ _ramp_steps(-21, -18.5, 8.2, 2.0, 0.0, 2.5, "WestTowerRamp", 10) \
 		+ _ramp_steps(18.5, 21, -8.2, -2.0, 0.0, 2.5, "EastTowerRamp", 10)

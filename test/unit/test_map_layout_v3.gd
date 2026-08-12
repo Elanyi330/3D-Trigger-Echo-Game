@@ -758,11 +758,13 @@ func test_streets_no_overlap() -> void:
 #         （参照 test_corner_face_contacts 模式）+ 底面 y==0（坐地面）。
 #         市街带界断言由 test_streets_bounds 覆盖，此处不重复。----
 func test_streets_f3_highwalls() -> void:
+	# F8（2026-08-12 用户实测定位）：EastSpurS/WestSpurN size.x 3→2（center.x 随缩 16→15.5 保持贴 rim，
+	# 墙头 17.5→16.5 留 2.0m 绕墙通道），EastSpurN/WestSpurS 保持 3.0 —— 尺寸断言钉死"只改两处"
 	var specs := [
 		["EastSpurN", Vector3(16.0, 1.5, 7.1), Vector3(3.0, 3.0, 0.8)],
-		["EastSpurS", Vector3(16.0, 1.5, -7.1), Vector3(3.0, 3.0, 0.8)],
+		["EastSpurS", Vector3(15.5, 1.5, -7.1), Vector3(2.0, 3.0, 0.8)],
 		["WestSpurS", Vector3(-16.0, 1.5, -7.1), Vector3(3.0, 3.0, 0.8)],
-		["WestSpurN", Vector3(-16.0, 1.5, 7.1), Vector3(3.0, 3.0, 0.8)],
+		["WestSpurN", Vector3(-15.5, 1.5, 7.1), Vector3(2.0, 3.0, 0.8)],
 	]
 	for spec0 in specs:
 		var spec: Array = spec0
@@ -791,6 +793,36 @@ func test_streets_f3_highwalls() -> void:
 		else:
 			var gap_e: float = -14.5 - bb[1].x
 			assert_almost_eq(gap_e, 0.0, 0.01, "%s 东面贴 rim 面 x=-14.5 缝 == 0" % nm)
+
+
+# ---- F8 回归. 绕墙通道净距：EastSpurS 墙头 ↔ EastTowerRamp 足迹、WestSpurN ↔ WestTowerRamp。
+#         2026-08-12 用户实测定位：原净距 1.0m（玩家宽 1.0 零余量）卡顿，
+#         横脊墙 size.x 3→2 后墙头 x=±16.5 ↔ 塔坡道足迹 x=±18.5，净距 == 2.0（±0.001）。
+#         数据级钉住用户场景：只改 EastSpurS/WestSpurN 两处即可达成，EastSpurN/WestSpurS 不在其列。----
+func test_streets_spur_ramp_channel() -> void:
+	for spec0 in [["EastSpurS", "EastTowerRamp", 1.0], ["WestSpurN", "WestTowerRamp", -1.0]]:
+		var spec: Array = spec0
+		var wall := _find(V3.STREETS, spec[0])
+		assert_false(wall.is_empty(), "STREETS 含 %s" % spec[0])
+		if wall.is_empty():
+			continue
+		var wb := _aabb(wall)
+		var ramp_edge := INF if spec[2] > 0.0 else -INF
+		for e0 in V3.STREETS:
+			var e: Dictionary = e0
+			if (e["name"] as String).begins_with(spec[1]):
+				var rb := _aabb(e)
+				if spec[2] > 0.0:
+					ramp_edge = minf(ramp_edge, rb[0].x)
+				else:
+					ramp_edge = maxf(ramp_edge, rb[1].x)
+		assert_true(ramp_edge != INF and ramp_edge != -INF, "STREETS 含 %s*" % spec[1])
+		if ramp_edge == INF or ramp_edge == -INF:
+			continue
+		var wall_head: float = wb[1].x if spec[2] > 0.0 else wb[0].x
+		var gap: float = absf(ramp_edge - wall_head)
+		assert_almost_eq(gap, 2.0, 0.001,
+			"%s 墙头 ↔ %s 足迹绕墙通道净距 == 2.0（±0.001，F8 原 1.0m 卡顿）" % [spec[0], spec[1]])
 
 
 # ---- F3 返工. 4 处长墙豁口净空：豁口区域内 all_solids() 无任何阻挡实体
