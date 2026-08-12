@@ -19,7 +19,7 @@ const STEP := 4.0
 const COMBAT_X := 23.5
 const COMBAT_Z := 14.0
 # 外环基线日期语义：基线建立日；布局数据变更 → 基线作废需复测重立
-const BASELINE_TAG := "BASELINE_2026-08-11"
+const BASELINE_TAG := "BASELINE_2026-08-12"
 const BASELINE_LIST_MAX := 20
 
 
