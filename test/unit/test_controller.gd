@@ -133,3 +133,175 @@ func test_gravity_applies_when_airborne() -> void:
     await wait_physics_frames(50)
     assert_lt(controller.velocity.y, v_early,
             "随下落时间增长，velocity.y 应更负（重力持续加速）")
+
+
+# ══════════════════════════════════════════════════════════════
+# F1 自动登台（step-up 0.62m）：真实物理场景测试
+# 台阶几何 = 地面 StaticBody + 台阶盒（Objects 层 1）+ 真实控制器实例 + 物理帧推进。
+# 胶囊镜像生产 MovementController.tscn（radius 0.5 / height 1.83，CollisionShape3D 本地偏移 0）：
+#   脚底 = 中心 - 0.915；站地面（顶面 y=0）→ 中心 0.915；站 0.6 台面 → 中心 1.515。
+# 设计：高差 ≤0.62m 视为斜坡直接走上去；0.9m 箱保持只能跳上；空中绝不触发。
+# ══════════════════════════════════════════════════════════════
+
+const CAP_HALF := 0.915  # 生产胶囊半高（1.83/2）
+
+
+# 替换 before_each 的默认胶囊为生产尺寸（radius 0.5 / height 1.83）
+func _production_capsule() -> void:
+    var cap := CapsuleShape3D.new()
+    cap.radius = 0.5
+    cap.height = 1.83
+    var col := _controller_collision()
+    assert_not_null(col, "前置：控制器应有 CollisionShape3D 子节点")
+    col.shape = cap
+
+
+func _controller_collision() -> CollisionShape3D:
+    for child in controller.get_children():
+        if child is CollisionShape3D:
+            return child
+    return null
+
+
+# 台阶盒辅助：BoxShape3D StaticBody（Objects 层 1），center_y 由调用方给定（= top_y - size.y/2）
+func _make_box(size: Vector3, center: Vector3) -> StaticBody3D:
+    var body := StaticBody3D.new()
+    body.collision_layer = 1
+    body.collision_mask = 0
+    var col := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = size
+    col.shape = shape
+    body.add_child(col)
+    body.position = center
+    add_child_autofree(body)
+    return body
+
+
+# ── F1-1：平地 + 0.6m 台阶——持续前进（无跳跃）自动登上 ──
+func test_step_up_climbs_06() -> void:
+    _production_capsule()
+    _make_floor()
+    # 0.6m 台阶盒：顶面 y=0.6，前表面 z=-2，盒体 z=-2..-14（足够长，不会走出台面）
+    _make_box(Vector3(6, 0.6, 12), Vector3(0, 0.3, -8))
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    Input.action_press("move_forward")  # 朝台阶持续前进，无跳跃输入
+    await wait_physics_frames(70)
+    print("STEP_UP_06_POS=", controller.global_position,
+            " on_floor=", controller.is_on_floor())
+    assert_almost_eq(controller.global_position.y, 0.6 + CAP_HALF, 0.05,
+            "不跳跃自动登上 0.6m 台阶（脚底抬升 0.6±0.05 → 中心 ≈1.515）")
+    assert_true(controller.is_on_floor(), "台阶顶上应 is_on_floor")
+    assert_lt(controller.global_position.z, -2.0, "应已越过台阶前表面（z=-2）到达顶部")
+
+
+# ── F1-2：0.3 → 0.6 两级微台阶——连续走上顶 ──
+func test_step_up_micro_stairs() -> void:
+    _production_capsule()
+    _make_floor()
+    _make_box(Vector3(6, 0.3, 6), Vector3(0, 0.15, -5))   # 第一级：顶面 0.3，前表面 z=-2
+    _make_box(Vector3(6, 0.6, 12), Vector3(0, 0.3, -14))  # 第二级：顶面 0.6，前表面 z=-8
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    Input.action_press("move_forward")
+    await wait_physics_frames(90)
+    print("MICRO_STAIRS_POS=", controller.global_position,
+            " on_floor=", controller.is_on_floor())
+    assert_almost_eq(controller.global_position.y, 0.6 + CAP_HALF, 0.05,
+            "连续登上 0.3→0.6 两级微台阶（脚底 0.6±0.05）")
+    assert_true(controller.is_on_floor(), "第二级顶上应 is_on_floor")
+    assert_lt(controller.global_position.z, -8.0, "应已越过第二级前表面（z=-8）")
+
+
+# ── F1-3：0.9m 箱——高于 STEP_MAX，同样输入上不去（保持只能跳上）──
+func test_step_up_blocked_by_09() -> void:
+    _production_capsule()
+    _make_floor()
+    _make_box(Vector3(4, 0.9, 4), Vector3(0, 0.45, -4))  # 0.9m 箱：顶面 0.9，前表面 z=-2
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    Input.action_press("move_forward")
+    await wait_physics_frames(60)
+    print("BLOCKED_BY_09_POS=", controller.global_position)
+    assert_gt(controller.global_position.z, -1.7,
+            "应被 0.9m 箱侧面挡住（接触位 z≈-1.5），不能越过箱体")
+    assert_almost_eq(controller.global_position.y, CAP_HALF, 0.05,
+            "0.9 > STEP_MAX 0.62：仍在箱底地面（不上去）")
+
+
+# ── F1-4：0.6 台阶上方净空 1.0m（< 玩家高 1.83）——不触发登台，不嵌进顶板 ──
+func test_step_up_low_ceiling() -> void:
+    _production_capsule()
+    _make_floor()
+    _make_box(Vector3(6, 0.6, 8), Vector3(0, 0.3, -6))   # 0.6 台阶：顶面 0.6，前表面 z=-2
+    _make_box(Vector3(6, 0.2, 8), Vector3(0, 1.7, -6))   # 顶板：底面 y=1.6，恰在台阶上方（净空 1.0）
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    Input.action_press("move_forward")
+    await wait_physics_frames(60)
+    print("LOW_CEILING_POS=", controller.global_position)
+    assert_almost_eq(controller.global_position.y, CAP_HALF, 0.05,
+            "净空不足：不触发登台，仍站地面")
+    assert_lt(controller.global_position.y - CAP_HALF, 0.6,
+            "脚底抬升 < 0.6（未登上台阶、未嵌进顶板）")
+    assert_gt(controller.global_position.z, -1.7, "应被台阶侧面挡住")
+
+
+# ── F1-5：空中经过高台侧面——绝不触发登台（防下落贴墙瞬移上高台）──
+# 注：0.6m 矮台阶物理上无法构造空中误登台（脚底<0.6 贴墙必与台阶体重叠、脚底>0.6
+# 登台增量≤0 被"只升不降"守卫拦下）；空中窗口存在于高台侧落——下落脚底经过
+# (台高-0.62, 台高) 时，无空中守卫的实现会抬升 cast 越台顶、向下命中台面、把空中
+# 玩家瞬移上台。故用 2.0m 高台 + 贴墙下坠（velocity 直设，模拟击退/坠落）验证守卫。
+func test_no_step_up_airborne() -> void:
+    _production_capsule()
+    _make_floor()
+    _make_box(Vector3(6, 2.0, 12), Vector3(0, 1.0, -8))  # 2.0m 高台：顶面 2.0，前表面 z=-2
+    # 贴住高台侧面、脚底 1.585（落在登台窗口 (1.38,2.2) 内）、带水平冲向高台的速度。
+    # 不做落地前等待 → 首帧 is_on_floor=false。无空中守卫的实现首帧即会瞬移上台顶。
+    controller.global_position = Vector3(0, 2.5, -1.5)
+    controller.velocity = Vector3(0, -1.0, -6.0)
+    await wait_physics_frames(40)  # 下落 + 贴墙滑落到地面
+    print("AIRBORNE_POS=", controller.global_position,
+            " on_floor=", controller.is_on_floor())
+    assert_true(controller.is_on_floor(), "应落地（高台旁地面）")
+    assert_almost_eq(controller.global_position.y, CAP_HALF, 0.1,
+            "落地在高台旁地面（y≈0.915），而非空中瞬移上高台（2.915）")
+    assert_gt(controller.global_position.z, -1.6, "未越过高台前表面")
+
+
+# ── F1-6：从 0.6 台面向前走下——自然下落，无异常弹跳，落地恢复 on_floor ──
+func test_step_down_smooth() -> void:
+    _production_capsule()
+    _make_floor()
+    _make_box(Vector3(8, 0.6, 8), Vector3(0, 0.3, -6))    # 0.6 平台：顶面 0.6，z=-2..-10
+    _make_box(Vector3(8, 2.0, 1), Vector3(0, 1.0, -13.5)) # 背后挡墙（z=-13..-14）：防止走出地图
+    controller.global_position = Vector3(0, 2.0, -6)       # 平台顶上方
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：应站在平台顶")
+    assert_almost_eq(controller.global_position.y, 0.6 + CAP_HALF, 0.05, "前置：站在平台顶")
+
+    Input.action_press("move_forward")  # 向前走离后缘（z=-10）
+    var prev_y: float = controller.global_position.y
+    var bounced := false
+    var landed := false
+    for i in 180:
+        await wait_physics_frames(1)
+        var y: float = controller.global_position.y
+        if y > prev_y + 0.03:
+            bounced = true
+        prev_y = y
+        if controller.is_on_floor() and y < 1.2:  # 已落到地面（平台顶 y=1.515）
+            landed = true
+            break
+    Input.action_release("move_forward")
+    print("STEP_DOWN_POS=", controller.global_position,
+            " on_floor=", controller.is_on_floor())
+    assert_true(landed, "应已走下平台落到地面")
+    assert_false(bounced, "走下台阶全程 y 单调下降（无异常弹跳）")
+    assert_true(controller.is_on_floor(), "落地后 is_on_floor 恢复")
+    assert_almost_eq(controller.global_position.y, CAP_HALF, 0.1, "落地在地面（y≈0.915）")
