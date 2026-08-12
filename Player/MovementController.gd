@@ -119,7 +119,14 @@ func accelerate(delta: float) -> void:
 #   实测相位敏感卡滞——step-up 必须保持在 move_and_slide 之前）。
 # F2a-P2 查询一致性：所有查询 mask = collision_mask（与身体 move_and_slide 同源
 #   =3）；intersect_shape 结果过滤 torso/head 组（敌人不是地形）；intersect_ray
-#   命中敌人体 → 该 RID 加 exclude 重放一次。
+#   命中敌人体 → 该 RID 加 exclude 重放一次。墙门控同样排除敌人（贴敌不登台，
+#   防登台-滑落循环）。
+# F2a-G1 滑翔跨隙守卫：floor_snap_length 吸附滑翔（走离边缘后 ~snap 长度内
+#   is_on_floor 仍真、无真实碰撞）可让探针够到相邻高台跨隙瞬移——登台前下查
+#   底缘前缘正下方，支撑面深度超过 floor_snap_length（悬挑跨隙）即放弃。
+# F2a-G2 中段穿透守卫：起点/路径/落点三查之外，补"当前→落点"中点抬升重叠查询。
+# F2a-G3 立面判定封坡道：触发墙与棱线命中都要求法线 y<0.5（近垂直）——坡面
+#   （含 20° 坡走廊、陡坡立面 45°-60° 分量）不触发登台，交给 move_and_slide。
 # Godot 4.7 API 注记：intersect_shape 为静态重叠查询（不沿 motion 扫描、返回无
 #   position/normal）；cast_motion 扫掠只返回命中分数且胶囊底半球贴棱时高度偏低。
 #   故相位1 用静态查询覆盖扫掠体（水平总位移 ≤0.156 « 胶囊直径 1.0，无隧穿
@@ -130,6 +137,8 @@ const STEP_MIN_RISE := 0.01    # 只升不降阈值（防平地抖动/反复触�
 const STEP_CAST_MARGIN := 0.001  # 查询 margin：默认 0.04 会误判（0.62-0.04<0.6 卡台阶顶）
 const STEP_LANDING_LIFT := 0.02  # P4 落点抬高量（brief 预案 0.01→0.02 微调，实测依据见下）
 const STEP_EDGE_INSET := 0.05  # 登台落点越过台阶棱线的距离（越棱必需量）
+const STEP_WALL_NORMAL_Y := 0.5  # G3：台阶立面判定阈值——阻挡面/棱线法线 y<0.5（近垂直）
+                                 # 才算台阶立面；≥0.5 为坡面/台面，登台交给 move_and_slide
 
 # P5a：碰撞节点 _ready 缓存（Crouch 只改 shape 的 height/center 不换子节点，缓存安全）
 @onready var _col_cached: CollisionShape3D = _find_collision_shape()
@@ -195,6 +204,19 @@ func _try_step_up(delta: float) -> void:
 	# （jump_recorder.gd 的 _floor_normal_y 同源于 player.floor_max_angle）
 	var floor_normal_y := cos(floor_max_angle)
 
+	# G1：防 snap-glide 悬挑跨隙——地板吸附滑翔（走离边缘后 floor_snap_length 内
+	# is_on_floor 仍真但无真实支撑）可让探针够到相邻高台触发跨隙瞬移。守卫：
+	# 底缘前缘正下方的支撑面必须落在 floor_snap_length 深度内（真实登台：地板
+	# 连续延伸到墙脚，深度≈0；跨隙悬挑：墙脚下方是深坑）。注意不能用"上一帧
+	# 是否有地板碰撞"判定——贴墙静止帧地板支撑同样不上报碰撞（实测）。
+	var gap_from := capsule_xform.origin + dir * (capsule.radius - 0.05)
+	gap_from.y = feet_y + 0.02
+	_ray_params.from = gap_from
+	_ray_params.to = gap_from + Vector3.DOWN * (floor_snap_length + 0.05)
+	var gap_hit := _ray_with_enemy_retry(space_state)
+	if gap_hit.is_empty() or gap_hit.position.y < feet_y - floor_snap_length:
+		return
+
 	# 相位2（先行）：探针 = STEP_MAX 抬升 + 本帧步幅，向下垂射线找落点高度。
 	# 探针偏移 [0, 前进方向满半径]：贴墙时满半径探针恰越过台阶棱线命中台面。
 	var probe_origin := capsule_xform.origin + Vector3.UP * STEP_MAX + dir * advance
@@ -231,6 +253,10 @@ func _try_step_up(delta: float) -> void:
 	_ray_params.to = edge_from + dir * landing_dist
 	var edge_hit := _ray_with_enemy_retry(space_state)
 	if not edge_hit.is_empty():
+		# G3：命中的是坡面（法线 y≥0.5）而非台阶立面 → 放弃登台，交给
+		# move_and_slide 正常爬坡（封真坡道逐帧瞬移）
+		if edge_hit.normal.y >= STEP_WALL_NORMAL_Y:
+			return
 		landing_dist = minf(landing_dist,
 				(edge_hit.position - edge_from).dot(dir) + STEP_EDGE_INSET)
 
@@ -263,6 +289,14 @@ func _try_step_up(delta: float) -> void:
 		_shape_params.transform = landing_xform
 		if not _shape_filtered(space_state).is_empty():
 			return
+	# G2：中段穿透检查——当前位置→落点中点再做一次抬升重叠查询，拦薄几何
+	# （细柱/栏杆）中段穿透（水平位移 ≤0.156 « 胶囊直径，两端查已覆盖大部分，
+	# 此查为保险层）
+	var mid_xform := raised
+	mid_xform.origin = raised.origin + dir * (landing_dist * 0.5)
+	_shape_params.transform = mid_xform
+	if not _shape_filtered(space_state).is_empty():
+		return
 
 	global_position += dir * landing_dist + Vector3.UP * lift
 	velocity.y = 0.0
@@ -299,15 +333,15 @@ func _is_enemy_collider(collider: Variant) -> bool:
 	return body != null and (body.is_in_group(&"torso") or body.is_in_group(&"head"))
 
 
-## P5c/P2：上一帧 move_and_slide 碰撞中是否存在"地形墙"碰撞（法线达不上地板
-## 阈值、且非 torso/head 敌人）。贴敌不算可登台的墙——敌人不是地形，防贴敌帧
-## 反复触发登台-滑落循环
+## P5c/P2/G3：上一帧 move_and_slide 碰撞中是否存在"近垂直地形墙"碰撞。
+## 条件：法线 y < STEP_WALL_NORMAL_Y（近垂直面才算台阶立面——G3：坡面/斜面
+## 法线 y≥0.5 不触发登台，封死真坡道逐帧瞬移；y≥0.5 也天然排除地板类碰撞）
+## 且非 torso/head 敌人（P2：敌人不是地形）。
 func _has_terrain_wall() -> bool:
-	var wall_normal_y := cos(floor_max_angle)
 	for i in get_slide_collision_count():
 		var c := get_slide_collision(i)
-		if c.get_normal().y >= wall_normal_y:
-			continue  # 地板类碰撞
+		if c.get_normal().y >= STEP_WALL_NORMAL_Y:
+			continue  # 地板/坡面类：非台阶立面
 		if _is_enemy_collider(c.get_collider()):
 			continue  # 敌人不是地形
 		return true

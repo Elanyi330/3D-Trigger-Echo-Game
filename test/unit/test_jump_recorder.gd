@@ -154,10 +154,11 @@ func test_episode_timeout_path() -> void:
 # 垂直原地跳 → 落回同名地面 → classify fail；帧数覆盖滞空(~46帧)+落地确认(30帧)。
 # 依赖实测结论：Godot 4.7 _physics_process 按树序执行（process_priority 对物理无效），
 # recorder 最后入树 → 在玩家 move_and_slide 之后读当帧状态。
-# 注（终审 M3 地面守卫）：_physics_process 仅在找到法线 y>FLOOR_NORMAL_Y 的碰撞时才覆盖
-# _last_floor_y/_last_floor_name。Player 默认 floor_max_angle=45°，is_on_floor() 的支撑碰撞
-# 法线 y≥cos45°≈0.707>0.7，故"on_floor 但无合格碰撞"分支在当前参数下不可达，属防御性
-# 守卫，现有用例不单独覆盖。
+# 注（终审 M3 地面守卫）：_physics_process 仅在找到法线 y≥_floor_normal_y 的碰撞时才覆盖
+# _last_floor_y/_last_floor_name。法线阈值与玩家同源（F2a-P3）：setup 时
+# _floor_normal_y = cos(player.floor_max_angle)，与引擎 is_on_floor() 判定一致
+# （默认 45° → cos≈0.707），故"on_floor 但无合格碰撞"分支在当前参数下不可达，
+# 属防御性守卫，现有用例不单独覆盖。
 func test_jump_episode_integration() -> void:
 	var floor_body := _make_floor()
 	floor_body.name = "IntFloor"

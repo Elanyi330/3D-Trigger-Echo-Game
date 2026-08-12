@@ -467,3 +467,132 @@ func test_crouch_step_up() -> void:
             "蹲姿登台成功（脚底 0.6 → origin 1.515；胶囊中心 1.285 = 0.6+0.685）")
     assert_true(controller.is_on_floor(), "台阶顶上应 is_on_floor")
     assert_lt(controller.global_position.z, -2.0, "应已越过台阶前表面到达顶部")
+
+
+# ══════════════════════════════════════════════════════════════
+# F2a 二轮守卫（2026-08-12）：G1 滑翔跨隙 / G2 中段穿透 / G3 坡道瞬移
+# ══════════════════════════════════════════════════════════════
+
+
+# 逐物理步 y 增量采样器（坡道测试用；await 级采样在本环境混叠 ~2 物理步）
+class _SlopeSampler extends Node:
+    var target: MovementController
+    var steps := 0
+    var max_dy := 0.0
+    var prev_y := -1.0
+    var start_y := 0.0
+    var peak_y := 0.0
+    var peak_step := 0
+
+    func _physics_process(_d: float) -> void:
+        steps += 1
+        var y := target.global_position.y
+        if prev_y >= 0.0:
+            max_dy = maxf(max_dy, y - prev_y)
+        prev_y = y
+        if y > peak_y:
+            peak_y = y
+            peak_step = steps
+
+
+# ── G1：地板吸附滑翔不得跨隙瞬移上相邻高台 ──
+# 平台 A 顶 0.6（z=-2..-10），间隙 0.4m，平台 B 顶 1.2（z=-10.4 起），从 A 走向 B。
+# 无守卫时：走离 A 边缘后 floor_snap_length 滑翔窗口内 is_on_floor 仍真，
+# 探针够到 B → 跨隙瞬移（实测 HEAD：中心 y 直达 1.99+，脚底 ≥1.08）。
+# 守卫：底缘前缘下方支撑深度超过 floor_snap_length（悬挑跨隙）即放弃登台。
+# 阈值用脚底高度（站立 A：脚底 0.6 < 1.15；登上 B：脚底 1.2 ≥ 1.15）。
+func test_no_gap_cross_teleport() -> void:
+    _make_floor()
+    _make_box(Vector3(8, 0.6, 8), Vector3(0, 0.3, -6))    # 平台 A：顶 0.6，z=-2..-10
+    _make_box(Vector3(8, 1.2, 8), Vector3(0, 0.6, -14.4)) # 平台 B：顶 1.2，z=-10.4..-18.4
+    controller.global_position = Vector3(0, 0.6 + cap_half + 0.5, -4)  # A 顶上方
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：应站在平台 A 顶")
+    assert_almost_eq(controller.global_position.y - cap_half, 0.6, 0.05, "前置：A 顶（脚底 0.6）")
+
+    Input.action_press("move_forward")
+    var breached := false
+    for i in 200:
+        await wait_physics_frames(1)
+        if controller.global_position.y - cap_half >= 1.15:
+            breached = true
+            break
+    Input.action_release("move_forward")
+    print("GAP_CROSS pos=", controller.global_position,
+            " on_floor=", controller.is_on_floor())
+    assert_false(breached, "不得跨隙登上平台 B（任意帧脚底高度 < 1.15）")
+    assert_true(controller.is_on_floor(), "最终应站在实地（地面/平台 A/间隙槽底）")
+
+
+# ── G3：真坡道上不得逐帧登台瞬移（20° 坡走廊贴墙爬坡） ──
+# 坡面法线通过地板判定（0.94 ≥ cos45）；无守卫时侧墙贴墙帧触发 step-up，
+# 探针命中坡面把自己当台阶逐帧抬升（深验实测 5 倍速）。守卫：触发墙与棱线
+# 命中均要求法线 y<0.5（近垂直立面），坡面命中即放弃。本环境直走坡道无墙不
+# 触发（HEAD 亦绿）——走廊构型覆盖守卫代码路径，属封死型回归用例。
+func test_no_step_up_on_slope() -> void:
+    _make_floor()
+    # 20° 坡：斜面板（旋转盒），底端埋入平地（尖端 z≈-2），沿 -z 上升
+    var ramp := StaticBody3D.new()
+    ramp.collision_layer = 1
+    ramp.collision_mask = 0
+    var rc := CollisionShape3D.new()
+    var rs := BoxShape3D.new()
+    rs.size = Vector3(6, 0.2, 6.5)
+    rc.shape = rs
+    ramp.add_child(rc)
+    ramp.rotation_degrees = Vector3(20, 0, 0)
+    ramp.position = Vector3(0, 1.0, -5.054)
+    add_child_autofree(ramp)
+    # 侧墙走廊：内表面 x=2.5，沿坡延伸
+    _make_box(Vector3(0.4, 4, 24), Vector3(2.7, 2, -10))
+
+    # 玩家置于坡面中段贴墙（坡面 h≈0.73 处）
+    controller.global_position = Vector3(2.0, 2.14, -4)
+    await wait_physics_frames(30)
+    assert_true(controller.is_on_floor(), "前置：应站在坡面上")
+
+    var sampler := _SlopeSampler.new()
+    sampler.target = controller
+    add_child(sampler)
+    sampler.start_y = controller.global_position.y
+    sampler.peak_y = sampler.start_y
+    Input.action_press("move_forward")
+    Input.action_press("move_right")  # 持续压向侧墙——贴墙爬坡触发场景
+    await wait_physics_frames(80)
+    Input.action_release("move_forward")
+    Input.action_release("move_right")
+    print("SLOPE max_dy_per_step=", snappedf(sampler.max_dy, 0.001),
+            " peak=", snappedf(sampler.peak_y, 0.001))
+    # ① 单物理步 y 增量 ≤ 0.06（行走爬坡 = 0.106×tan20 ≈ 0.039；逐帧登台瞬移 ≥0.2）
+    assert_lte(sampler.max_dy, 0.06, "爬坡期间单物理步 y 增量 ≤ 0.06（无逐帧瞬移）")
+    # ② 整体爬升速率 ≤ walk_speed×sin20°×1.6（行走爬坡 = walk×sin20）
+    var climb_time: float = maxi(sampler.peak_step, 1) / 60.0
+    var rate: float = (sampler.peak_y - sampler.start_y) / climb_time
+    var limit: float = 6.35 * sin(deg_to_rad(20.0)) * 1.6
+    assert_lte(rate, limit, "爬升速率 ≤ walk×sin20°×1.6（%.2f m/s）" % limit)
+    remove_child(sampler)
+    sampler.free()
+
+
+# ── G2：登台路径中段的薄几何（细柱）阻挡登台，不得穿透 ──
+# 0.6 台阶（棱线 z=-2）；登台路径（贴墙位 z=-1.5 → 落点 z≈-1.656）中段立
+# 0.1×0.1 细柱（高 1.5，z=-1.578）。断言：登台被拦、玩家保持在地面不穿柱。
+# 注：胶囊半径 0.5 » 登台水平位移 0.156，起点/路径/落点三查已覆盖路径全程，
+# 中段查为保险层——本用例锁定"薄几何拦登台"行为（HEAD 三查亦拦，属回归守卫）。
+func test_step_up_mid_path_blocked() -> void:
+    _make_floor()
+    _make_box(Vector3(6, 0.6, 12), Vector3(0, 0.3, -8))          # 0.6 台阶：棱线 z=-2
+    _make_box(Vector3(0.1, 1.5, 0.1), Vector3(0, 0.75, -1.578)) # 细柱：路径中段
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    Input.action_press("move_forward")
+    for i in 90:
+        await wait_physics_frames(1)
+        assert_lt(controller.global_position.y, 0.6 + cap_half - 0.1,
+                "第 %d 帧不得登上台阶（细柱阻挡）" % i)
+    Input.action_release("move_forward")
+    print("MID_BLOCKED pos=", controller.global_position)
+    assert_almost_eq(controller.global_position.y, cap_half, 0.05,
+            "登台被细柱拦下：仍站地面")
+    assert_gt(controller.global_position.z, -1.7, "未穿过细柱/台阶")
