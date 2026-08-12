@@ -18,7 +18,11 @@ extends Node
 @export var recording_enabled := true
 const MAX_EPISODE_TIME := 5.0     # 单 episode 超时（秒）
 const LANDING_CONFIRM := 0.5      # 落地稳定确认时长（秒）
-const FLOOR_NORMAL_Y := 0.7       # 碰撞法线 y > 此值视为地面（略宽于 floor_max_angle 45°）
+# 碰撞法线阈值（F2a-P3）：与玩家 floor_max_angle 同源——setup 时
+# _floor_normal_y := cos(player.floor_max_angle)。与 Player/MovementController.gd
+# step-up 的法线阈值（同为 cos(floor_max_angle)）保持一致，避免 45° 边界坡度
+# 引擎判墙/记录判地的口径分裂。45° 为 CharacterBody3D 默认值（player 缺省兜底）。
+var _floor_normal_y := cos(deg_to_rad(45.0))
 
 var _player: CharacterBody3D = null
 var _head: Node3D = null
@@ -47,6 +51,10 @@ var _last_floor_name := ""
 func setup(player: CharacterBody3D, layout_solids: Array, map_name: String,
 		base_dir: String = "user://jump_training") -> void:
 	_player = player
+	# F2a-P3：法线阈值从玩家 floor_max_angle 计算（与 MovementController step-up 同源）；
+	# player 为 null（文件级测试）沿用 45° 默认兜底
+	if player != null:
+		_floor_normal_y = cos(player.floor_max_angle)
 	_head = player.get_node_or_null("Head") if player else null
 	_map_name = map_name
 	_base_dir = base_dir
@@ -140,7 +148,7 @@ func _physics_process(delta: float) -> void:
 	if col != null:
 		floor_y = col.get_position().y  # 接触点 y = 踩踏面高度
 		floor_name = _collider_name(col)
-	# 地面信息守卫（终审 M3）：仅当找到法线 y>FLOOR_NORMAL_Y 的碰撞才覆盖；
+	# 地面信息守卫（终审 M3）：仅当找到法线 y≥_floor_normal_y 的碰撞才覆盖；
 	# on_floor 但无合格碰撞的理论分支保留上次地面信息，防 0/"" 误分类。
 	if on_floor and col != null:
 		_last_floor_y = floor_y
@@ -167,13 +175,14 @@ func _physics_process(delta: float) -> void:
 	_was_on_floor = on_floor
 
 
-## 遍历当帧滑动碰撞，取法线 y>FLOOR_NORMAL_Y 的碰撞体为踩踏面
+## 遍历当帧滑动碰撞，取法线 y≥_floor_normal_y（=cos(player.floor_max_angle)，
+## 与引擎地板判定同源）的碰撞体为踩踏面
 func _find_floor_collision() -> KinematicCollision3D:
 	if _player == null:
 		return null
 	for i in _player.get_slide_collision_count():
 		var col := _player.get_slide_collision(i)
-		if col.get_normal().y > FLOOR_NORMAL_Y:
+		if col.get_normal().y >= _floor_normal_y:
 			return col
 	return null
 
