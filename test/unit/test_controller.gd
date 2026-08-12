@@ -340,7 +340,11 @@ func test_step_up_pace_coupled() -> void:
     var min_time: float = (3.0 * 0.62) / 6.35 * 0.8
     assert_gte(climb_steps / 60.0, min_time,
             "登台耗时不得显著快于行走节奏（≥ 3×0.62/6.35×0.8 = %.3fs）" % min_time)
-    assert_lte(sampler.max_h_disp, 0.2, "单物理步水平位移 ≤ 0.2（杜绝突进帧）")
+    # F5（PACE 修正，2026-08-12）：STEP_PACE_MAX 预算按构造精确 = 0.2
+    # （落点 = 0.2 − advance，同帧 move_and_slide 前进 = advance）——引擎速度积分
+    # 的浮点舍入（1 ULP ≈ 4.8e-8，实测 0.2000000477）会贴线擦过阈值，故给 1e-4
+    # 容差；行为阈值仍是 0.2（旧突进帧 0.26+ 依旧拦截）。
+    assert_lte(sampler.max_h_disp, 0.2 + 0.0001, "单物理步水平位移 ≤ 0.2（杜绝突进帧）")
     remove_child(sampler)
     sampler.free()
 
@@ -467,6 +471,171 @@ func test_crouch_step_up() -> void:
             "蹲姿登台成功（脚底 0.6 → origin 1.515；胶囊中心 1.285 = 0.6+0.685）")
     assert_true(controller.is_on_floor(), "台阶顶上应 is_on_floor")
     assert_lt(controller.global_position.z, -2.0, "应已越过台阶前表面到达顶部")
+
+
+# ══════════════════════════════════════════════════════════════
+# F5 手感微调（2026-08-12 用户验收反馈）：B1 同帧连锁登台 / B2 首帧登台
+# ══════════════════════════════════════════════════════════════
+
+
+# 爬升采样器：物理步粒度记录爬升窗口（脚底 ∈ [start_feet, done_feet)）内的
+# 停顿帧（前向位移 < slow_dz）/ 最大连续停顿 / 最大 y 回落，以及完成后
+# （跳过 settle 帧后）连续 stable_frames 帧的 y 稳定度。
+# 用途：① 微台阶无振荡（停顿帧=0）；② 塔坡道首帧登台（停顿帧/时长量化）。
+class _ClimbSampler extends Node:
+    var target: MovementController
+    var half := 0.915
+    var start_feet := 0.02
+    var done_feet := 0.58
+    var slow_dz := 0.05
+    var settle_skip := 3
+    var stable_frames := 20
+
+    var steps := 0
+    var start_step := -1
+    var done_step := -1
+    var climb_frames := -1
+    var slow_frames := 0
+    var max_consec_slow := 0
+    var max_y_drop := 0.0
+    var post_violations := 0
+    var _consec_slow := 0
+    var _in_climb := false
+    var _done := false
+    var _stable_left := 0
+    var _stable_y := 0.0
+    var _prev := Vector3()
+
+    func _physics_process(_d: float) -> void:
+        steps += 1
+        var p := target.global_position
+        var feet: float = p.y - half
+        if not _done and not _in_climb and feet >= start_feet:
+            _in_climb = true
+            start_step = steps
+            _prev = p
+        elif not _done and _in_climb:
+            var dz: float = _prev.z - p.z
+            if dz < slow_dz:
+                slow_frames += 1
+                _consec_slow += 1
+            else:
+                _consec_slow = 0
+            max_consec_slow = maxi(max_consec_slow, _consec_slow)
+            max_y_drop = maxf(max_y_drop, _prev.y - p.y)
+            _prev = p
+            if feet >= done_feet:
+                _done = true
+                done_step = steps
+                climb_frames = done_step - start_step
+                _stable_left = settle_skip + stable_frames
+        elif _done and _stable_left > 0:
+            _stable_left -= 1
+            # F5（测量修正 2026-08-12）：登台完成帧仍处于沉降窗口（链条落点抬高
+            # 0.02 + 引擎解穿透 1-2 帧）——基线若取完成帧（实测偏低 ~0.011，嵌入
+            # 台面 0.01），会把后续"完全稳定"误判为振荡。基线改在 settle_skip
+            # 沉降结束后起算：连续 stable_frames 帧相对沉降后基线 ±0.01 = 真稳定。
+            if _stable_left == stable_frames:
+                _stable_y = p.y
+            if _stable_left < stable_frames and absf(p.y - _stable_y) > 0.01:
+                post_violations += 1
+            if _stable_left <= 0:
+                set_physics_process(false)
+
+
+# ── F5-1：0.3m 深微台阶（祭坛微台阶 MicroN1/N2 同构几何）——登台无振荡/无停顿 ──
+# 几何（对应 map MicroN1/N2：级 1 顶 0.3 深 0.3，级 2 顶 0.6 深 0.3，盒底坐地）：
+#   级 1 z∈[-2.3,-2]（前表面 z=-2），级 2 z∈[-2.6,-2.3]（前表面 z=-2.3），级 2 向后延长。
+# 根因 ②/③：登台落点前缘贴近下一级 0.3m 立面——旧"上一帧 slide 碰撞"门控每级
+#   停 16ms（碰撞帧 + 门控帧），且碰撞吸收水平速度造成"卡顿"；B2 首帧探针登台
+#   消除碰撞/停顿，B1 同帧连锁兜底嵌体积情形。
+# 断言：① 爬升窗口内停顿帧（前向位移 < 0.05）== 0（无碰撞滞留帧）；
+#       ② 爬升期间单帧 y 回落 ≤ 0.03（无去穿透挤出振荡；登台沉降 ≈0.02）；
+#       ③ 完成后连续 20 帧 y 稳定 ±0.01（无残余抖动）。
+func test_micro_stairs_no_jitter() -> void:
+    _make_floor()
+    _make_box(Vector3(6, 0.3, 0.3), Vector3(0, 0.15, -2.15))   # 级 1：顶 0.3，z∈[-2.3,-2]
+    _make_box(Vector3(6, 0.6, 12), Vector3(0, 0.3, -8.3))     # 级 2：顶 0.6，z∈[-14.3,-2.3]
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    var sampler := _ClimbSampler.new()
+    sampler.target = controller
+    sampler.done_feet = 0.58
+    add_child(sampler)
+
+    Input.action_press("move_forward")
+    for i in 300:
+        await wait_physics_frames(1)
+        if sampler.climb_frames >= 0 and sampler.post_violations >= 0 \
+                and sampler._stable_left <= 0:
+            break
+    Input.action_release("move_forward")
+    print("MICRO_NO_JITTER climb_frames=", sampler.climb_frames,
+            " slow=", sampler.slow_frames,
+            " consec=", sampler.max_consec_slow,
+            " max_y_drop=", snappedf(sampler.max_y_drop, 0.001),
+            " post_viol=", sampler.post_violations,
+            " pos=", controller.global_position)
+    assert_eq(sampler.slow_frames, 0,
+            "爬升窗口内无停顿帧（前向位移 < 0.05，旧门控碰撞帧 ≈1-2）")
+    assert_lte(sampler.max_y_drop, 0.03, "爬升期间单帧 y 回落 ≤ 0.03（无去穿透振荡）")
+    assert_eq(sampler.post_violations, 0,
+            "登台完成后连续 20 帧 y 稳定 ±0.01")
+    assert_almost_eq(controller.global_position.y, 0.6 + cap_half, 0.05,
+            "最终登上第二级顶（脚底 0.6）")
+    remove_child(sampler)
+    sampler.free()
+
+
+# ── F5-2：塔坡道 10 级——B2 首帧登台量化：总耗时 ≤ 无 B2 基线 70%，级间无停顿 ──
+# 几何（对应 map 塔坡道 _ramp_steps 同构：10 级，级高 0.25、级深 0.62，盒底坐地）：
+#   第 i 级前表面 z = -2 - 0.62·i，顶 0.25·(i+1)；末级向后延长。
+# 根因 ③：旧门控读上一帧碰撞——每级停 16ms 且碰撞吸收速度（10 级累计卡顿）；
+#   B2 探针首帧登台 → 全程无碰撞、速度不落。
+# 断言：① 爬升总耗时 ≤ HEAD（无 B2）实测基线 × 0.7；
+#       ② 爬升窗口停顿帧总数 ≤ 3（HEAD 每级 2-3 帧 ≈ 20+，B2 后 0）；
+#       ③ 级间无 >2 帧连续停顿（探针输出级间帧数见 print）。
+func test_tower_ramp_first_frame() -> void:
+    # 基线 = HEAD（无 B1/B2）实测爬升物理步数（2026-08-12 RED 阶段测得，见报告）
+    var baseline_no_b2_frames := 170
+    _make_floor()
+    for i in range(10):
+        var top: float = 0.25 * float(i + 1)
+        var zf: float = -2.0 - 0.62 * float(i)   # 第 i 级前表面
+        var zd: float = 12.0 if i == 9 else 0.62
+        _make_box(Vector3(6, top, zd), Vector3(0, top * 0.5, zf - zd * 0.5))
+    await wait_physics_frames(25)
+    assert_true(controller.is_on_floor(), "前置：控制器应落在地面上")
+
+    var sampler := _ClimbSampler.new()
+    sampler.target = controller
+    sampler.done_feet = 2.44
+    sampler.stable_frames = 0  # 坡道顶无稳定段需求，只测爬升窗口
+    add_child(sampler)
+
+    Input.action_press("move_forward")
+    for i in 600:
+        await wait_physics_frames(1)
+        if sampler.climb_frames >= 0:
+            break
+    Input.action_release("move_forward")
+    print("TOWER_RAMP climb_frames=", sampler.climb_frames,
+            " slow=", sampler.slow_frames,
+            " consec=", sampler.max_consec_slow,
+            " max_y_drop=", snappedf(sampler.max_y_drop, 0.001),
+            " pos=", controller.global_position)
+    assert_true(sampler.climb_frames >= 0, "600 帧内应登上塔坡道第 10 级顶")
+    if sampler.climb_frames >= 0:
+        assert_lte(sampler.climb_frames, int(baseline_no_b2_frames * 0.7),
+                "爬升总耗时 ≤ 无 B2 基线 %d × 0.7 = %d 帧（首帧登台消除每级 16ms 停顿）"
+                % [baseline_no_b2_frames, int(baseline_no_b2_frames * 0.7)])
+    assert_lte(sampler.slow_frames, 3, "爬升窗口停顿帧 ≤ 3（旧门控每级 2-3 帧 ≈ 20+）")
+    assert_lte(sampler.max_consec_slow, 2, "级间无 >2 帧连续停顿")
+    assert_almost_eq(controller.global_position.y, 2.5 + cap_half, 0.05,
+            "最终登上塔坡道顶（脚底 2.5）")
+    remove_child(sampler)
+    sampler.free()
 
 
 # ══════════════════════════════════════════════════════════════

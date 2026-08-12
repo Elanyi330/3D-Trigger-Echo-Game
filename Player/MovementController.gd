@@ -184,6 +184,13 @@ const STEP_LANDING_LIFT := 0.02  # P4 落点抬高量（brief 预案 0.01→0.02
 const STEP_EDGE_INSET := 0.05  # 登台落点越过台阶棱线的距离（越棱必需量）
 const STEP_WALL_NORMAL_Y := 0.5  # G3：台阶立面判定阈值——阻挡面/棱线法线 y<0.5（近垂直）
                                  # 才算台阶立面；≥0.5 为坡面/台面，登台交给 move_and_slide
+const STEP_CHAIN_MAX := 3      # B1：同帧连锁登台总级数上限——首级 + 最多 2 级连锁
+                               # （0.3+0.3=0.6 ≤0.62 恰覆盖微台阶双级；0.6+0.6=1.2
+                               # 超 STEP_MAX 预算由循环内检查天然拦截，0.9 箱单级即超）
+const STEP_PACE_MAX := 0.2     # 登台帧水平总预算（F5）：瞬移 + 同帧前进 ≤ 0.2（走速
+                               # 步幅 0.106 + 越棱必需量 0.05 + 裕量）。B2 首帧登台
+                               # 不再碰撞吸收速度——登台帧"瞬移+满速前进"叠加实测
+                               # 0.258 超 P1 节奏守卫（≤0.2），钳制落点距离防突进帧。
 
 # P5a：碰撞节点 _ready 缓存（Crouch 只改 shape 的 height/center 不换子节点，缓存安全）
 @onready var _col_cached: CollisionShape3D = _find_collision_shape()
@@ -210,20 +217,21 @@ func _ready() -> void:
 func _try_step_up(delta: float) -> void:
 	# 空中绝不触发；起跳上升帧（velocity.y>0）不触发，避免吞掉跳跃冲量。
 	# 本函数在 move_and_slide 之前调用：is_on_floor()/is_on_wall() 读上一帧
-	# move_and_slide 的结果——首次撞墙帧玩家已被停住，本帧登台，无可感知延迟；
-	# 登台瞬移后同帧 move_and_slide 立即以行走速度+floor snap 越过棱线（动态
-	# 跨棱；若在 move_and_slide 之后瞬移，胶囊会静止坐在棱凸角上被推回，实测卡滞）。
+	# move_and_slide 的结果——B2 起墙门控加入脚部前向探针（首接触帧即登，
+	# 不再依赖上一帧碰撞记录），原 slide 碰撞门控保留为补充（任一通过即触发）。
+	# F5 实测根因（2026-08-12）：低台阶（0.25/0.3m 高）胶囊底球触的是台阶
+	# 顶棱，碰撞法线 (0,1,0) 被原门控按"地板"滤掉——塔坡道/微台阶玩家首级
+	# 即卡死或逐级顿挫；探针直接命中台阶立面（法线 y≈0）补上该盲区。
+	# B1（同帧连锁登台）：登台后若落点仍与前方台阶体积重叠（胶囊前缘嵌入），
+	# 在累计上升 ≤ STEP_MAX 预算内同帧继续登下一级——等效斜坡体验，消除
+	# 微台阶级间"引擎去穿透每帧挤出"抖动；循环上限 STEP_CHAIN_MAX 防无限循环，
+	# 预算检查（0.3+0.3=0.6 ≤0.62 恰覆盖双级；0.6+0.6=1.2 >0.62 天然拦截）防越级。
 	if not is_on_floor() or velocity.y > 0.0:
 		return
-	# P5c：未撞墙跳过整套查询（平地行走零开销）。P2 同源：敌人不是地形——
-	# 贴住敌人（torso/head）不算可登台的墙，否则贴敌帧反复触发登台-滑落循环
-	if not _has_terrain_wall():
-		return
-	# 前进意图门控：撞墙后 accelerate 每帧从输入重建速度——无前进输入时重建值
-	# 为 0，不触发登台（贴墙站立不会被抬上台阶）
 	var hvel := Vector2(velocity.x, velocity.z)
 	if hvel.length() <= 0.1:
 		return
+	var dir := Vector3(hvel.x, 0.0, hvel.y).normalized()
 	var col := _col_cached
 	if col == null:  # P5a：lazy 兜底（缓存为 null 时首次使用再扫一次）
 		col = _find_collision_shape()
@@ -233,119 +241,144 @@ func _try_step_up(delta: float) -> void:
 	var capsule := col.shape as CapsuleShape3D
 	if capsule == null:
 		return
-
 	var space_state := get_world_3d().direct_space_state
-	var dir := Vector3(hvel.x, 0.0, hvel.y).normalized()
-	# P1：水平进度与玩家速度耦合——advance = 撞墙前真实行走步幅（_walk_speed，
-	# 撞墙帧 move_and_slide 写回清零的 velocity 不可用）；低速保底见
-	# STEP_MIN_ADVANCE 注记（保底只为探针数值有效，落点仍受预算约束）。
-	var advance := maxf(_walk_speed * delta, STEP_MIN_ADVANCE)
-	var half_height: float = capsule.height * 0.5
-	# shape 查询变换 = 真实胶囊世界变换（含 CollisionShape3D 本地偏移，
-	# 与 Crouch.gd 动态改胶囊高度/中心的联动保持一致）
-	var capsule_xform := global_transform * col.transform
-	var feet_y: float = capsule_xform.origin.y - half_height
-	# P3：地板法线阈值读自身 floor_max_angle——与 move_and_slide 引擎地板判定同源
-	# （jump_recorder.gd 的 _floor_normal_y 同源于 player.floor_max_angle）
-	var floor_normal_y := cos(floor_max_angle)
-
-	# G1：防 snap-glide 悬挑跨隙——地板吸附滑翔（走离边缘后 floor_snap_length 内
-	# is_on_floor 仍真但无真实支撑）可让探针够到相邻高台触发跨隙瞬移。守卫：
-	# 底缘前缘正下方的支撑面必须落在 floor_snap_length 深度内（真实登台：地板
-	# 连续延伸到墙脚，深度≈0；跨隙悬挑：墙脚下方是深坑）。注意不能用"上一帧
-	# 是否有地板碰撞"判定——贴墙行走帧地板支撑同样不上报碰撞（实测更正：静止
-	# 帧有上报，行走帧没有）。
-	var gap_from := capsule_xform.origin + dir * (capsule.radius - 0.05)
-	gap_from.y = feet_y + 0.02
-	_ray_params.from = gap_from
-	_ray_params.to = gap_from + Vector3.DOWN * (floor_snap_length + 0.05)
-	var gap_hit := _ray_with_enemy_retry(space_state)
-	if gap_hit.is_empty() or gap_hit.position.y < feet_y - floor_snap_length:
-		return
-
-	# 相位2（先行）：探针 = STEP_MAX 抬升 + 本帧步幅，向下垂射线找落点高度。
-	# 探针偏移 [0, 前进方向满半径]：贴墙时满半径探针恰越过台阶棱线命中台面。
-	var probe_origin := capsule_xform.origin + Vector3.UP * STEP_MAX + dir * advance
-	var probe_top_y: float = probe_origin.y - half_height + 0.001
-	var ray_len: float = STEP_MAX + STEP_DOWN_EXTRA
-	var best_y := -INF
-	var probe_offsets: Array[Vector3] = [Vector3.ZERO, dir * capsule.radius]
-	for offset in probe_offsets:
-		var from: Vector3 = probe_origin + offset
-		from.y = probe_top_y
-		_ray_params.from = from
-		_ray_params.to = from + Vector3.DOWN * ray_len
-		var hit := _ray_with_enemy_retry(space_state)
-		if not hit.is_empty() and hit.normal.y >= floor_normal_y \
-				and hit.position.y > best_y:
-			best_y = hit.position.y
-	if best_y == -INF:
-		return
-	# 只升不降：走下台阶/平地不干扰
-	if best_y - feet_y <= STEP_MIN_RISE:
-		return
-	# 命中面高于抬升上限（探针中心下射可命中抬升体以上的面，如 0.9 箱顶）→ 不是台阶
-	if best_y - feet_y > STEP_MAX:
-		return
-
-	# P1：落点水平预算 = 本帧步幅 + 越棱必需量（棱线内侧 STEP_EDGE_INSET）。
-	# 棱线在预算内时落点收紧到棱线内侧 inset，不越棱超预算；贴墙帧玩家已被墙
-	# 停住（上一帧 move_and_slide 结果），登台瞬移 ≤ advance+inset ≤ 0.156（走速），
-	# 同帧 move_and_slide 的后续前进发生在台面之上——多级台阶无连锁突进。
-	var landing_dist := advance + STEP_EDGE_INSET
-	var edge_from := capsule_xform.origin
-	edge_from.y = best_y - 0.05
-	_ray_params.from = edge_from
-	_ray_params.to = edge_from + dir * landing_dist
-	var edge_hit := _ray_with_enemy_retry(space_state)
-	if not edge_hit.is_empty():
-		# G3：命中的是坡面（法线 y≥0.5）而非台阶立面 → 放弃登台，交给
-		# move_and_slide 正常爬坡（封真坡道逐帧瞬移）
-		if edge_hit.normal.y >= STEP_WALL_NORMAL_Y:
+	var total_rise := 0.0
+	for _chain in range(STEP_CHAIN_MAX):
+		# P5c/P2/B2：墙门控 = 上一帧 slide 碰撞（原逻辑，读上一帧 move_and_slide
+		# 结果）或脚部前向探针（B2，当前帧直接探测前方立面）——任一通过即触发。
+		# P2 同源：敌人不是地形——贴住敌人（torso/head）不算可登台的墙。
+		if not _has_terrain_wall() and not _has_foot_wall_probe(delta):
 			return
-		landing_dist = minf(landing_dist,
-				(edge_hit.position - edge_from).dot(dir) + STEP_EDGE_INSET)
+		# 前进意图门控：撞墙后 accelerate 每帧从输入重建速度——无前进输入时重建值
+		# 为 0，不触发登台（贴墙站立不会被抬上台阶）
+		if hvel.length() <= 0.1:
+			return
+		# P1：水平进度与玩家速度耦合——advance = 撞墙前真实行走步幅（_walk_speed，
+		# 撞墙帧 move_and_slide 写回清零的 velocity 不可用）；低速保底见
+		# STEP_MIN_ADVANCE 注记（保底只为探针数值有效，落点仍受预算约束）。
+		# F5（PACE 修正）：B2 首帧登台帧 velocity 未被碰撞吸收（= 满速），而
+		# _walk_speed 是上一帧缓存——加速期两者差 ~0.05m/s，会让"瞬移+同帧前进"
+		# 微超 0.2 节奏预算（实测 0.2008）。取 max(_walk_speed, 当前水平速度)：
+		# 首帧登台帧用当前满速（预算精确 0.2）；撞墙帧 velocity≈0 仍回落到缓存值。
+		var advance := maxf(maxf(_walk_speed, hvel.length()) * delta, STEP_MIN_ADVANCE)
+		var half_height: float = capsule.height * 0.5
+		# shape 查询变换 = 真实胶囊世界变换（含 CollisionShape3D 本地偏移，
+		# 与 Crouch.gd 动态改胶囊高度/中心的联动保持一致）
+		var capsule_xform := global_transform * col.transform
+		var feet_y: float = capsule_xform.origin.y - half_height
+		# P3：地板法线阈值读自身 floor_max_angle——与 move_and_slide 引擎地板判定同源
+		# （jump_recorder.gd 的 _floor_normal_y 同源于 player.floor_max_angle）
+		var floor_normal_y := cos(floor_max_angle)
 
-	# P4：落点抬高 0.02 交给 floor snap / 重力沉降。取值依据（brief 预案 0.01→0.02
-	# 微调）：登台落点跨越台阶棱线（overhang），底缘圆周与台面同高过棱时必然撞上
-	# 棱凸角（斜向接触法线把胶囊推回台阶下、丢地板态，相位敏感卡滞）；抬高 0.02
-	# 后底缘越过棱角上方（> margin+求解容差），无角接触，沉降后平贴台面。0 间隙
-	# 方案实测同样失败：贴合位出发的高度 0 扫掠无法命中台面（snap 空转悬停后坠落）。
-	# 站稳后 rise=0，被"只升不降"守卫拦下，无重触发循环。
-	var lift: float = best_y + STEP_LANDING_LIFT - feet_y
-	var raised := capsule_xform
-	raised.origin += Vector3.UP * lift
+		# G1：防 snap-glide 悬挑跨隙——地板吸附滑翔（走离边缘后 floor_snap_length 内
+		# is_on_floor 仍真但无真实支撑）可让探针够到相邻高台触发跨隙瞬移。守卫：
+		# 底缘前缘正下方的支撑面必须落在 floor_snap_length 深度内（真实登台：地板
+		# 连续延伸到墙脚，深度≈0；跨隙悬挑：墙脚下方是深坑）。注意不能用"上一帧
+		# 是否有地板碰撞"判定——贴墙行走帧地板支撑同样不上报碰撞（实测更正：静止
+		# 帧有上报，行走帧没有）。
+		var gap_from := capsule_xform.origin + dir * (capsule.radius - 0.05)
+		gap_from.y = feet_y + 0.02
+		_ray_params.from = gap_from
+		_ray_params.to = gap_from + Vector3.DOWN * (floor_snap_length + 0.05)
+		var gap_hit := _ray_with_enemy_retry(space_state)
+		if gap_hit.is_empty() or gap_hit.position.y < feet_y - floor_snap_length:
+			return
 
-	# 相位1：抬升净空三连查（起点/路径终点/落点，均按落点抬高后的变换查询——
-	# 落点本身抬高 0.02 » 查询 margin 0.001，不会把台面误判为重叠）——高箱、
-	# 低净空顶板、落点嵌体（如手雷落台阶边）即放弃。水平总位移 ≤0.156 « 胶囊
-	# 直径 1.0，静态查询无隧穿。
-	_shape_params.shape = capsule
-	_shape_params.transform = raised
-	if not _shape_filtered(space_state).is_empty():
-		return
-	var raised_fwd := raised
-	raised_fwd.origin += dir * advance
-	_shape_params.transform = raised_fwd
-	if not _shape_filtered(space_state).is_empty():
-		return
-	if landing_dist > advance:
-		var landing_xform := raised
-		landing_xform.origin = raised.origin + dir * landing_dist
-		_shape_params.transform = landing_xform
+		# 相位2（先行）：探针 = STEP_MAX 抬升 + 本帧步幅，向下垂射线找落点高度。
+		# 探针偏移 [0, 前进方向满半径]：贴墙时满半径探针恰越过台阶棱线命中台面。
+		var probe_origin := capsule_xform.origin + Vector3.UP * STEP_MAX + dir * advance
+		var probe_top_y: float = probe_origin.y - half_height + 0.001
+		var ray_len: float = STEP_MAX + STEP_DOWN_EXTRA
+		var best_y := -INF
+		var probe_offsets: Array[Vector3] = [Vector3.ZERO, dir * capsule.radius]
+		for offset in probe_offsets:
+			var from: Vector3 = probe_origin + offset
+			from.y = probe_top_y
+			_ray_params.from = from
+			_ray_params.to = from + Vector3.DOWN * ray_len
+			var hit := _ray_with_enemy_retry(space_state)
+			if not hit.is_empty() and hit.normal.y >= floor_normal_y \
+					and hit.position.y > best_y:
+				best_y = hit.position.y
+		if best_y == -INF:
+			return
+		# 只升不降：走下台阶/平地不干扰
+		if best_y - feet_y <= STEP_MIN_RISE:
+			return
+		# 命中面高于抬升上限（探针中心下射可命中抬升体以上的面，如 0.9 箱顶）→ 不是台阶
+		if best_y - feet_y > STEP_MAX:
+			return
+		# B1：累计上升预算——同帧连锁累计不超过 STEP_MAX（0.3+0.3=0.6 ≤0.62
+		# 恰覆盖微台阶双级；0.6+0.6=1.2 >0.62 天然拦截，0.9 箱单级即超）
+		if total_rise + (best_y - feet_y) > STEP_MAX:
+			return
+
+		# P1：落点水平预算 = 本帧步幅 + 越棱必需量（棱线内侧 STEP_EDGE_INSET）。
+		# 棱线在预算内时落点收紧到棱线内侧 inset，不越棱超预算；贴墙帧玩家已被墙
+		# 停住（上一帧 move_and_slide 结果），登台瞬移 ≤ advance+inset ≤ 0.156（走速），
+		# 同帧 move_and_slide 的后续前进发生在台面之上——多级台阶无连锁突进。
+		# F5（PACE）：B2 首帧登台不再碰撞吸收速度，登台帧"瞬移+同帧前进"叠加会
+		# 超 0.2 节奏预算（实测 0.258）——落点钳制到 STEP_PACE_MAX - advance，
+		# 保证登台帧总位移 ≤ 0.2（登台节奏 ≈ 行走节奏）。
+		var landing_dist := minf(advance + STEP_EDGE_INSET, STEP_PACE_MAX - advance)
+		var edge_from := capsule_xform.origin
+		edge_from.y = best_y - 0.05
+		_ray_params.from = edge_from
+		_ray_params.to = edge_from + dir * landing_dist
+		var edge_hit := _ray_with_enemy_retry(space_state)
+		if not edge_hit.is_empty():
+			# G3：命中的是坡面（法线 y≥0.5）而非台阶立面 → 放弃登台，交给
+			# move_and_slide 正常爬坡（封真坡道逐帧瞬移）
+			if edge_hit.normal.y >= STEP_WALL_NORMAL_Y:
+				return
+			landing_dist = minf(landing_dist,
+					(edge_hit.position - edge_from).dot(dir) + STEP_EDGE_INSET)
+
+		# P4：落点抬高 0.02 交给 floor snap / 重力沉降。取值依据（brief 预案 0.01→0.02
+		# 微调）：登台落点跨越台阶棱线（overhang），底缘圆周与台面同高过棱时必然撞上
+		# 棱凸角（斜向接触法线把胶囊推回台阶下、丢地板态，相位敏感卡滞）；抬高 0.02
+		# 后底缘越过棱角上方（> margin+求解容差），无角接触，沉降后平贴台面。0 间隙
+		# 方案实测同样失败：贴合位出发的高度 0 扫掠无法命中台面（snap 空转悬停后坠落）。
+		# 站稳后 rise=0，被"只升不降"守卫拦下，无重触发循环。
+		var lift: float = best_y + STEP_LANDING_LIFT - feet_y
+		var raised := capsule_xform
+		raised.origin += Vector3.UP * lift
+
+		# 相位1：抬升净空三连查（起点/路径终点/落点，均按落点抬高后的变换查询——
+		# 落点本身抬高 0.02 » 查询 margin 0.001，不会把台面误判为重叠）——高箱、
+		# 低净空顶板、落点嵌体（如手雷落台阶边）即放弃。水平总位移 ≤0.156 « 胶囊
+		# 直径 1.0，静态查询无隧穿。
+		_shape_params.shape = capsule
+		_shape_params.transform = raised
 		if not _shape_filtered(space_state).is_empty():
 			return
-	# G2：中段穿透检查——当前位置→落点中点再做一次抬升重叠查询，拦薄几何
-	# （细柱/栏杆）中段穿透（水平位移 ≤0.156 « 胶囊直径，两端查已覆盖大部分，
-	# 此查为保险层）
-	var mid_xform := raised
-	mid_xform.origin = raised.origin + dir * (landing_dist * 0.5)
-	_shape_params.transform = mid_xform
-	if not _shape_filtered(space_state).is_empty():
-		return
+		var raised_fwd := raised
+		raised_fwd.origin += dir * advance
+		_shape_params.transform = raised_fwd
+		if not _shape_filtered(space_state).is_empty():
+			return
+		if landing_dist > advance:
+			var landing_xform := raised
+			landing_xform.origin = raised.origin + dir * landing_dist
+			_shape_params.transform = landing_xform
+			if not _shape_filtered(space_state).is_empty():
+				return
+		# G2：中段穿透检查——当前位置→落点中点再做一次抬升重叠查询，拦薄几何
+		# （细柱/栏杆）中段穿透（水平位移 ≤0.156 « 胶囊直径，两端查已覆盖大部分，
+		# 此查为保险层）
+		var mid_xform := raised
+		mid_xform.origin = raised.origin + dir * (landing_dist * 0.5)
+		_shape_params.transform = mid_xform
+		if not _shape_filtered(space_state).is_empty():
+			return
 
-	global_position += dir * landing_dist + Vector3.UP * lift
-	velocity.y = 0.0
+		global_position += dir * landing_dist + Vector3.UP * lift
+		velocity.y = 0.0
+		total_rise += best_y - feet_y
+		# B1 续：本级落点完成后，循环回到顶部重新探测——若前缘仍嵌入前方台阶
+		# 体积（或贴近下一级立面），在预算内同帧继续登；否则门控/相位2 任一失败
+		# 即退出（return），流程与单级登台一致。
+	return
 
 
 ## P2：intersect_shape 结果过滤 torso/head 组碰撞体（敌人不是地形，不阻挡登台查询）
@@ -392,6 +425,43 @@ func _has_terrain_wall() -> bool:
 			continue  # 敌人不是地形
 		return true
 	return false
+
+
+## B2：脚部前向探针——当前帧从脚底（feet_y+0.02）向移动方向投射短射线
+## （长度 = advance + 胶囊半径 + 0.2），命中近垂直地形面（法线 y <
+## STEP_WALL_NORMAL_Y，同 G3 判定）即视为墙——等效"首帧登台"门控：
+## 不再依赖上一帧 move_and_slide 碰撞记录。F5 实测盲区（2026-08-12）：
+## 低台阶（0.25/0.3m 高）胶囊底球触的是台阶顶棱，碰撞法线 (0,1,0) 被
+## 原门控按"地板"滤掉——塔坡道/微台阶玩家卡死或逐级顿挫；探针直接命中
+## 台阶立面（法线 y≈0）消除该盲区，且首接触帧即登（省 16ms/级）。
+## 误触防护：torso/head 敌人经 _ray_with_enemy_retry 过滤重放（P2 同源，
+## 敌人不是地形）；平地前方无立面射线不命中；坡面法线 y≥0.5 过滤（G3）；
+## 高墙/远墙由相位2 的"只升不降 + ≤STEP_MAX"检查拦截——探针只负责"墙"判定，
+## 真正的登台与否仍由落点探测把关。
+func _has_foot_wall_probe(delta: float) -> bool:
+	var col := _col_cached
+	if col == null:
+		col = _find_collision_shape()
+		_col_cached = col
+	if col == null:
+		return false
+	var capsule := col.shape as CapsuleShape3D
+	if capsule == null:
+		return false
+	var hvel := Vector2(velocity.x, velocity.z)
+	if hvel.length() <= 0.1:
+		return false
+	var dir := Vector3(hvel.x, 0.0, hvel.y).normalized()
+	var advance := maxf(_walk_speed * delta, STEP_MIN_ADVANCE)
+	var capsule_xform := global_transform * col.transform
+	var from := capsule_xform.origin
+	from.y = capsule_xform.origin.y - capsule.height * 0.5 + 0.02
+	_ray_params.from = from
+	_ray_params.to = from + dir * (advance + capsule.radius + 0.2)
+	var hit := _ray_with_enemy_retry(get_world_3d().direct_space_state)
+	if hit.is_empty():
+		return false
+	return hit.normal.y < STEP_WALL_NORMAL_Y
 
 
 func _find_collision_shape() -> CollisionShape3D:

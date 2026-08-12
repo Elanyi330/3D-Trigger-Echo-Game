@@ -210,13 +210,16 @@ static func _ramp_steps(x_min: float, x_max: float, z_from: float, z_to: float,
 
 ## 钟门生成器：side=1 北 / side=-1 南（180° 旋转 = x/z 乘 side）。
 ## 双柱间 2.5m 门廊（柱 x 内缘 ±1.25）+ 过梁（底 4.5 顶 4.9）+ 两侧低翼墙。
+## F5（2026-08-12 用户验收反馈）：摊阁台阶↔门柱夹缝 0.45m 卡顿——柱深 3→2.25
+## 靠广场侧收缩 0.75m（北 z∈[13,16]→[13.75,16]，南镜像），留 1.2m 通道；
+## 过梁（z∈[12.75,16.25]）不动仍覆盖柱顶；旋转对称保持（size.z 与 center.z 同步变）。
 static func _bell_gate(side: int) -> Array:
 	var tag: String = "GateN" if side == 1 else "GateS"
 	return [
 		{"name": tag + "_PillarW", "kind": "wall",
-			"center": Vector3(-3.125 * side, 1.5, 14.5 * side), "size": Vector3(3.75, 3, 3)},
+			"center": Vector3(-3.125 * side, 1.5, 14.875 * side), "size": Vector3(3.75, 3, 2.25)},
 		{"name": tag + "_PillarE", "kind": "wall",
-			"center": Vector3(3.125 * side, 1.5, 14.5 * side), "size": Vector3(3.75, 3, 3)},
+			"center": Vector3(3.125 * side, 1.5, 14.875 * side), "size": Vector3(3.75, 3, 2.25)},
 		{"name": tag + "_Lintel", "kind": "wall",
 			"center": Vector3(0, 4.7, 14.5 * side), "size": Vector3(11, 0.4, 3.5)},
 		{"name": tag + "_WingW", "kind": "wall",
@@ -228,9 +231,9 @@ static func _bell_gate(side: int) -> Array:
 
 ## 市集带生成器：side=1 北 / side=-1 南。
 ## 摊阁（2.0×1.8 顶 1.2 可跳，z∈[10,11.8] 贴 rim N 面 z=10，x∈[±2.5,±4.5] 避开翼墙 x≥5、
-## 与门柱 z 缝恰 1.2）+ 摊阁台阶（顶 0.6，贴摊阁北缘 z=11.8）+ 中央双箱（x=±0.5
-## 内收，原 ±2 与台阶缝 0.25——任务 9 A4 重布，2026-08-11）+ 高棚板对（底 4.5，
-## 间留 2m 天井 x∈[-1,1]）。
+## 与门柱 z 缝 1.95——F5 柱深 3→2.25 后）+ 摊阁台阶（顶 0.6，贴摊阁北缘 z=11.8，
+## 与门柱 z 缝恰 1.2）+ 中央双箱（x=±0.5 内收，原 ±2 与台阶缝 0.25——任务 9 A4 重布，
+## 2026-08-11）+ 高棚板对（底 4.5，间留 2m 天井 x∈[-1,1]）。
 static func _market_belt(side: int) -> Array:
 	var tag: String = "BeltN" if side == 1 else "BeltS"
 	return [
