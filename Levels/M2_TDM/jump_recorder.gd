@@ -59,7 +59,13 @@ func setup(player: CharacterBody3D, layout_solids: Array, map_name: String,
 	_map_name = map_name
 	_base_dir = base_dir
 	_episodes_dir = base_dir.path_join("episodes")
-	_map_hash_str = JumpRecordCore.map_hash(layout_solids)
+	# X1 移动机制修订失效键：MovementController.MOVEMENT_REV 参与哈希——移动语义
+	# 变更（布局不变）同样触发重置铁律，堵旧/新物理录像混存洞。
+	# player 非 MovementController（含 null 文件级测试）回退空 rev（旧行为）。
+	var movement_rev := ""
+	if player is MovementController:
+		movement_rev = MovementController.MOVEMENT_REV
+	_map_hash_str = JumpRecordCore.map_hash(layout_solids, movement_rev)
 	_verify_and_reset()
 
 

@@ -135,3 +135,18 @@ func test_serialize_real_layout() -> void:
 	assert_true(ordered, "全部行 name 字典序非降")
 	assert_eq(JumpRecordCore.map_hash(solids), JumpRecordCore.map_hash(V3.all_solids()),
 			"真实布局两次调用 → 哈希稳定")
+
+
+# ================= 7. 移动机制修订失效键（X1） =================
+# 数据污染铁律补全：移动语义变更（step-up/空中控制）不改布局哈希，但跳跃操作
+# 数据已不同——movement_rev 参与哈希，机制修订即自动作废旧录像。
+func test_hash_movement_rev() -> void:
+	var solids := _fixture_solids()
+	var h_empty := JumpRecordCore.map_hash(solids)
+	var h_r1 := JumpRecordCore.map_hash(solids, "move-r1")
+	var h_r2 := JumpRecordCore.map_hash(solids, "move-r2:step0.62,air-rest3.0/run0.76")
+	assert_ne(h_r1, h_r2, "同 solids 不同 rev → 哈希不同")
+	assert_ne(h_empty, h_r1, "空 rev 与非空 rev → 哈希不同")
+	assert_eq(JumpRecordCore.map_hash(solids, "move-r1"), h_r1, "同 solids 同 rev → 哈希相同")
+	assert_eq(JumpRecordCore.map_hash(solids, ""), h_empty,
+			"空串 rev 保持旧行为（与无参调用哈希一致）")

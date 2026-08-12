@@ -10,9 +10,27 @@ class_name MovementController
 @export var crouch_speed: float = 2.59
 @export var acceleration := 8
 @export var deceleration := 10
-# 注意：空中加速已按 CS 禁用（temp_accel=0），此参数保留为未来 airstrafe 扩展预留
+# 注意：F2 起空中加速改用 Source 投影式公式（见下方 AIR_* 常量），此参数仍未使用，
+# 保留为未来空中控制比例扩展预留
 @export_range(0.0, 1.0, 0.05) var air_control := 0.3
 @export var jump_height := 7.54
+# ── 空中控制（F2）：Source PM_AirAccelerate 投影式空中加速 ──────────────
+# 公式（所有空中帧）：proj = 水平速度·wishdir；addspeed = wish_cap − proj；
+#   addspeed > 0 时 velocity += wishdir × min(AIR_ACCELERATE × wish_cap × dt, addspeed)
+# 有初速跑跳：proj ≫ wish_cap → 天然零加速（CS 手感：跳跃不增加速度）；
+# 原地跳 REST 档：≤ AIR_WISH_CAP_REST 的空中转向微调（Source air-strafe 特性保留）。
+# 参数出处：AIR_ACCELERATE = CS sv_airaccelerate 12；RUN 档 wish 帽 = 30u/s = 0.76m/s
+#   （Quakeworld/Source 权威 air wishspeed）；REST 档 3.0 为手感调参（≤半速，不给
+#   bhop 能量源——第 2 跳起起跳速度 ≥0.5 自动回落 RUN 档，无叠速链）。
+const AIR_WISH_CAP_RUN := 0.76
+const AIR_WISH_CAP_REST := 3.0
+const AIR_ACCELERATE := 12.0
+const REST_TAKEOFF_THRESHOLD := 0.5
+var _air_wish_cap := AIR_WISH_CAP_RUN   # 起跳瞬间定档（按起跳时水平速度，见跳跃分支）
+# 移动机制修订标识（X1）——任何移动语义变更（台阶高度/空中控制/速度模型等）必须
+# bump 此值：JumpRecorder.setup 用它参与地图哈希，自动触发跳跃记录重置铁律，
+# 防旧物理录像与新物理混存（布局哈希不变但移动语义已变）。
+const MOVEMENT_REV := "move-r2:step0.62,air-rest3.0/run0.76"
 # 自动登台（F1）：on_floor + 水平移动时，高差 ≤ STEP_MAX 视为斜坡直接走上去。
 # 取值 0.62 的依据与 CS 偏离说明见 _try_step_up() 头部注释。
 const STEP_MAX := 0.62
@@ -35,9 +53,17 @@ func _physics_process(delta: float) -> void:
 
 	direction_input()
 
+	# 落地钳制（防 bhop）需要：记录 move_and_slide 之前的接地状态
+	var was_on_floor := is_on_floor()
+
 	if is_on_floor():
 		if Input.is_action_just_pressed(&"jump"):
 			velocity.y = jump_height
+			# 空中控制定档（起跳瞬间一次写入，F2）：起跳时水平速度 < 阈值 = 原地跳
+			# → REST 档（可空中转向）；否则跑跳 → RUN 档（proj≫cap 天然零加速）
+			var takeoff_speed := Vector2(velocity.x, velocity.z).length()
+			_air_wish_cap = AIR_WISH_CAP_REST \
+					if takeoff_speed < REST_TAKEOFF_THRESHOLD else AIR_WISH_CAP_RUN
 	else:
 		velocity.y -= gravity * delta
 
@@ -45,6 +71,15 @@ func _physics_process(delta: float) -> void:
 
 	_try_step_up(delta)
 	move_and_slide()
+	# 落地钳制（防 bhop，F2）：非接地→接地过渡帧水平速度 > 基础 speed → 钳回 speed。
+	# 拦空中叠速（air-strafe/bhop 能量链）；正常跑跳落地速度 ≈ speed 不触发，
+	# step-up 登台帧 was_on_floor 为真同样不触发。
+	if is_on_floor() and not was_on_floor:
+		var land_h := Vector2(velocity.x, velocity.z).length()
+		if land_h > speed:
+			var land_scale := speed / land_h
+			velocity.x *= land_scale
+			velocity.z *= land_scale
 	# P1：缓存最近一次自由行走（在地板、未撞墙）的速度幅值——撞墙帧 move_and_slide
 	# 会把 velocity 写回清零并由 accelerate 低速重建，登台步幅预算须用撞墙前的真实
 	# 行走速度，否则登台退化为蠕动
@@ -70,6 +105,21 @@ func accelerate(delta: float) -> void:
 	var temp_vel := velocity
 	temp_vel.y = 0
 
+	# 空中（含起跳瞬间）：Source PM_AirAccelerate 投影公式独立分支（不改变垂直
+	# 分量）——有初速跑跳 proj≫cap 天然零加速；原地跳 REST 档获得 ≤cap 转向微调
+	# （公式与参数出处见 AIR_* 常量注释）。地面 lerp 逻辑完全不变。
+	if not is_on_floor() or velocity.y > 0.0:
+		if direction.length_squared() > 0.0:
+			var wishdir := direction.normalized()
+			var proj := temp_vel.dot(wishdir)
+			var addspeed := _air_wish_cap - proj
+			if addspeed > 0.0:
+				temp_vel += wishdir \
+						* minf(AIR_ACCELERATE * _air_wish_cap * delta, addspeed)
+		velocity.x = temp_vel.x
+		velocity.z = temp_vel.z
+		return
+
 	var temp_accel: float
 	# 下蹲豁免 speed_modifier（CS：蹲速固定 2.59，不受武器移速影响——任务2 审查移交约束）；
 	# 站立时用 走速 × 武器移速倍率
@@ -80,11 +130,6 @@ func accelerate(delta: float) -> void:
 		temp_accel = acceleration
 	else:
 		temp_accel = deceleration
-
-	if not is_on_floor() or velocity.y > 0.0:
-		# 空中（含起跳瞬间）：CS 式——水平速度完全保留（无空气阻力、无空中加速），
-		# 跳跃轨迹由起跳时的速度决定（跳上掩体窗口的前提）；起跳帧不衰减
-		temp_accel = 0.0
 
 	var accel_weight = clamp(temp_accel * delta, 0.0, 1.0)
 	temp_vel = temp_vel.lerp(target, accel_weight)
@@ -208,7 +253,8 @@ func _try_step_up(delta: float) -> void:
 	# is_on_floor 仍真但无真实支撑）可让探针够到相邻高台触发跨隙瞬移。守卫：
 	# 底缘前缘正下方的支撑面必须落在 floor_snap_length 深度内（真实登台：地板
 	# 连续延伸到墙脚，深度≈0；跨隙悬挑：墙脚下方是深坑）。注意不能用"上一帧
-	# 是否有地板碰撞"判定——贴墙静止帧地板支撑同样不上报碰撞（实测）。
+	# 是否有地板碰撞"判定——贴墙行走帧地板支撑同样不上报碰撞（实测更正：静止
+	# 帧有上报，行走帧没有）。
 	var gap_from := capsule_xform.origin + dir * (capsule.radius - 0.05)
 	gap_from.y = feet_y + 0.02
 	_ray_params.from = gap_from

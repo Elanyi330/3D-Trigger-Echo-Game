@@ -26,8 +26,14 @@ static func serialize_solids(solids: Array) -> String:
 
 ## SHA-256 十六进制（64 字符小写）——对 serialize_solids 结果取哈希，
 ## 作为布局指纹键：地图每改动一次此值即变，老图记录自动作废。
-static func map_hash(solids: Array) -> String:
-	return serialize_solids(solids).sha256_text()
+## movement_rev（X1）：移动机制修订标识——非空时序列化末尾追加一行
+## "rev|<movement_rev>" 再哈希；移动语义变更（布局不变）也触发老录像作废。
+## 空串保持旧行为（哈希与无参调用一致，兼容既有测试）。
+static func map_hash(solids: Array, movement_rev: String = "") -> String:
+	var text := serialize_solids(solids)
+	if not movement_rev.is_empty():
+		text += "\nrev|" + movement_rev
+	return text.sha256_text()
 
 
 ## episode 分类：净升高 ≥0.5 → "climb"；起落同名面 → "fail"；其余 → "traverse"。

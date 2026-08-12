@@ -103,6 +103,33 @@ func test_setup_corrupt_manifest_resets() -> void:
 	assert_eq(m["map_hash"], recorder.current_hash(), "损坏 manifest 被新 manifest 覆盖")
 
 
+# ================= 3c. 移动机制 rev 变更 → 重置铁律（X1） =================
+# 实证移动机制变更触发重置铁律：布局不变但移动语义变更（step-up/空中控制修订）——
+# 旧 rev 哈希 manifest + 假 episode → setup（玩家携带新 MOVEMENT_REV）→ episode 被清、
+# manifest 哈希为新 rev 值。
+func test_setup_movement_rev_change_resets() -> void:
+	var player: MovementController = load("res://Player/MovementController.tscn").instantiate()
+	add_child_autofree(player)
+	var old_hash := JumpRecordCore.map_hash(V3.all_solids(), "move-r1:legacy")
+	DirAccess.make_dir_recursive_absolute(TMP_DIR + "/episodes")
+	var f := FileAccess.open(TMP_DIR + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(JumpRecordCore.manifest_dict(old_hash, "回声祭坛v3", 5)))
+	f.close()
+	var fake := FileAccess.open(TMP_DIR + "/episodes/ep_0004.jsonl", FileAccess.WRITE)
+	fake.store_line("{}")
+	fake.close()
+
+	recorder.setup(player, V3.all_solids(), "回声祭坛v3", TMP_DIR)
+
+	assert_false(FileAccess.file_exists(TMP_DIR + "/episodes/ep_0004.jsonl"),
+			"移动机制 rev 变更 → 老 episode 被清空")
+	var m: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TMP_DIR + "/manifest.json"))
+	var new_hash := JumpRecordCore.map_hash(V3.all_solids(), MovementController.MOVEMENT_REV)
+	assert_eq(m["map_hash"], new_hash, "重置后 manifest 哈希 = 新 rev 值")
+	assert_ne(m["map_hash"], old_hash, "新哈希 ≠ 旧 rev 哈希")
+	assert_eq(int(m["episode_count"]), 0, "重置后 episode_count 归零")
+
+
 # ================= 4. episode 写盘格式（缝驱动，climb 路径） =================
 func test_episode_write_format() -> void:
 	recorder.setup(null, V3.all_solids(), "回声祭坛v3", TMP_DIR)
