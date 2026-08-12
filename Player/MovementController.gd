@@ -30,7 +30,10 @@ var _air_wish_cap := AIR_WISH_CAP_RUN   # 起跳瞬间定档（按起跳时水�
 # 移动机制修订标识（X1）——任何移动语义变更（台阶高度/空中控制/速度模型等）必须
 # bump 此值：JumpRecorder.setup 用它参与地图哈希，自动触发跳跃记录重置铁律，
 # 防旧物理录像与新物理混存（布局哈希不变但移动语义已变）。
-const MOVEMENT_REV := "move-r2:step0.62,air-rest3.0/run0.76"
+# r3（F5，2026-08-12）：登台语义新增同帧连锁登台（B1：微台阶双级 2 帧登完无
+# 振荡）+ 首帧登台（B2：脚部前向探针首接触帧即登）+ PACE 0.2 落点钳制——移动
+# 语义已变，bump 触发记录重置；布局另有门柱 z 3→2.25 变更（哈希另一键），双键双保险。
+const MOVEMENT_REV := "move-r3:step0.62+chain+firstframe,air-rest3.0/run0.76"
 # 自动登台（F1）：on_floor + 水平移动时，高差 ≤ STEP_MAX 视为斜坡直接走上去。
 # 取值 0.62 的依据与 CS 偏离说明见 _try_step_up() 头部注释。
 const STEP_MAX := 0.62
@@ -244,9 +247,10 @@ func _try_step_up(delta: float) -> void:
 	var space_state := get_world_3d().direct_space_state
 	var total_rise := 0.0
 	for _chain in range(STEP_CHAIN_MAX):
-		# P5c/P2/B2：墙门控 = 上一帧 slide 碰撞（原逻辑，读上一帧 move_and_slide
-		# 结果）或脚部前向探针（B2，当前帧直接探测前方立面）——任一通过即触发。
-		# P2 同源：敌人不是地形——贴住敌人（torso/head）不算可登台的墙。
+		# P5c/P2/B2：墙门控 = 脚部前向探针每帧一条短射线（成本可忽略）+ slide
+		# 碰撞门控补充（原逻辑，读上一帧 move_and_slide 结果）——任一通过即触发，
+		# 登台完整查询仅贴墙帧触发。P2 同源：敌人不是地形——贴住敌人
+		# （torso/head）不算可登台的墙。
 		if not _has_terrain_wall() and not _has_foot_wall_probe(delta):
 			return
 		# 前进意图门控：撞墙后 accelerate 每帧从输入重建速度——无前进输入时重建值
@@ -452,7 +456,10 @@ func _has_foot_wall_probe(delta: float) -> bool:
 	if hvel.length() <= 0.1:
 		return false
 	var dir := Vector3(hvel.x, 0.0, hvel.y).normalized()
-	var advance := maxf(_walk_speed * delta, STEP_MIN_ADVANCE)
+	# F6：advance 公式与 _try_step_up 对齐——max(_walk_speed, 当前水平速度)；
+	# 首帧登台帧用当前满速（预算一致），撞墙帧 velocity≈0 回落到缓存值
+	# （差异 ~0.0008m 探针长度，纯一致性）
+	var advance := maxf(maxf(_walk_speed, hvel.length()) * delta, STEP_MIN_ADVANCE)
 	var capsule_xform := global_transform * col.transform
 	var from := capsule_xform.origin
 	from.y = capsule_xform.origin.y - capsule.height * 0.5 + 0.02
