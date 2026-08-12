@@ -2,7 +2,7 @@
 
 > **日期**：2026-08-12
 > **背景**：用户 v3 实机反馈三点——①台阶不跳上不去（0.6m 台阶全图皆是）②静止起跳纯垂直、无法跳上身旁障碍 ③两侧市街长廊太空、集火效果差。控制器调研定稿后拆为 F1（step-up）→ F2a（step-up 加固×2 轮）→ F2b（空中控制 + MOVEMENT_REV）→ F3（横脊墙）→ F5（台阶手感微调）→ F6（收尾）六个实现任务，全部子代理驱动 + 逐任务审查。
-> **提交链**：F1 `4abaa98` → F2a 加固 `4f16592` → F2a 守卫二轮 `1bf12d5` → F2b 空中控制+失效键 `87c19d9` → F3 初版 `e932b62`+`2abea33` → F3 返工 `07352f3` → F5 手感微调 `dd1ca1b`（F4 为文档收尾无代码提交；F6 收尾提交另见本文件末）
+> **提交链**：F1 `4abaa98` → F2a 加固 `4f16592` → F2a 守卫二轮 `1bf12d5` → F2b 空中控制+失效键 `87c19d9` → F3 初版 `e932b62`+`2abea33` → F3 返工 `07352f3` → F5 手感微调 `dd1ca1b` → F6 收尾 `33daf67` → F7 门柱再缩短 `4e87d05` → F8 横脊墙缩短 `71d57d9`（F4 为文档收尾无代码提交；F9 文档收尾另见本文件末）
 > **关键裁决**：
 > 1. step-up 取 0.62m：覆盖 0.6m 坡道级/0.3 微台阶/0.6 摊阁台阶；0.9m 箱保持只能跳上。CS 权威 18u=0.457m 因本项目台阶几何为 0.6m 级（AI navmesh 与方块视觉需求）而偏离，注释留档。
 > 2. 空中控制定 Source PM_AirAccelerate 投影式 + 起跳定档（REST 3.0 / RUN 0.76）+ 落地钳制 6.35 防 bhop；同轮裁决追加 **MOVEMENT_REV 移动机制版本失效键**——移动语义变更必须 bump，与布局哈希共构跳跃记录重置键；跳高口径按生产实测修正为 1.51±0.05（probe_jump 1.39 为理想化积分序）。
@@ -11,6 +11,9 @@
 > 5. 确立教训（已入 HANDOFF §五）：窄缝扫描角部盲区——"扫描绿≠可通行"，由探针连通门禁兜底；加墙必须给通行留 ≥1.2m 或完全不放。
 > 6. **F5（用户实测反馈，dd1ca1b）**：三点卡顿根因——①摊阁台阶↔门柱 0.45m 夹缝（scan_gaps 垂直阈值盲区）②微台阶逐级去穿透振荡 ③首接触帧墙门控读上一帧碰撞停 16ms/级。修复：门柱 z 3→2.25 留 1.2m 通道（布局唯一改动）+ 同帧连锁登台（B1）+ 首帧登台（B2 脚部前向探针）+ PACE 0.2 落点钳制（brief 外新增，实测 0.258→0.2）。
 > 7. **F6（收尾）**：MOVEMENT_REV bump r3（F5 登台语义变更，铁律）——与布局哈希（门柱尺寸变）双键双保险；探针 advance 公式对齐 + P5c 注释更新；文档基线 275 同步。
+> 8. **F7（用户二次反馈，4e87d05）**：摊阁台阶↔门柱 1.2m 通道仍卡（玩家 1.0m 仅两侧 0.1m 余量，斜向登台擦柱）→ 柱深 2.25→1.5 留 1.95m 通道（仅门柱 4 根，旋转对称硬约束）；偏差：test_belt_pavilions 同步/注释同步。
+> 9. **F8（用户实测定位，71d57d9）**：EastSpurS/WestSpurN 墙头↔塔坡道绕墙通道仅 1.0m（零余量）→ 长 3→2m 留 2.0m 通道；偏差：center 16→15.5（墙贴 rim 面不动，唯一解）；EastSpurN/WestSpurS 不动。
+> 10. **用户实机验收 PASS（2026-08-13）**："地图十分完美，各个地方都符合我的要求"——F9 文档收尾（基线 276 同步、HANDOFF/FEATURES/PROGRESS/README/记忆、本文件追加 F7/F8 brief）。
 
 ---
 
@@ -335,3 +338,90 @@ godot --headless --path . Levels/M2_TDM/L_M2.tscn            # 10 秒无错误�
 
 ## 报告格式
 状态 + A/B/C 落地 + 验证输出 + 提交哈希。
+
+---
+
+# ═══════════ F7 brief（原文；2026-08-12 用户二次反馈） ═══════════
+
+# 修复 F7 brief —— 门柱再缩短：摊阁台阶↔门柱通道 1.2m → 1.95m（用户二次反馈）
+
+## 背景（用户反馈 + 控制器实测）
+Trigger Echo。目录 /Users/elanyi/Projects/Trigger-Echo。用户复测反馈：**对称的两处摊阁台阶（市集带南北）旁的墙体与台阶距离仍过近，玩家通过会卡住，需要缩短墙体**。其余组件不动。
+控制器实测（dump 全量数据）：4 组市集带摊阁台阶（BeltN_PavStepE/W、BeltS_PavStepE/W）与钟门柱净距 = **1.2m**（F5 已从 0.45 修到 1.2）——对 1.0m 宽玩家仍仅两侧各 0.1m 余量，斜向登台即擦柱卡顿。
+**用户红线：地图只动这两处墙体，其他组件零改动。** 180° 旋转对称是项目硬约束（test_streets_rotation_pairs 强制）——南北门柱互为旋转镜像，须 4 根同步缩短（东/西 × 北/南），这正是"对称的两处"的完整解。
+
+## A. 布局改动（唯一：门柱 size.z 再缩短，4 根同步）
+`Levels/M2_TDM/map_layout_v3.gd` `_bell_gate(side)`：
+- GateN/S 四根门柱 size.z：**2.25 → 1.5**，center.z 同步：北柱 z∈[13.75,16] → **[14.5,16]**（center 14.875→15.25）；南镜像 z∈[-16,-14.5]
+- 结果：摊阁台阶 z_max 12.55 ↔ 门柱 z_min 14.5 → 净距 **1.95m**（玩家 1.0m + 两侧 0.475m 余量）
+- 校验（逐项）：
+  - 摊阁（z∈[10,11.8]）↔ 门柱 14.5：2.7m ✓
+  - 双箱（z∈[12,13]）↔ 门柱 14.5：1.5m ✓
+  - 门廊净空：两柱间 x 缝不变（size.x 3.75 未动）→ 门廊 2.5m ✓
+  - 过梁（z∈[12.75,16.25]）仍覆盖柱顶 ✓（柱 z_max 16 未变）
+  - 台阶（BeltN_PavStep z∈[11.8,12.55]）↔ 门柱 14.5：1.95 ✓
+  - 旋转对称：4 根同改，center 互为 ±side ✓
+- 注释：2026-08-12 用户二次反馈——1.2m 通道仍卡，柱深 2.25→1.5 留 1.95m
+
+## B. 测试
+1. `test_pavilion_step_clearance`（test_map_layout_v3.gd 既有，F5 新增）：gap 断言 1.2−0.001 → **1.95−0.001**；size.z 断言 2.25 → **1.5**
+2. 全套件全绿（旋转对/无重叠/预算 193 不变/breach 不受影响）
+3. scan_gaps_v3 必须 0 窄缝（新门柱与台阶 1.95、与双箱 1.5、与摊阁 2.7 全合规）
+
+## C. 验证（实际运行贴输出）
+```bash
+cd /Users/elanyi/Projects/Trigger-Echo
+godot --headless --path . -s addons/gut/gut_cmdln.gd -gselect=test_map_layout_v3.gd
+godot --headless --path . -s addons/gut/gut_cmdln.gd
+python3 tools/scan_gaps_v3.py
+godot --headless --path . -s res://tools/probe_v3_walk.gd
+godot --headless --path . Levels/M2_TDM/L_M2.tscn   # 10 秒无错误；重置日志新哈希
+```
+提交：`fix(m2v3): 门柱再缩短——摊阁台阶↔门柱通道 1.95m（F7 用户二次反馈，仅门柱 4 根）`
+
+## 禁止
+- **除门柱 size.z 外零布局改动**（用户红线：其他组件不做任何改动）；不改移动代码；不做清单外改动
+
+## 报告格式
+状态 + A 落地 + RED/GREEN 证据 + 五条验证输出 + 提交哈希 + 偏差。
+
+---
+
+# ═══════════ F8 brief（原文；2026-08-12 用户实测定位） ═══════════
+
+# 修复 F8 brief —— 横脊墙缩短：绕墙通道 1.0m → 2.0m（用户实测定位）
+
+## 背景（用户确认）
+Trigger Echo。目录 /Users/elanyi/Projects/Trigger-Echo。用户实测定位卡点：**东市街南段横脊墙（EastSpurS）与东塔坡道**、**西市街北段横脊墙（WestSpurN）与西塔坡道**之间绕墙通道仅 **1.0m**（玩家宽 1.0m，零余量，斜向通过即卡）。用户确认："就是这个地方，把墙体修改一下即可，其他一切地方和组件不要动。"
+
+## A. 布局改动（唯一：2 面横脊墙缩短 1m，旋转对称对）
+`Levels/M2_TDM/map_layout_v3.gd` STREETS：
+- **EastSpurS**：size.x **3.0 → 2.0**（center.x 16.0 不变）→ x∈[14.5,16.5]（墙头 17.5 → **16.5**）
+- **WestSpurN**（EastSpurS 的 180° 旋转镜像）：size.x **3.0 → 2.0** → x∈[-16.5,-14.5]（墙头 -17.5 → **-16.5**）
+- **EastSpurN / WestSpurS 不动**（其余两面绕行路径净距充足，用户确认不卡）
+- 结果：墙头↔塔坡道（x=±18.5）净距 **1.0 → 2.0m**（玩家两侧 0.5m 余量）
+- 校验：墙贴 rim 面（x=14.5 面接触）不变；墙长 2m 仍提供拐角博弈位；其余组件/移动代码零改动
+- 注释：2026-08-12 用户实测定位——绕墙通道 1.0m 卡顿，横脊墙 3→2m 留 2.0m
+
+## B. 测试
+1. `test_streets_f3_highwalls`：EastSpurS/WestSpurN 的 size.x 断言 3.0 → **2.0**（±0.01）；EastSpurN/WestSpurS 保持 3.0（可加断言钉住"只改两处"）
+2. **新增绕墙通道断言**（test_map_layout_v3.gd）：EastSpurS 墙头（x=16.5）与 EastTowerRamp 足迹（x_min 18.5）净距 **2.0−0.001**；WestSpurN 镜像同——数据级钉住用户场景
+3. 全套件全绿（旋转对自动适配：size 同改仍对称；无重叠/boost/预算 193 不变）
+4. scan_gaps_v3 必须 0 窄缝（1.0→2.0 通道不再构成任何窄缝）
+
+## C. 验证（实际运行贴输出）
+```bash
+cd /Users/elanyi/Projects/Trigger-Echo
+godot --headless --path . -s addons/gut/gut_cmdln.gd -gselect=test_map_layout_v3.gd
+godot --headless --path . -s addons/gut/gut_cmdln.gd
+python3 tools/scan_gaps_v3.py
+godot --headless --path . -s res://tools/probe_v3_walk.gd
+godot --headless --path . Levels/M2_TDM/L_M2.tscn   # 10 秒无错误；重置日志新哈希
+```
+提交：`fix(m2v3): 横脊墙缩短——绕墙通道 2.0m（F8 用户定位，仅 EastSpurS/WestSpurN 两处）`
+
+## 禁止
+- **除上述 2 面横脊墙 size.x 外零改动**（用户红线：其他一切地方和组件不要动）；不改移动代码；不做清单外改动
+
+## 报告格式
+状态 + A 落地 + RED/GREEN 证据 + 五条验证输出 + 提交哈希 + 偏差。
