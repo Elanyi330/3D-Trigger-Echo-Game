@@ -925,7 +925,7 @@ func test_wing_side_gap() -> void:
 
 # ---- 31. 市集带摊阁（任务 9 A4 重布后）：顶 1.2 可跳 / 尺寸 2.0×1.8 / 贴 rim 面 |z|=10 /
 #         台阶顶 0.6 贴摊阁缘缝 0 / 台阶↔翼墙 z 缝 0.95（台阶顶 0.6≤0.95 非阻挡体，合法）/
-#         摊阁↔门柱 z 缝 1.95（F5 2026-08-12：柱深 3→2.25 后）----
+#         摊阁↔门柱 z 缝 2.7（F7 2026-08-12：柱深 2.25→1.5 后）----
 func test_belt_pavilions() -> void:
 	for tags0 in [["BeltN", "GateN"], ["BeltS", "GateS"]]:
 		var tags: Array = tags0
@@ -961,12 +961,12 @@ func test_belt_pavilions() -> void:
 			assert_almost_eq(gap_wing, 0.95, 0.01,
 				"%s_PavStep%s 与翼墙 z 缝 == 0.95（台阶顶 0.6 非阻挡体，窄缝规则不适用）" % [belt, lr])
 			var gap_pillar: float = maxf(pb[0].z - plb[1].z, plb[0].z - pb[1].z)
-			assert_almost_eq(gap_pillar, 1.95, 0.01,
-				"%s_Pav%s 与门柱 z 缝 == 1.95（F5 柱深 3→2.25，2026-08-12）" % [belt, lr])
+			assert_almost_eq(gap_pillar, 2.7, 0.01,
+				"%s_Pav%s 与门柱 z 缝 == 2.7（F7 柱深 2.25→1.5，2026-08-12）" % [belt, lr])
 
 
-# ---- 31b. 摊阁台阶 ↔ 门柱净距 ≥1.2（F5 用户验收反馈：0.45m 夹缝卡顿，
-#          柱深 3→2.25 靠广场侧收缩 0.75m → 台阶与门柱净距恰 1.2，数据断言钉死 A）----
+# ---- 31b. 摊阁台阶 ↔ 门柱净距 ≥1.95（F7 用户二次反馈：1.2m 通道仍卡，
+#          柱深 2.25→1.5 靠广场侧再收缩 0.75m → 台阶与门柱净距恰 1.95，数据断言钉死 A）----
 func test_pavilion_step_clearance() -> void:
 	for tags0 in [["BeltN", "GateN"], ["BeltS", "GateS"]]:
 		var tags: Array = tags0
@@ -985,13 +985,13 @@ func test_pavilion_step_clearance() -> void:
 			print("PILLAR_GAP ", belt, lr, " step_z=[", snappedf(sb[0].z, 0.001), ",",
 					snappedf(sb[1].z, 0.001), "] pillar_z=[", snappedf(plb[0].z, 0.001), ",",
 					snappedf(plb[1].z, 0.001), "] gap=", snappedf(gap, 0.001))
-			# FP 容差：13.75−12.55 浮点得 1.1999998（1 ULP）——容差 0.001 仍远小于
-			# F5 修复目标 0.45→1.2 的差距（若柱深回归 3.0，gap 会跌回 0.45，必失败）
-			assert_gte(gap, 1.2 - 0.001, "%s_PavStep%s 与 %s_Pillar%s 水平净距 ≥ 1.2（F5 修复）"
+			# FP 容差：14.5−12.55 浮点得 1.9499999（1 ULP）——容差 0.001 仍远小于
+			# F7 修复目标 1.2→1.95 的差距（若柱深回归 2.25，gap 会跌回 1.2，必失败）
+			assert_gte(gap, 1.95 - 0.001, "%s_PavStep%s 与 %s_Pillar%s 水平净距 ≥ 1.95（F7 修复）"
 					% [belt, lr, gate, lr])
 			var pz: Vector3 = pillar["size"]
-			assert_almost_eq(pz.z, 2.25, 0.001,
-					"%s_Pillar%s size.z == 2.25（F5 柱深 3→2.25）" % [gate, lr])
+			assert_almost_eq(pz.z, 1.5, 0.001,
+					"%s_Pillar%s size.z == 1.5（F7 柱深 2.25→1.5）" % [gate, lr])
 
 
 # ---- 32. 旋转对称：每个 GateN_*/BeltN_* 有 GateS_*/BeltS_* 对应体，center 互为 (-x,-z)、size 相同 ----
