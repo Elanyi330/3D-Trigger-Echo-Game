@@ -143,6 +143,22 @@ func refund_throw() -> void:
 	_fire_cooldown = 0.0
 
 
+## TDM 复活满弹（2026-08-13）：弹匣/备弹填满 + 打断换弹 + 射击状态全复位
+## （后坐力累积/射击序号/冷却清零——复活即全新武器手感）。
+## 供 PlayerLife.on_reset 回调消费（WeaponManager 遍历各槽调用）。
+func refill() -> void:
+	if _resource == null:
+		return
+	interrupt_reload()
+	_mag = _resource.magazine
+	_reserve = _resource.max_ammo
+	_fire_cooldown = 0.0
+	_since_last_shot = 0.0
+	_shot_index = 0
+	_last_shot_offset = Vector2.ZERO
+	recoil_accum = Vector2.ZERO
+
+
 func _refill_infinite_ammo() -> void:
 	# 无限弹药补满（spec §9.9）：弹匣满 + 备弹回满（备弹无穷）。调用方：try_fire 空匣补满、
 	# start_reload 瞬时满。L_Main.cheats 注入在 setup 之后设置标志（无资源防御）。

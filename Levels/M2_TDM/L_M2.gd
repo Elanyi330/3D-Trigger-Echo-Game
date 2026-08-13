@@ -1,7 +1,9 @@
 # Levels/M2_TDM/L_M2.gd
-# M2 TDM 小图主场景控制器：灰盒地图 + 玩家（MovementController）+ 武器系统 + WaveSpawner 波次刷怪。
-# 验收目标（用户 2026-08-10）：①玩家可逛遍全图无 bug；②可踏足位置波次刷敌人（每波 5 个，全灭 1.5s 后下一波），
-# 验证射击角度与空气墙。武器装配移植自 L_Main.gd（同一套 WeaponManager + WeaponView + 输入路由 + HUD）。
+# M2 TDM 小图主场景控制器：灰盒地图 + 玩家（MovementController）+ 武器系统 +
+# TDM 框架（计分/复活/胜负/重开）+ 友军×4 + 敌营补位 + 小地图。
+# TDM 需求（2026-08-13）：无限复活、先到 50 杀或 8 分钟击杀多者胜、复活延迟 3s（用户 2026-08-11 拍板）；
+# 出生点（用户 2026-08-13 拍板）：玩家+4 友军北营 10 点随机、5 敌南营 10 点随机，
+# 角色只在无其他角色占用的点位出现（SpawnPool 防重叠）。
 extends Node3D
 
 const WEAPON_RES := [
@@ -17,9 +19,9 @@ const WEAPON_MODELS := [
 	preload("res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb"),
 ]
 const GREYBOX := preload("res://Levels/M2_TDM/map_greybox.gd")
-const VISUALS := preload("res://Levels/M2_TDM/map_visuals.gd")
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
+const FRIENDLY_TINT := Color(0.3, 0.65, 0.35)  # 友方绿（与玩家本色一致）
 
 @export var range_mode := true  # 测试模式：枪械备弹无限（弹匣有限正常换弹）+ 手雷无限（投完切回主武器但可再切回投）
 
@@ -27,14 +29,32 @@ var _player: CharacterBody3D
 var _head: Node3D
 var _manager: WeaponManager
 var _view: WeaponView
-var _spawner: WaveSpawner
 var _recorder: JumpRecorder
 var _spawn_serial := 0   # 敌人名序号（同面一敌一名会撞名——Godot 撞名会重置为 @Class@id）
+
+# ---- TDM 框架（2026-08-13）----
+var _match: TdmMatch
+var _life: PlayerLife
+var _north_pool: SpawnPool   # 北营点池（玩家 + 4 友军共用，防重叠）
+var _respawner: TdmRespawner  # 南营敌补位器
+
+# ---- HUD ----
+var _ammo_label: Label
+var _weapon_label: Label
+var _hitmarker: Label
+var _minimap: Minimap
+var _score_label: Label
+var _hp_label: Label
+var _death_overlay: ColorRect
+var _death_label: Label
+var _death_remaining: float = 0.0
+var _result_panel: Panel
+var _result_label: Label
 
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	# 灰盒地图（纯灰盒——Kenney 平铺方向错误导致视觉更差，已回退；视觉重做放 T5）
+	# 灰盒地图（纯色主题配色——2026-08-13 纹理升级已回退，配色用户拍板「可用」）
 	var gb: Node3D = GREYBOX.new()
 	gb.name = "Greybox"
 	add_child(gb)
@@ -47,8 +67,8 @@ func _ready() -> void:
 	_head = _player.get_node("Head")
 	_setup_weapons()
 	_setup_hud()
-	# 波次刷怪（WaveSpawner：每波 5 敌刷在可踏足面，全灭 1.5s 后下一波）
-	_setup_wave_spawner()
+	# TDM 框架：北营点池（玩家+友军）→ 比赛状态机 → 敌营补位 → 玩家生命
+	_setup_tdm()
 	# 跳跃记录（任务 15）：记录跳建筑操作供 AI 学习；地图哈希不符自动清空旧记录。
 	# 必须在 Player 入树之后 add_child——Godot 4.7 _physics_process 按树序执行，
 	# recorder 排玩家之后才能在 move_and_slide 之后读当帧状态。
@@ -56,6 +76,78 @@ func _ready() -> void:
 	_recorder.name = "JumpRecorder"
 	add_child(_recorder)
 	_recorder.setup(_player, LAYOUT.all_solids(), "回声祭坛v3")
+
+
+# ---- TDM 框架装配 ----
+func _setup_tdm() -> void:
+	# 北营点池：玩家 + 4 友军共用（角色只在无其他角色占用的点位出现——用户拍板需求）
+	_north_pool = SpawnPool.new()
+	_north_pool.setup(LAYOUT.camp_spawn_points(1))
+	# 友军×4（与玩家同色；M1.5 静态桩无 AI——M3 接队友行为）
+	for i in 4:
+		var f: Enemy = Enemy.new()
+		f.name = "Friendly%d" % i
+		f.tint = FRIENDLY_TINT
+		f.is_enemy = false
+		add_child(f)
+		f.global_position = _north_pool.acquire(f)
+		f.rotation.y = PI + randf_range(-PI / 6.0, PI / 6.0)  # 朝广场方向 ±30°
+	# 玩家占北营一个随机空点
+	_player.global_position = _north_pool.acquire(_player)
+	# 比赛状态机（50 杀 / 8 分钟）
+	_match = TdmMatch.new()
+	_match.name = "TdmMatch"
+	add_child(_match)
+	_match.setup()
+	_match.score_changed.connect(_on_score_changed)
+	_match.time_changed.connect(_on_time_changed)
+	_match.match_ended.connect(_on_match_ended)
+	# 敌营补位器（南营 10 点 5 敌，死 3s 空点补位）
+	_respawner = TdmRespawner.new()
+	_respawner.name = "TdmRespawner"
+	add_child(_respawner)
+	_respawner.setup(LAYOUT.camp_spawn_points(-1), _spawn_enemy, 3.0)
+	_respawner.enemy_died.connect(func(_e: Node) -> void: _match.add_friendly_kill())
+	# 玩家生命（挂在玩家下，复活回调取北营空点）
+	_life = PlayerLife.new()
+	_life.name = "PlayerLife"
+	_player.add_child(_life)
+	_life.setup(_player, _on_player_death, _on_player_respawn_point, _on_player_reset)
+	_life.health_changed.connect(_on_health_changed)
+	_life.died.connect(_on_player_died)
+	_life.respawned.connect(_on_player_respawned)
+	# 开局
+	_respawner.start()
+	_match.start()
+
+
+func _on_player_death() -> void:
+	_north_pool.release(_player)  # 释放玩家点位，复活从空点随机取
+
+
+func _on_player_respawn_point() -> Vector3:
+	return _north_pool.acquire(_player)
+
+
+## 复活满血满弹：各槽 refill + 退出 ADS（PlayerLife 已回满血/恢复输入）
+func _on_player_reset() -> void:
+	_manager.set_aim(false)
+	for i in 4:
+		var core := _manager.get_core(i)
+		if core:
+			core.refill()
+
+
+## spawn_fn 闭包：实例化敌方并 add_child（位置/点位由 TdmRespawner 分配定位）。
+## 朝向：南营朝广场中心 (0,0,0) 即 +Z 方向 ±30°（Godot -Z 前向惯例：yaw = atan2(-dir.x, -dir.z)）。
+func _spawn_enemy() -> Node:
+	var e := Enemy.new()
+	e.name = "Enemy%d" % _spawn_serial
+	_spawn_serial += 1
+	add_child(e)
+	e.rotation.y = PI + randf_range(-PI / 6.0, PI / 6.0)
+	return e
+
 
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
 func _setup_weapons() -> void:
@@ -93,14 +185,7 @@ func _setup_weapons() -> void:
 	_view.setup(_manager, _player)
 
 
-# ---- HUD（弹药/准星/命中标记/波次，移植自 L_Main.gd）----
-var _ammo_label: Label
-var _weapon_label: Label
-var _wave_label: Label
-var _hitmarker: Label
-var _minimap: Minimap  # M2 小地图（左上角圆形雷达）
-
-
+# ---- HUD（准星/命中/弹药/计分板/血条/死亡/结算/小地图）----
 func _setup_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.name = "HUD"
@@ -125,6 +210,16 @@ func _setup_hud() -> void:
 	layer.add_child(_hitmarker)
 	_hitmarker.position = vp * 0.5 + Vector2(14, -28)
 	_hitmarker.modulate.a = 0.0
+	# 计分板（顶部居中）：我方 X : X 敌方 + 倒计时
+	_score_label = Label.new()
+	_score_label.add_theme_font_size_override("font_size", 32)
+	_score_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	_score_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_score_label.add_theme_constant_override("outline_size", 8)
+	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.add_child(_score_label)
+	_score_label.position = Vector2(0, 16)
+	_score_label.size = Vector2(vp.x, 48)
 	# 弹药背板（右下）
 	var panel := Panel.new()
 	var sb := StyleBoxFlat.new()
@@ -148,23 +243,49 @@ func _setup_hud() -> void:
 	_weapon_label.add_theme_constant_override("outline_size", 8)
 	layer.add_child(_weapon_label)
 	_weapon_label.position = Vector2(30, vp.y - 70)
-	# 波次（右上角·临时，未来正式游戏去除：「波次 N · 剩余 X」，WaveSpawner 信号驱动）
-	_wave_label = Label.new()
-	_wave_label.text = "波次 1 · 剩余 %d" % WaveSpawner.WAVE_SIZE
-	_wave_label.add_theme_font_size_override("font_size", 28)
-	_wave_label.add_theme_color_override("font_color", Color(0.55, 0.85, 1))
-	_wave_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
-	_wave_label.add_theme_constant_override("outline_size", 8)
-	layer.add_child(_wave_label)
-	_wave_label.position = Vector2(vp.x - 380, 24)
-	_wave_label.size = Vector2(350, 40)
-	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# 玩家血条（左下，武器名下方）
+	_hp_label = Label.new()
+	_hp_label.add_theme_font_size_override("font_size", 24)
+	_hp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_hp_label.add_theme_constant_override("outline_size", 8)
+	layer.add_child(_hp_label)
+	_hp_label.position = Vector2(30, vp.y - 108)
+	# 死亡黑幕 + 倒计时（隐藏）
+	_death_overlay = ColorRect.new()
+	_death_overlay.color = Color(0, 0, 0, 0.85)
+	_death_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(_death_overlay)
+	_death_label = Label.new()
+	_death_label.add_theme_font_size_override("font_size", 52)
+	_death_label.add_theme_color_override("font_color", Color(1, 0.3, 0.25))
+	_death_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.add_child(_death_label)
+	_death_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_death_overlay.visible = false
+	_death_label.visible = false
+	# 结算面板（隐藏）
+	_result_panel = Panel.new()
+	var rsb := StyleBoxFlat.new()
+	rsb.bg_color = Color(0, 0, 0, 0.75)
+	rsb.set_corner_radius_all(16)
+	_result_panel.add_theme_stylebox_override("panel", rsb)
+	layer.add_child(_result_panel)
+	_result_panel.position = vp * 0.5 - Vector2(260, 110)
+	_result_panel.size = Vector2(520, 220)
+	_result_label = Label.new()
+	_result_label.add_theme_font_size_override("font_size", 44)
+	_result_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+	_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_result_label.size = Vector2(520, 220)
+	_result_panel.add_child(_result_label)
+	_result_panel.visible = false
 	# 小地图（M2 左上角圆形雷达）：数据驱动蓝图投影 + 12m 内敌我标志
 	var minimap := Minimap.new()
 	minimap.name = "Minimap"
 	layer.add_child(minimap)
 	minimap.setup(LAYOUT.all_solids(), _player, _enemy_entities)
-	_minimap = minimap  # 成员句柄（M3 操作小地图用；审查 MM2a 修复）
+	_minimap = minimap
 	# 弹药/切枪信号刷新
 	_manager.weapon_ammo_updated.connect(_on_ammo_updated)
 	_manager.weapon_switched.connect(_on_weapon_switched)
@@ -173,12 +294,11 @@ func _setup_hud() -> void:
 
 
 func _enemy_entities() -> Array:
-	# 小地图实体提供者：L_M2 直接子节点中的 Enemy（≤5 个，每帧枚举零成本）。
-	# M3 队友出现后在此追加 is_enemy=false 条目（同一接口）。
+	# 小地图实体提供者：L_M2 直接子节点中的 Enemy 与友军（≤9 个，每帧枚举零成本）。
 	var out: Array = []
 	for c in get_children():
 		if c is Enemy:
-			out.append({"pos": c.global_position, "is_enemy": true})
+			out.append({"pos": c.global_position, "is_enemy": c.is_enemy})
 	return out
 
 
@@ -212,44 +332,73 @@ func _refresh_hud() -> void:
 	_weapon_label.text = res.weapon_name
 
 
-# ---- 波次刷怪（T12：WaveSpawner 装配；取代 T10 的临时 standable shuffle 撒点）----
-func _setup_wave_spawner() -> void:
-	_spawner = WaveSpawner.new()
-	_spawner.name = "WaveSpawner"
-	add_child(_spawner)
-	_spawner.setup(LAYOUT.standable_surfaces(), _spawn_enemy, LAYOUT.spawn_exclusions())
-	_spawner.wave_started.connect(_on_wave_started)
-	_spawner.enemies_left.connect(_on_enemies_left)
-	_spawner.start()
+# ---- TDM 信号 → HUD ----
+func _on_score_changed(friendly: int, enemy: int) -> void:
+	_update_score_label(friendly, enemy)
 
 
-## spawn_fn 闭包：实例化 Enemy 并放到位（pos.y 已含面 top_y——Enemy 原点在脚底）。
-## 朝向沿用 T10：面向广场中心 (0,0,0) ±30°（Godot -Z 前向：yaw = atan2(-dir.x, -dir.z)）。
-func _spawn_enemy(surface: Dictionary, pos: Vector3) -> Node:
-	var e := Enemy.new()
-	e.name = "Enemy%d_%s" % [_spawn_serial, str(surface["name"])]
-	_spawn_serial += 1
-	add_child(e)
-	e.global_position = pos
-	var dir := Vector3(-pos.x, 0.0, -pos.z)
-	if dir.length_squared() < 0.01:  # 退化兜底：中心位无朝向，默认朝 -Z
-		dir = Vector3(0, 0, -1)
-	dir = dir.normalized()
-	e.rotation.y = atan2(-dir.x, -dir.z) + randf_range(-PI / 6.0, PI / 6.0)
-	return e
+func _on_time_changed(seconds_left: int) -> void:
+	_update_score_label(_match.friendly_score, _match.enemy_score, seconds_left)
 
 
-func _on_wave_started(n: int) -> void:
-	_update_wave_label(n, WaveSpawner.WAVE_SIZE)
+func _update_score_label(friendly: int, enemy: int, seconds_left: int = -1) -> void:
+	var t: int = seconds_left
+	if t < 0:
+		t = _match.time_left() if _match else 480
+	_score_label.text = "我方 %d : %d 敌方   %d:%02d" % [friendly, enemy, int(t / 60.0), t % 60]
 
 
-func _on_enemies_left(count: int) -> void:
-	_update_wave_label(_spawner.current_wave(), count)
+func _on_health_changed(hp: float) -> void:
+	_hp_label.text = "HP %d" % int(ceil(hp))
+	_hp_label.add_theme_color_override("font_color",
+		Color(0.3, 1, 0.4) if hp > 40.0 else Color(1, 0.35, 0.3))
 
 
-func _update_wave_label(wave_n: int, left: int) -> void:
-	if _wave_label:
-		_wave_label.text = "波次 %d · 剩余 %d" % [wave_n, left]
+func _on_player_died() -> void:
+	_death_remaining = _life.RESPAWN_DELAY
+	_death_overlay.visible = true
+	_death_label.visible = true
+	_update_death_label()
+
+
+func _on_player_respawned() -> void:
+	_death_overlay.visible = false
+	_death_label.visible = false
+
+
+func _update_death_label() -> void:
+	_death_label.text = "你阵亡了\n%d 秒后复活" % int(ceil(_death_remaining))
+
+
+func _on_match_ended(winner: int) -> void:
+	# 结算冻结：玩家冻结（R 重开时恢复）；面板显示比分与重开提示
+	_player.process_mode = Node.PROCESS_MODE_DISABLED
+	var verdict: String
+	match winner:
+		TdmMatch.Winner.FRIENDLY:
+			verdict = "胜利！"
+		TdmMatch.Winner.ENEMY:
+			verdict = "失败"
+		_:
+			verdict = "平局"
+	_result_label.text = "%s\n我方 %d : %d 敌方\n\n按 R 重新开始" % [verdict, _match.friendly_score, _match.enemy_score]
+	_result_panel.visible = true
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+
+func _restart_match() -> void:
+	_result_panel.visible = false
+	_match.reset()
+	_life.respawn_now()  # 满血满弹 + 取点 + 恢复输入（存活/死亡/倒计时中均安全）
+	_respawner.start()   # 清场南营敌 + 重新刷 5 敌
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+
+func _process(delta: float) -> void:
+	# 死亡倒计时刷新（死亡黑幕可见时）
+	if _death_overlay.visible:
+		_death_remaining -= delta
+		_update_death_label()
 
 
 func _input(event: InputEvent) -> void:
@@ -257,7 +406,7 @@ func _input(event: InputEvent) -> void:
 		get_tree().quit()
 
 
-# ---- 输入路由（L_Main 同款：fire 由 WeaponManager 物理帧轮询，这里路由 reload/aim/切枪）----
+# ---- 输入路由（L_Main 同款：fire 由 WeaponManager 物理帧轮询，这里路由 reload/aim/切枪/测试键）----
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"reload"):
 		_manager.start_reload()
@@ -275,3 +424,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_manager.switch_to(3)
 	elif event.is_action_pressed(&"next_weapon"):
 		_manager.next_weapon()
+	elif event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_K:
+			# K 自杀测试键（临时，正式游戏去除）：验证死亡/复活/结算全流程——敌人 M3 前不会攻击玩家
+			_life.take_damage(999.0)
+		elif event.keycode == KEY_R:
+			# R 重开（结算后可用）
+			if _match.state == TdmMatch.State.RESULT:
+				_restart_match()

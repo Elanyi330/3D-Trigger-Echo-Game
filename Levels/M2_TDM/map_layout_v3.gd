@@ -392,31 +392,16 @@ static func standable_surfaces() -> Array:
 	]
 
 
-## 敌人撒点排除区（任务 12，WaveSpawner 拒绝采样消费）：面 name → 排除矩形列表
-## （世界坐标 XZ 投影），矩形格式 {"x_min","x_max","z_min","z_max"}。
-## 用途：防止刷出的敌人与建筑体积（基座/坡道/斜板/组合柱）视觉重叠。
-## 约定：每个矩形必须落在所属面（standable_surfaces()）的 x/z 范围内
-## （撒点只在面内采样，面外部分无意义——test_spawn_exclusions.gd 断言）。
-## 注：祭坛台微台阶 N/S 投影（x∈[-1,1]，z∈[-5.6,-5.0]/[5.0,5.6]）不入表——
-## 其 z 范围在 Altar 面 z∈[-5,5] 之外，且撒点边距 SPAWN_MARGIN=0.5 使采样
-## 只达 |z|≤4.5，敌人与微台阶之间恒有 ≥0.2m 间隙，排除无行为效果（YAGNI）。
-static func spawn_exclusions() -> Dictionary:
-	return {
-		# 祭坛台面（Altar，top_y 0.6）：基座 + 东/西坡道 + 斜板 4 块的投影
-		"Altar": [
-			{"x_min": -2.0, "x_max": 2.0, "z_min": -2.0, "z_max": 2.0},      # Pedestal（4×4 基座）
-			{"x_min": 3.6, "x_max": 6.6, "z_min": -3.5, "z_max": 2.5},       # RampE（东坡道 8 级）
-			{"x_min": -6.6, "x_max": -3.6, "z_min": -2.5, "z_max": 3.5},     # RampW（西坡道 8 级）
-			{"x_min": -2.4, "x_max": 0.6, "z_min": -2.4, "z_max": -2.0},     # AltarSlabA
-			{"x_min": -0.6, "x_max": 2.4, "z_min": 2.0, "z_max": 2.4},       # AltarSlabA2
-			{"x_min": 2.0, "x_max": 2.4, "z_min": -3.0, "z_max": 0.0},       # AltarSlabB
-			{"x_min": -2.4, "x_max": -2.0, "z_min": 0.0, "z_max": 3.0},      # AltarSlabB2
-		],
-		# 回廊面（Corridor，top_y 3.0）：组合柱 4 根投影（柱 0.5×0.5，中心 (±3.05,±3.05)）
-		"Corridor": [
-			{"x_min": 2.8, "x_max": 3.3, "z_min": 2.8, "z_max": 3.3},        # Pillar_NE
-			{"x_min": -3.3, "x_max": -2.8, "z_min": 2.8, "z_max": 3.3},      # Pillar_NW
-			{"x_min": 2.8, "x_max": 3.3, "z_min": -3.3, "z_max": -2.8},      # Pillar_SE
-			{"x_min": -3.3, "x_max": -2.8, "z_min": -3.3, "z_max": -2.8},    # Pillar_SW
-		],
-	}
+## 营地出生点（2026-08-13 用户拍板）：玩家+4 友军出生在北营、5 敌人出生在南营，
+## 每营内置 10 个随机刷新点——角色只在"当前无其他角色占用"的点位出现（SpawnPool 消费）。
+## 布局：2 行 × 5 列网格（x∈{-4..4} 步长 2，z = ±25.5 / ±27.5），营内范围
+## x∈[-6,6]×z∈[25,28]（北营；南营为 180° 旋转 z 取负）。
+## 间距：同行/同列 2m、对角 2.83m ≥ 角色胶囊直径 0.62m，恒不重叠；
+## 边距：z 行距墙内缘 0.5m（净隙 0.19m 不穿墙）、x 边列距侧墙 2m。
+## y=0 地面（Enemy/玩家原点在脚底）。side=1 北营 / side=-1 南营。
+static func camp_spawn_points(side: int) -> Array:
+	var pts := []
+	for x in [-4.0, -2.0, 0.0, 2.0, 4.0]:
+		for z in [25.5, 27.5]:
+			pts.append(Vector3(x, 0.0, z * side))
+	return pts

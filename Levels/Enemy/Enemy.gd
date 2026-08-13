@@ -14,6 +14,7 @@ const FADE_TIME := 0.5   # 淡出时长（s）
 
 @export var max_health: float = 100.0  # 企划书：所有单位统一 100HP
 @export var tint: Color = Color(0.65, 0.25, 0.22)  # 敌方红（队友绿/玩家本色）
+@export var is_enemy: bool = true  # TDM 友军复用本类（tint 绿 + is_enemy=false，小地图接口）
 
 var health: float = 100.0
 var dead: bool = false
