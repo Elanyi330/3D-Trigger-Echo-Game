@@ -86,6 +86,8 @@ func _ready() -> void:
 	_setup_hud()
 	# TDM 框架：北营点池（玩家+友军）→ 比赛状态机 → 敌营补位 → 玩家生命
 	_setup_tdm()
+	# 导航（2026-08-13 navmesh 阶段 2/3）：烘焙网格 + 28 处人类验证跳跃链接（M3 AI 寻路消费）
+	_setup_navigation()
 	# 跳跃记录（任务 15）：记录跳建筑操作供 AI 学习；地图哈希不符自动清空旧记录。
 	_recorder = JumpRecorder.new()
 	_recorder.name = "JumpRecorder"
@@ -142,6 +144,30 @@ func _setup_tdm() -> void:
 	_setup_ammo_boxes()
 	_on_health_changed(_life.health)
 	_begin_player_protection()
+
+
+## 导航装配（2026-08-13 navmesh 阶段 2/3）：烘焙网格区域 + 28 处跳跃链接。
+## M3 AI 寻路（NavigationAgent3D）直接消费；--nav-debug 启动参数显示网格与链接（阶段 5 验收用）。
+func _setup_navigation() -> void:
+	var nav_mesh: NavigationMesh = load("res://Levels/M2_TDM/navmesh.res")
+	if nav_mesh == null:
+		push_warning("L_M2: navmesh.res 未找到——先运行 godot --headless --path . -s tools/bake_navmesh.gd 重新烘焙")
+		return
+	var region := NavigationRegion3D.new()
+	region.name = "NavRegion"
+	region.navigation_mesh = nav_mesh
+	add_child(region)
+	for l0 in LAYOUT.jump_links():
+		var l: Dictionary = l0
+		var link := NavigationLink3D.new()
+		link.name = "NavLink_" + str(l["name"])
+		link.start_position = l["from"]
+		link.end_position = l["to"]
+		link.bidirectional = true
+		add_child(link)
+	if "--nav-debug" in OS.get_cmdline_user_args():
+		# 服务器级调试渲染：导航多边形（蓝）+ 边 + 跳跃链接（阶段 5 验收可视化）
+		NavigationServer3D.set_debug_enabled(true)
 
 
 ## 弹药箱 ×10（2026-08-13 用户需求）：固定刷新点，玩家靠近自动拾取

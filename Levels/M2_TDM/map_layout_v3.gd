@@ -407,6 +407,60 @@ static func camp_spawn_points(side: int) -> Array:
 	return pts
 
 
+## TDM 跳跃链接（2026-08-13 navmesh 阶段 3）：人类验证跳跃边收敛 + 180° 旋转对称补齐，共 28 处。
+## 每条 = 双向 NavigationLink：{"name", "from": 起跳面点, "to": 落点面点}（y=面高度即脚底）。
+## 依据：tools/jump_study.py 520 episode 边表（人类实证 n≥2）+ tools/probe_reachability.gd 几何分析；
+## 自动覆盖不建 link：0.6m 台阶/坡道/同高相邻（max_climb 0.62 自动连通）、下跳（AI 自由跳下）。
+## 暂缓边（YAGNI，人类 n=2 但链路过长）：rim↔钟门柱↔翼墙两级链。
+static func jump_links() -> Array:
+	var links := []
+	# 1. 摊阁(1.2) ↔ 摊位簇板(2.2)（人类：WestPavilion→WestClusterS_Panel n=2；E 侧对称）
+	links.append({"name": "PavToCluster_W", "from": Vector3(-18.7, 1.2, -8.6), "to": Vector3(-18.4, 2.2, -4.8)})
+	links.append({"name": "PavToCluster_E", "from": Vector3(18.7, 1.2, 8.6), "to": Vector3(18.4, 2.2, 4.8)})
+	# 2. 簇板(2.2) ↔ rim 围墙(3.0)（人类：WestClusterS_Panel→RimW_B n=2、EastTower→RimE_T n=2；对称 4 处）
+	links.append({"name": "ClusterToRim_WN", "from": Vector3(-17.5, 2.2, -4.9), "to": Vector3(-13.6, 3.0, -4.7)})
+	links.append({"name": "ClusterToRim_EN", "from": Vector3(17.5, 2.2, 4.9), "to": Vector3(13.6, 3.0, 4.7)})
+	links.append({"name": "ClusterToRim_WS", "from": Vector3(-17.5, 2.2, 4.9), "to": Vector3(-13.6, 3.0, 4.7)})
+	links.append({"name": "ClusterToRim_ES", "from": Vector3(17.5, 2.2, -4.9), "to": Vector3(13.6, 3.0, -4.7)})
+	# 3. 摊阁(1.2) ↔ 横脊墙(3.0)（人类：WestPavilion→WestSpurS n=3；旋转对称 4 处）
+	links.append({"name": "PavToSpur_W", "from": Vector3(-17.9, 1.2, -9.4), "to": Vector3(-16.2, 3.0, -7.4)})
+	links.append({"name": "PavToSpur_E", "from": Vector3(17.9, 1.2, 9.4), "to": Vector3(16.2, 3.0, 7.4)})
+	links.append({"name": "PavToSpur_WS", "from": Vector3(-16.2, 1.2, -9.4), "to": Vector3(-15.8, 3.0, 7.4)})
+	links.append({"name": "PavToSpur_ES", "from": Vector3(16.2, 1.2, 9.4), "to": Vector3(15.8, 3.0, -7.4)})
+	# 4. rim 围墙侧豁口(2.5m) 同高跳（人类：RimS1→RimS2 n=3、RimN1→RimN2 n=2；4 侧豁口）
+	links.append({"name": "RimGap_NW", "from": Vector3(-9.7, 3.0, 9.5), "to": Vector3(-5.5, 3.0, 9.5)})
+	links.append({"name": "RimGap_NE", "from": Vector3(5.5, 3.0, 9.5), "to": Vector3(9.7, 3.0, 9.5)})
+	links.append({"name": "RimGap_SW", "from": Vector3(-9.7, 3.0, -9.5), "to": Vector3(-5.5, 3.0, -9.5)})
+	links.append({"name": "RimGap_SE", "from": Vector3(5.5, 3.0, -9.5), "to": Vector3(9.7, 3.0, -9.5)})
+	# 5. 市街长墙顶段间豁口(2.5m) 同高跳（人类：WestWall_M→WestWall_N n=2；东西各 2 豁口）
+	links.append({"name": "LongWallGap_WN", "from": Vector3(-23.0, 3.0, 5.2), "to": Vector3(-23.0, 3.0, 8.3)})
+	links.append({"name": "LongWallGap_WS", "from": Vector3(-23.0, 3.0, -8.3), "to": Vector3(-23.0, 3.0, -5.2)})
+	links.append({"name": "LongWallGap_EN", "from": Vector3(23.0, 3.0, 5.2), "to": Vector3(23.0, 3.0, 8.3)})
+	links.append({"name": "LongWallGap_ES", "from": Vector3(23.0, 3.0, -8.3), "to": Vector3(23.0, 3.0, -5.2)})
+	# 6. 望楼/水塔顶(2.5) ↔ 塔顶箱(3.4)（人类：WestTowerBox 落点 n=1；几何 Δh=0.9）
+	links.append({"name": "TowerBox_W", "from": Vector3(-18.5, 2.5, 0.0), "to": Vector3(-18.5, 3.4, 0.0)})
+	links.append({"name": "TowerBox_E", "from": Vector3(18.5, 2.5, 0.0), "to": Vector3(18.5, 3.4, 0.0)})
+	# 7. 簇箱 Ground ↔ 箱顶(0.9)（人类：EastClusterN_Box 落点 n=3；4 簇箱）
+	links.append({"name": "Crate_WN", "from": Vector3(-15.0, 0.0, 11.0), "to": Vector3(-15.0, 0.9, 11.0)})
+	links.append({"name": "Crate_WS", "from": Vector3(-15.0, 0.0, -5.0), "to": Vector3(-15.0, 0.9, -5.0)})
+	links.append({"name": "Crate_EN", "from": Vector3(15.0, 0.0, 5.0), "to": Vector3(15.0, 0.9, 5.0)})
+	links.append({"name": "Crate_ES", "from": Vector3(15.0, 0.0, -11.0), "to": Vector3(15.0, 0.9, -11.0)})
+	# 8. 簇箱顶(0.9) ↔ 簇板(2.2)（人类：EastClusterN_Box↔EastClusterN_Panel 双向 n=2；4 簇）
+	links.append({"name": "CrateToCluster_WN", "from": Vector3(-15.0, 0.9, 11.0), "to": Vector3(-18.5, 2.2, 11.0)})
+	links.append({"name": "CrateToCluster_WS", "from": Vector3(-15.0, 0.9, -5.0), "to": Vector3(-18.5, 2.2, -5.0)})
+	links.append({"name": "CrateToCluster_EN", "from": Vector3(15.0, 0.9, 5.0), "to": Vector3(18.5, 2.2, 5.0)})
+	links.append({"name": "CrateToCluster_ES", "from": Vector3(15.0, 0.9, -11.0), "to": Vector3(18.5, 2.2, -11.0)})
+	# 9. 主坡道顶(3.0) ↔ 回廊(3.0) 跨 0.9m 高栏板（人类：Ground→CorridorSlab n=4 起跳在栏板旁；
+	#    navmesh 栏板 0.2 厚实体挡住坡道-回廊同高连接，实测探针确认断开）
+	links.append({"name": "RampTopToCorridor_E", "from": Vector3(4.5, 3.0, 2.0), "to": Vector3(2.5, 3.0, 2.0)})
+	links.append({"name": "RampTopToCorridor_W", "from": Vector3(-4.5, 3.0, -2.0), "to": Vector3(-2.5, 3.0, -2.0)})
+	# 10. 塔坡道顶(2.5) ↔ 塔顶(2.5)（人类：WestTowerRampStep10 落点 n=4；塔栏板豁口通道
+	#    0.2m 深被 agent 半径侵蚀吞掉——navmesh 实测断开，link 补齐）
+	links.append({"name": "TowerRampToTower_E", "from": Vector3(19.7, 2.5, -2.0), "to": Vector3(18.5, 2.5, -1.5)})
+	links.append({"name": "TowerRampToTower_W", "from": Vector3(-19.7, 2.5, 2.0), "to": Vector3(-18.5, 2.5, 1.5)})
+	return links
+
+
 ## 弹药箱固定刷新点（2026-08-13 用户需求）：总计 10 处，180° 旋转对称（5 对）。
 ## 约束：①不在双方营地（营矩形 x∈[-6,6]×z∈[±24.5,±28.5] 之外）②两两水平距 ≥5m
 ## ③覆盖点名位置：中心塔二楼（钟楼回廊 ×2）、两边祭坛（祭坛台东/西 ×2）、
