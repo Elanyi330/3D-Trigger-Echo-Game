@@ -6,7 +6,9 @@
 
 ## 目标
 
-给该测试确定性 RNG 种子，flaky 根治。**只改 `test/unit/test_wave_spawner.gd` 一个文件、一个测试函数。**
+给该测试确定性 RNG 种子，flaky 根治。**只改 `test/unit/test_wave_spawner.gd` 一个文件、一个测试函数。** 附带（T4 审查 Minor，控制器裁定顺带清理）：`Weapons/ThrowTrajectory.gd` 两处过期注释修正：
+1. `_render_landing` 内注释"半径 0.25m"→"半径 0.3m"（实值已改 0.3，注释未同步）。
+2. 文件头注释中"50 点虚线预览/终点 = 弹道末点"描述改为"200 点虚线预览/落点 = 首次穿越地面插值点"（M1 遗留描述，语义已变）。仅改注释文本，不动任何代码。
 
 ## 改动（精确）
 
