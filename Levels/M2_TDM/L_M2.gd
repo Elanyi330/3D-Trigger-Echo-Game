@@ -52,6 +52,8 @@ var _score_f_val: Label   # 我方得分数字
 var _score_t_val: Label   # 对局时间数字
 var _score_e_val: Label   # 敌方得分数字
 var _hp_label: Label
+var _hp_bar_bg: ColorRect   # 血条背景（2026-08-13 血条化）
+var _hp_bar_fill: ColorRect  # 血条填充
 var _player_name_label: Label
 var _death_overlay: ColorRect
 var _death_label: Label
@@ -133,16 +135,18 @@ func _setup_tdm() -> void:
 	_life.health_changed.connect(_on_health_changed)
 	_life.died.connect(_on_player_died)
 	_life.respawned.connect(_on_player_respawned)
-	# 开局（玩家也有出生保护）
+	# 开局（玩家也有出生保护；初始化血条显示）
 	_respawner.start()
 	_match.start()
+	_on_health_changed(_life.health)
 	_begin_player_protection()
 
 
-## 每局名字分配：玩家 + 4 友军 + 5 敌人（随机英文名不重复；敌名队列随死亡/补位循环）
+## 每局名字分配：玩家固定 "player"（2026-08-13 用户拍板：玩家不需要随机名）；
+## 4 友军 + 5 敌人随机英文名不重复（敌名队列随死亡/补位循环）
 func _new_match_names() -> void:
 	_stats.new_match()
-	_stats.player_name = _stats.make_name()
+	_stats.player_name = "player"
 	_stats.register("friendly", _stats.player_name)
 	_friendly_names.clear()
 	_enemy_names.clear()
@@ -248,14 +252,30 @@ func _setup_weapons() -> void:
 
 
 # ---- HUD（准星/命中/弹药/计分板/血条/名字/保护/死亡/结算/小地图）----
-# UI 字体（2026-08-13 用户反馈"敌方得分/敌方"显示异常）：SystemFont 按名加载系统苹方，
-# 根治 Godot 默认字体中文 fallback 缺失（纯离线——系统字体本机解析，不随包分发）。
-var _ui_font: SystemFont
+# UI 字体（2026-08-13 用户反馈"敌"字显示失败——根因实测：SystemFont "PingFang SC" 在本机
+# 解析到不含"敌"字的残缺字体（敌=false 我=true）；改为 FontFile 直接加载系统冬青黑体简体，
+# 字形实测齐全（纯离线——系统字体本机加载，不随包分发）。
+var _ui_font: Font
+
+
+func _load_ui_font() -> Font:
+	var paths := [
+		"/System/Library/Fonts/Hiragino Sans GB.ttc",
+		"/System/Library/Fonts/STHeiti Light.ttc",
+	]
+	for p in paths:
+		if FileAccess.file_exists(p):
+			var f := FontFile.new()
+			if f.load_dynamic_font(p) == OK:
+				return f
+	# 兜底：SystemFont 按名（PingFang 置末位——本机实测其缺"敌"字）
+	var sf := SystemFont.new()
+	sf.font_names = PackedStringArray(["Hiragino Sans GB", "Heiti SC", "STHeiti", "PingFang SC"])
+	return sf
 
 
 func _setup_hud() -> void:
-	_ui_font = SystemFont.new()
-	_ui_font.font_names = PackedStringArray(["PingFang SC", "Heiti SC", "Noto Sans CJK SC", "Arial"])
+	_ui_font = _load_ui_font()
 	# 全局默认：本场景全部 Label 走 _hud_label/手工设置字体（下方逐个 add_theme_font_override）
 	var layer := CanvasLayer.new()
 	layer.name = "HUD"
@@ -320,11 +340,22 @@ func _setup_hud() -> void:
 	_ammo_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	layer.add_child(_ammo_label)
 	_ammo_label.position = Vector2(vp.x - 300 + 18, vp.y - 110 + 14)
-	# 武器名（左下）
-	_weapon_label = _hud_label(layer, Vector2(30, vp.y - 70), "", 28, Color(1, 0.85, 0.4))
-	# 玩家血条 + 名字（左下，武器名下方）
-	_hp_label = _hud_label(layer, Vector2(30, vp.y - 108), "", 24, Color(0.3, 1, 0.4))
-	_player_name_label = _hud_label(layer, Vector2(130, vp.y - 108), "", 24, Color(1, 1, 1))
+	# 武器名（左下，2026-08-13 放大）
+	_weapon_label = _hud_label(layer, Vector2(30, vp.y - 70), "", 34, Color(1, 0.85, 0.4))
+	# 玩家名字（左下，2026-08-13 放大；固定 "player"——用户拍板）
+	_player_name_label = _hud_label(layer, Vector2(30, vp.y - 106), "", 30, Color(1, 1, 1))
+	# 玩家血条（左下，2026-08-13 用户要求：文本 → 血条）
+	_hp_bar_bg = ColorRect.new()
+	_hp_bar_bg.color = Color(0.1, 0.12, 0.14, 0.9)
+	layer.add_child(_hp_bar_bg)
+	_hp_bar_bg.position = Vector2(30, vp.y - 138)
+	_hp_bar_bg.size = Vector2(240, 22)
+	_hp_bar_fill = ColorRect.new()
+	_hp_bar_fill.color = Color(0.3, 1, 0.4)
+	layer.add_child(_hp_bar_fill)
+	_hp_bar_fill.position = Vector2(32, vp.y - 136)
+	_hp_bar_fill.size = Vector2(236, 18)
+	_hp_label = _hud_label(layer, Vector2(282, vp.y - 140), "", 28, Color(0.3, 1, 0.4))
 	# 出生保护白屏脉冲 + 标签（隐藏）
 	_protect_overlay = ColorRect.new()
 	_protect_overlay.color = Color(1, 1, 1, 0.22)
@@ -332,7 +363,7 @@ func _setup_hud() -> void:
 	_protect_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_protect_overlay)
 	_protect_overlay.visible = false
-	_protect_label = _hud_label(layer, Vector2(30, vp.y - 140), "出生保护", 20, Color(0.7, 0.9, 1))
+	_protect_label = _hud_label(layer, Vector2(30, vp.y - 172), "出生保护", 20, Color(0.7, 0.9, 1))
 	_protect_label.visible = false
 	# 死亡黑幕 + 倒计时（隐藏）
 	_death_overlay = ColorRect.new()
@@ -470,9 +501,13 @@ func _on_time_changed(seconds_left: int) -> void:
 
 
 func _on_health_changed(hp: float) -> void:
-	_hp_label.text = "HP %d" % int(ceil(hp))
-	_hp_label.add_theme_color_override("font_color",
-		Color(0.3, 1, 0.4) if hp > 40.0 else Color(1, 0.35, 0.3))
+	# 血条填充 + 数值（2026-08-13 血条化；重开 respawn_now 会发 health_changed → 自动刷新）
+	var frac := clampf(hp / 100.0, 0.0, 1.0)
+	_hp_bar_fill.size = Vector2(236.0 * frac, 18.0)
+	var col := Color(0.3, 1, 0.4) if hp > 40.0 else Color(1, 0.35, 0.3)
+	_hp_bar_fill.color = col
+	_hp_label.text = "%d" % int(ceil(hp))
+	_hp_label.add_theme_color_override("font_color", col)
 
 
 func _on_player_died() -> void:
