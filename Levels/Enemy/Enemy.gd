@@ -47,10 +47,15 @@ func set_display_name(n: String) -> void:
 ## 射击方阵营 == 目标阵营 → 跳过伤害。M2 玩家武器系统以 "friendly" 射击；
 ## M3 队友 AI 同样 "friendly"（不打玩家/队友）；M3 敌人 AI 以 "enemy" 射击
 ## （不打敌人，可打玩家/友军——玩家/友军 get_faction()=="friendly" ≠ "enemy"）。
+## 穿透头部 hitbox：hitscan 爆头命中 HeadHitbox（group "head"，转发伤害到本体），
+## 其自身无阵营接口——取其 enemy 引用判断（2026-08-13 用户反馈爆头友军死亡 bug 根因）。
 ## 无阵营目标（地形/训练靶）不拦（返回 false）。
 static func is_friendly_fire(shooter_faction: String, target: Node) -> bool:
-	if target != null and target.has_method("get_faction"):
-		return target.get_faction() == shooter_faction
+	var faction_target: Node = target
+	if target != null and target.is_in_group("head") and target.get("enemy") != null:
+		faction_target = target.get("enemy")
+	if faction_target != null and faction_target.has_method("get_faction"):
+		return faction_target.get_faction() == shooter_faction
 	return false
 
 

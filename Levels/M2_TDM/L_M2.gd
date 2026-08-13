@@ -167,12 +167,14 @@ func _on_player_respawn_point() -> Vector3:
 
 
 ## 复活满血满弹：各槽 refill + 退出 ADS（PlayerLife 已回满血/恢复输入）
+## 末尾刷新弹药 HUD——refill 不发 ammo 信号，不刷则显示上一局数值（2026-08-13 用户反馈修复）
 func _on_player_reset() -> void:
 	_manager.set_aim(false)
 	for i in 4:
 		var core := _manager.get_core(i)
 		if core:
 			core.refill()
+	_refresh_hud()
 
 
 ## 玩家出生保护（开局/复活共用）：身体白闪 + 白屏脉冲 + HUD 标签
@@ -200,11 +202,13 @@ func _spawn_enemy() -> Node:
 
 
 func _on_enemy_died(e: Node) -> void:
-	_match.add_friendly_kill()
+	# 顺序铁律：先记 stats 再记 match——最后一杀触发 50 杀 end() 时，
+	# match_ended 信号链会同步读 stats 构建结算面板（2026-08-13 用户反馈"最后一杀没记录"根因）。
 	if e is Enemy:
 		_stats.add_death(e.display_name)
 		_enemy_names.push_back(e.display_name)  # 名字回队尾（补位敌继承身份）
 	_stats.add_kill(_stats.player_name)  # M2 仅玩家击杀（M3 队友击杀归因接入点）
+	_match.add_friendly_kill()
 
 
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
@@ -244,7 +248,15 @@ func _setup_weapons() -> void:
 
 
 # ---- HUD（准星/命中/弹药/计分板/血条/名字/保护/死亡/结算/小地图）----
+# UI 字体（2026-08-13 用户反馈"敌方得分/敌方"显示异常）：SystemFont 按名加载系统苹方，
+# 根治 Godot 默认字体中文 fallback 缺失（纯离线——系统字体本机解析，不随包分发）。
+var _ui_font: SystemFont
+
+
 func _setup_hud() -> void:
+	_ui_font = SystemFont.new()
+	_ui_font.font_names = PackedStringArray(["PingFang SC", "Heiti SC", "Noto Sans CJK SC", "Arial"])
+	# 全局默认：本场景全部 Label 走 _hud_label/手工设置字体（下方逐个 add_theme_font_override）
 	var layer := CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
@@ -256,43 +268,43 @@ func _setup_hud() -> void:
 	_hitmarker = _hud_label(layer, vp * 0.5 + Vector2(14, -28), "✕", 40, Color(1, 0.25, 0.15))
 	_hitmarker.add_theme_constant_override("outline_size", 8)
 	_hitmarker.modulate.a = 0.0
-	# ---- 计分板（顶部居中，显示器风格——2026-08-13 用户设计）----
+	# ---- 计分板（顶部居中，显示器风格——2026-08-13 用户设计；2026-08-13 反馈整体放大）----
 	# 深色面板 + 亮边框；内部三段小显示器："我方得分：XX ｜ 对局时间：XX:XX ｜ 敌方得分：XX"
-	var board_w := 660.0
+	var board_w := 800.0
 	var board_x := vp.x * 0.5 - board_w * 0.5
 	var board := Panel.new()
 	var bsb := StyleBoxFlat.new()
 	bsb.bg_color = Color(0.04, 0.07, 0.1, 0.9)
 	bsb.border_color = Color(0.35, 0.55, 0.75)
 	bsb.set_border_width_all(3)
-	bsb.set_corner_radius_all(10)
+	bsb.set_corner_radius_all(12)
 	board.add_theme_stylebox_override("panel", bsb)
 	layer.add_child(board)
 	board.position = Vector2(board_x, 12)
-	board.size = Vector2(board_w, 66)
+	board.size = Vector2(board_w, 92)
 	# 三段内显示器小框（含标题小字 + 数值大字）
-	var seg_w := (board_w - 24) / 3.0
+	var seg_w := (board_w - 28) / 3.0
 	for seg in 3:
 		var inner := Panel.new()
 		var isb := StyleBoxFlat.new()
 		isb.bg_color = Color(0.07, 0.11, 0.16, 0.95)
 		isb.border_color = Color(0.22, 0.32, 0.42)
 		isb.set_border_width_all(1)
-		isb.set_corner_radius_all(5)
+		isb.set_corner_radius_all(6)
 		inner.add_theme_stylebox_override("panel", isb)
 		layer.add_child(inner)
-		inner.position = Vector2(board_x + 8 + seg * seg_w, 18)
-		inner.size = Vector2(seg_w - 4, 54)
+		inner.position = Vector2(board_x + 10 + seg * seg_w, 18)
+		inner.size = Vector2(seg_w - 6, 78)
 	var seg_titles := ["我方得分", "对局时间", "敌方得分"]
 	for seg in 3:
-		var lx: float = board_x + 16 + seg * seg_w
-		_hud_label(layer, Vector2(lx, 20), seg_titles[seg], 13, Color(0.65, 0.75, 0.85))
-	_score_f_val = _hud_label(layer, Vector2(board_x + 16, 36), "0", 26, Color(0.35, 1, 0.5))
-	_score_t_val = _hud_label(layer, Vector2(board_x + 16 + seg_w, 36), "8:00", 26, Color(1, 0.95, 0.75))
-	_score_e_val = _hud_label(layer, Vector2(board_x + 16 + seg_w * 2, 36), "0", 26, Color(1, 0.45, 0.4))
+		var lx: float = board_x + 20 + seg * seg_w
+		_hud_label(layer, Vector2(lx, 21), seg_titles[seg], 17, Color(0.65, 0.75, 0.85))
+	_score_f_val = _hud_label(layer, Vector2(board_x + 20, 46), "0", 36, Color(0.35, 1, 0.5))
+	_score_t_val = _hud_label(layer, Vector2(board_x + 20 + seg_w, 46), "8:00", 36, Color(1, 0.95, 0.75))
+	_score_e_val = _hud_label(layer, Vector2(board_x + 20 + seg_w * 2, 46), "0", 36, Color(1, 0.45, 0.4))
 	# 段间分隔符 "｜"
 	for seg in [1, 2]:
-		_hud_label(layer, Vector2(board_x + seg * seg_w - 8, 24), "｜", 30, Color(0.35, 0.55, 0.75))
+		_hud_label(layer, Vector2(board_x + seg * seg_w - 10, 32), "｜", 40, Color(0.35, 0.55, 0.75))
 	# 弹药背板（右下）
 	var panel := Panel.new()
 	var sb := StyleBoxFlat.new()
@@ -330,6 +342,7 @@ func _setup_hud() -> void:
 	_death_label = Label.new()
 	_death_label.add_theme_font_size_override("font_size", 52)
 	_death_label.add_theme_color_override("font_color", Color(1, 0.3, 0.25))
+	_death_label.add_theme_font_override("font", _ui_font)
 	_death_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_death_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	layer.add_child(_death_label)
@@ -350,6 +363,7 @@ func _setup_hud() -> void:
 	_result_title = Label.new()
 	_result_title.add_theme_font_size_override("font_size", 44)
 	_result_title.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+	_result_title.add_theme_font_override("font", _ui_font)
 	_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_panel.add_child(_result_title)
 	_result_title.position = Vector2(0, 18)
@@ -357,18 +371,21 @@ func _setup_hud() -> void:
 	_result_f_col = Label.new()
 	_result_f_col.add_theme_font_size_override("font_size", 20)
 	_result_f_col.add_theme_color_override("font_color", Color(0.45, 1, 0.6))
+	_result_f_col.add_theme_font_override("font", _ui_font)
 	_result_panel.add_child(_result_f_col)
 	_result_f_col.position = Vector2(40, 90)
 	_result_f_col.size = Vector2(280, 300)
 	_result_e_col = Label.new()
 	_result_e_col.add_theme_font_size_override("font_size", 20)
 	_result_e_col.add_theme_color_override("font_color", Color(1, 0.5, 0.45))
+	_result_e_col.add_theme_font_override("font", _ui_font)
 	_result_panel.add_child(_result_e_col)
 	_result_e_col.position = Vector2(350, 90)
 	_result_e_col.size = Vector2(280, 300)
 	_result_hint = Label.new()
 	_result_hint.add_theme_font_size_override("font_size", 24)
 	_result_hint.add_theme_color_override("font_color", Color(0.8, 0.9, 1))
+	_result_hint.add_theme_font_override("font", _ui_font)
 	_result_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_panel.add_child(_result_hint)
 	_result_hint.position = Vector2(0, 400)
@@ -388,7 +405,7 @@ func _setup_hud() -> void:
 	_refresh_hud()
 
 
-## HUD 通用标签工厂（黑描边）
+## HUD 通用标签工厂（黑描边 + 系统苹方字体）
 func _hud_label(layer: CanvasLayer, pos: Vector2, text: String, size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -396,6 +413,8 @@ func _hud_label(layer: CanvasLayer, pos: Vector2, text: String, size: int, color
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	l.add_theme_constant_override("outline_size", 6)
+	if _ui_font:
+		l.add_theme_font_override("font", _ui_font)
 	layer.add_child(l)
 	l.position = pos
 	return l

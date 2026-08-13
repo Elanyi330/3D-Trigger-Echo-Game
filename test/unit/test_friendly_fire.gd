@@ -50,6 +50,31 @@ func test_enemy_spawn_protection_blocks_damage() -> void:
 	assert_eq(foe.health, 60.0, "保护结束后正常受伤")
 
 
+func test_headshot_friendly_fire_penetrates_hitbox() -> void:
+	# 2026-08-13 用户反馈 bug：爆头队友依然会死——hitscan 命中 HeadHitbox（无阵营接口），
+	# 谓词必须穿透到其 enemy 引用判断（同友军阵营 → 拦截）。
+	var ally = ENEMY.new()
+	ally.is_enemy = false
+	add_child_autofree(ally)
+	await wait_physics_frames(1)  # _ready：head 入组 "head"
+	var head: Node = null
+	for c in ally.get_children():
+		if c.is_in_group("head"):
+			head = c
+	assert_not_null(head, "友军头部 hitbox 存在")
+	assert_true(ENEMY.is_friendly_fire("friendly", head), "命中友军头 = 友伤（拦截）")
+	# 敌方头：正常伤害
+	var foe = ENEMY.new()
+	foe.is_enemy = true
+	add_child_autofree(foe)
+	await wait_physics_frames(1)
+	var foe_head: Node = null
+	for c in foe.get_children():
+		if c.is_in_group("head"):
+			foe_head = c
+	assert_false(ENEMY.is_friendly_fire("friendly", foe_head), "命中敌头 = 有效伤害")
+
+
 func test_hitscan_settlement_skips_friendly() -> void:
 	# WeaponManager 伤害结算入口（_on_hit_landed 直调）：命中友军 → 不结算/不发命中标记
 	var ally = ENEMY.new()
