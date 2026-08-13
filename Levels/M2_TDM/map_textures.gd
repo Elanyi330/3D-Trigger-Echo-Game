@@ -107,14 +107,25 @@ static func box_mesh(size: Vector3) -> ArrayMesh:
 		]
 		for c in corners:
 			st.set_normal(n)
-			st.set_uv(c[1])
+			# UV 取模回 [0,1)——纹理周期 1m 内联重复，零依赖 sampler wrap
+			st.set_uv(Vector2(fmod(c[1].x, 1.0), fmod(c[1].y, 1.0)))
 			st.add_vertex(c[0])
-		st.add_index(base + 0)
-		st.add_index(base + 1)
-		st.add_index(base + 2)
-		st.add_index(base + 0)
-		st.add_index(base + 2)
-		st.add_index(base + 3)
+		# 绕序：Godot 正面 = 从法线方向看逆时针，即 n·(u×v) > 0；反则交换索引。
+		# 2026-08-13 根因修复：-Z/+Z 面绕序反了被背面剔除（用户实测"缺面+闪烁"）。
+		if n.dot(u_axis.cross(v_axis)) > 0.0:
+			st.add_index(base + 0)
+			st.add_index(base + 1)
+			st.add_index(base + 2)
+			st.add_index(base + 0)
+			st.add_index(base + 2)
+			st.add_index(base + 3)
+		else:
+			st.add_index(base + 0)
+			st.add_index(base + 2)
+			st.add_index(base + 1)
+			st.add_index(base + 0)
+			st.add_index(base + 3)
+			st.add_index(base + 2)
 		base += 4
 	var mesh := ArrayMesh.new()
 	st.commit(mesh)

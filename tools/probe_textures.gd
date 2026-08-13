@@ -30,7 +30,7 @@ func _init() -> void:
 		print("FAIL  MAT_GROUND %s 未映射纹理" % GB.MAT_GROUND)
 	print("纹理类型数: %d（期望 16，Ground 另计）, 规则条数: %d" % [kinds.size(), GB.NAME_THEME.size()])
 
-	# ---- 2. 几何不变（与 BoxMesh(size) 对比）----
+	# ---- 2. 几何不变（与 BoxMesh(size) 对比）+ 绕序全朝外 ----
 	for probe_size in [Vector3(60, 4, 1), Vector3(14, 0.6, 10), Vector3(0.5, 4.1, 0.5), Vector3(1, 3, 1)]:
 		var m: ArrayMesh = TEX.box_mesh(probe_size)
 		var arr: Array = m.surface_get_arrays(0)
@@ -46,22 +46,35 @@ func _init() -> void:
 		if not aabb.position.is_equal_approx(-probe_size * 0.5) or not aabb.size.is_equal_approx(probe_size):
 			fails += 1
 			print("FAIL  AABB %s 与 BoxMesh(size=%s) 不一致" % [aabb, probe_size])
+		# 绕序：每面 2 三角的几何法线必须与声明法线同向（背面剔除防回归——
+		# 2026-08-13 根因：-Z/+Z 面绕序反被剔除，用户实测"缺面+闪烁"）
+		var half: Vector3 = probe_size * 0.5
+		for t in idx.size() / 3:
+			var a: Vector3 = verts[idx[t * 3 + 0]]
+			var b: Vector3 = verts[idx[t * 3 + 1]]
+			var c: Vector3 = verts[idx[t * 3 + 2]]
+			var tn: Vector3 = (b - a).cross(c - a).normalized()
+			# 面法线：顶点均值的哪个分量贴 ±h（该面所在平面）即该面轴
+			var center := (a + b + c) / 3.0
+			var fn := Vector3.ZERO
+			for axis_i in 3:
+				if absf(absf(center[axis_i]) - half[axis_i]) < 0.001:
+					fn[axis_i] = signf(center[axis_i])
+					break
+			if fn.is_zero_approx() or tn.dot(fn) <= 0.0:
+				fails += 1
+				print("FAIL  绕序反向: 三角 %d 几何法线 %s 面法线 %s (size=%s)" % [t, tn, fn, probe_size])
 
-	# ---- 3. UV 米数展开 ----
+	# ---- 3. UV 米数展开 + 取模回 [0,1) ----
 	for probe_size in [Vector3(60, 4, 1), Vector3(60, 1, 58), Vector3(4, 2.5, 4), Vector3(0.4, 2.1, 3)]:
 		var m: ArrayMesh = TEX.box_mesh(probe_size)
 		var arr: Array = m.surface_get_arrays(0)
 		var uvs: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV]
-		var max_u := 0.0
-		var max_v := 0.0
 		for uv in uvs:
-			max_u = maxf(max_u, uv.x)
-			max_v = maxf(max_v, uv.y)
-		var exp_u: float = maxf(probe_size.x, probe_size.z)
-		var exp_v: float = maxf(probe_size.y, probe_size.z)
-		if not is_equal_approx(max_u, exp_u) or not is_equal_approx(max_v, exp_v):
-			fails += 1
-			print("FAIL  UV 展开 (%s, %s) != 期望 (%s, %s)  (size=%s)" % [max_u, max_v, exp_u, exp_v, probe_size])
+			if uv.x < 0.0 or uv.x >= 1.0 or uv.y < 0.0 or uv.y >= 1.0:
+				fails += 1
+				print("FAIL  UV 未取模回 [0,1): %s (size=%s)" % [uv, probe_size])
+				break
 
 	# ---- 4. 纹理确定性 + 尺寸 ----
 	var t1: ImageTexture = TEX.texture_for("stone_brick")
@@ -90,6 +103,10 @@ func _init() -> void:
 		if bell.find_children("*", "CollisionShape3D", true, false).size() != 0:
 			fails += 1
 			print("FAIL  钟饰出现碰撞体（decor 无碰撞语义被破坏）")
+		# 钟饰悬于伞顶上方（2026-08-13 修正：旧 root 在地面嵌进 Pedestal 不可见）
+		if absf((bell as Node3D).position.y - 8.0) > 0.01:
+			fails += 1
+			print("FAIL  钟饰 root y=%s 不在伞顶上方 8.0" % (bell as Node3D).position.y)
 	# 结构红线：实体数仍 193，且除钟外全部 StaticBody 碰撞不变（碰撞层=1）
 	var solids: Array = LAYOUT.all_solids()
 	if solids.size() != 193:

@@ -98,8 +98,10 @@ func _spawn_solid(e: Dictionary) -> void:
 	body.add_child(col)
 
 	var mesh := MeshInstance3D.new()
-	# 2026-08-13 纹理级视觉升级：定制 UV BoxMesh（几何与 BoxMesh(size) 一致，UV 按米展开）+ 主题纹理材质
-	mesh.mesh = TEX.box_mesh(s)
+	# 2026-08-13 纹理级视觉升级：定制 UV BoxMesh + 主题纹理材质。
+	# 微放大 0.02（每侧 0.01）：仅视觉层消除贴面实体共面 z-fighting（纹理花纹会闪，
+	# 纯色同色看不出）；碰撞仍用上方 BoxShape3D 原尺寸，零改动。
+	mesh.mesh = TEX.box_mesh(s + Vector3(0.02, 0.02, 0.02))
 	mesh.material_override = TEX.material_for(_color_for(kind, e["name"]), s)
 	body.add_child(mesh)
 
@@ -183,7 +185,9 @@ func _spawn_decor(e: Dictionary) -> void:
 	var root_node := Node3D.new()
 	root_node.name = e["name"]
 	add_child(root_node)
-	root_node.position = Vector3(c.x, 0, c.z)
+	# 树 root 在地面；钟饰 root 抬高到 data center.y 下方（悬于伞顶雷口上方——
+	# 2026-08-13 修正：旧代码钟也放地面，嵌在 Pedestal 内部不可见）
+	root_node.position = Vector3(c.x, 0, c.z) if not is_bell else Vector3(c.x, c.y - 0.6, c.z)
 	if is_bell:
 		_build_bell(root_node, s)
 	else:
