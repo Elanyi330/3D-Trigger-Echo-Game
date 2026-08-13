@@ -84,6 +84,7 @@ func setup(manager: WeaponManager, move: MovementController) -> void:
 	manager.aim_toggled.connect(_on_aim_toggled)  # M1.5：开镜动画（举枪到眼前 + FOV 由 Head 平滑）
 	_mount(manager.get_current_slot())
 	_build_body()  # 下半身自见（低头可见自己身体——相机挂在角色眼睛上）
+	manager.set_weapon_view(self)  # M2 手感修复：投掷原点接线（get_throw_origin 提供右手雷位置）
 
 
 # 下半身自见：与 Soldier_Echo 同比例的骨盆/双腿/双脚，挂玩家（随 yaw、不随俯仰）。
@@ -155,6 +156,17 @@ func _mount(slot: int) -> void:
 	var w := view_model.equip(scene)
 	_wire_core(slot)
 	_position_flash(w)
+
+
+func get_throw_origin() -> Variant:
+	# M2 手感修复（2026-08-13）：投掷原点 = 视图模型手雷网格中心（右手雷处，随蓄力动画实时跟随）。
+	# 返回 null = 当前无武器模型（WeaponManager 回退相机）。
+	var weapon := view_model.current_weapon
+	if weapon == null:
+		return null
+	for c in weapon.find_children("*", "MeshInstance3D", true, false):
+		return c.global_position
+	return null
 
 
 func _wire_core(slot: int) -> void:

@@ -666,3 +666,42 @@ func test_bullet_hole_no_cap_parented_persist() -> void:
 	for child in enemy.get_children():
 		if child is BulletHole:
 			child.queue_free()  # 清理：防跨测试残留
+
+
+# ================= 7. M2 手感修复：投掷 launch 单一来源 =================
+func test_launch_params_feed_preview_and_grenade_consistently() -> void:
+	_with_camera()
+	manager = _build_manager([ak, glock, knife, m67])
+	await _deploy_m67()
+	Input.action_press("fire")
+	await wait_physics_frames(2)
+	var lp: Dictionary = manager._launch_params()
+	var traj := _trajectory()
+	assert_eq(traj.points[0], lp["origin"], "预览原点 = 发射原点（单一来源）")
+	var v0: Vector3 = (lp["direction"] as Vector3) * manager.throw_strength
+	var dt := ThrowTrajectory.STEP_SECONDS
+	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+	# 预览第 2 点 = 半隐式欧拉一步（同公式同源重力）
+	assert_almost_eq(traj.points[1].x, (lp["origin"] as Vector3).x + v0.x * dt, 0.001, "预览 x 与 launch 一致")
+	assert_almost_eq(traj.points[1].y, (lp["origin"] as Vector3).y + v0.y * dt - 0.5 * g * dt * dt, 0.001,
+			"预览 y 与 launch 一致（重力同源）")
+	assert_almost_eq(traj.points[1].z, (lp["origin"] as Vector3).z + v0.z * dt, 0.001, "预览 z 与 launch 一致")
+	Input.action_release("fire")
+	await wait_physics_frames(2)
+	var grenade := _find_grenade()
+	assert_not_null(grenade, "松开后生成真实 Grenade")
+	assert_almost_eq(grenade.global_position.x, (lp["origin"] as Vector3).x, 0.3,
+			"出手位置 = 发射原点（物理 2 帧位移容差）")
+	assert_almost_eq(grenade.global_position.z, (lp["origin"] as Vector3).z, 0.3, "出手位置 z = 发射原点")
+
+
+func test_weapon_view_throw_origin_returns_grenade_mesh_position() -> void:
+	var view := WeaponView.new()
+	add_child_autofree(view)
+	await wait_physics_frames(1)  # _ready 建 view_model
+	view.view_model.equip(load("res://Assets/Models/Weapons/Throwable/Grenade_M67_Echo/Grenade_M67_Echo.glb"))
+	var o: Variant = view.get_throw_origin()
+	assert_not_null(o, "装备手雷后返回投掷原点")
+	var p: Vector3 = o
+	assert_lt(p.z, 0.0, "手雷原点在相机前方（-Z，WEAPON_FRAME 取景）")
+	assert_gt(p.y, -0.5, "手雷原点在画面下方（-Y，右手持雷位）")

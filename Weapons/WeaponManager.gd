@@ -25,6 +25,10 @@ signal enemy_hit
 @export var view_models: Array[PackedScene] = []
 # 投掷出手速度（m/s，M67 出手速度；参数化导出避免硬编码散值——非 .tres 字段，调参走此导出）
 @export var throw_strength: float = 15.0
+# M2 手感修复（2026-08-13）：投掷手感——瞄准点射线距离上限（m）/ 瞄天空回退瞄准距离（m）。
+# 投掷方向 = 瞄准点 − 手雷原点（瞄哪打哪）；强度保持 throw_strength 固定（CS 固定投速）。
+@export var throw_aim_max_dist: float = 30.0
+@export var throw_aim_fallback_dist: float = 25.0
 # M1.5：投掷出手后自动切回主武器（CS 式；用户拍板）。默认开启；机制单测可关闭以隔离流程。
 @export var auto_switch_after_throw: bool = true
 
@@ -42,6 +46,7 @@ var _throw_pending: bool = false  # M67 引信阶段标志（fire 按住 = 手�
 var _trajectory: ThrowTrajectory  # 投掷抛物线预览（任务 8：THROWING 显示/取消/投出隐藏）
 var _bullet_holes: Array[BulletHole] = []  # 弹孔跟踪（M1.5 起取消数量上限——30s 生命周期自然约束累积）
 var _melee: MeleeController  # 近战判定控制器（任务 10：MELEE 槽位 fire 分发/右键重刺）
+var _weapon_view: Node = null  # 投掷原点来源（WeaponView.get_throw_origin；null = 回退相机，测试兼容）
 # M1 任务15：换弹排队（CC0 gun.gd 照搬）——射击中按 R 标记排队，射完自动 start_reload；
 # 队列跟随当前槽位（切枪取消），空仓路径不走排队（立即换）
 var _queued_reload: bool = false
@@ -94,6 +99,40 @@ func setup(slots: Array[WeaponResource], movement: MovementController) -> void:
 func set_head(head: Node3D) -> void:
 	# 机瞄接线（任务 6）：Head.set_ads(active, ads_multiplier) —— FOV 缩放 + 灵敏度缩放
 	_head = head
+
+
+func set_weapon_view(view: Node) -> void:
+	# M2 手感修复（2026-08-13）：投掷原点接线——WeaponView.setup 调用；null 回退相机（单元测试环境）。
+	_weapon_view = view
+
+
+func _throw_origin() -> Vector3:
+	if _weapon_view != null and _weapon_view.has_method("get_throw_origin"):
+		var p: Variant = _weapon_view.get_throw_origin()
+		if p != null:
+			return p
+	return _camera.global_position if _camera != null else Vector3.ZERO
+
+
+func _aim_point() -> Vector3:
+	# 瞄准点 = 相机视线射线命中世界（mask=1）的点；无命中（瞄天空）→ 视向固定距离回退点。
+	# 回退点远离时方向≈视向，行为连续；测试环境无相机 → 沿默认视向兜底。
+	if _camera == null:
+		return Vector3(0, 1, -throw_aim_fallback_dist)
+	var dir := -_camera.global_transform.basis.z
+	var from := _camera.global_position
+	var ray := PhysicsRayQueryParameters3D.create(from, from + dir * throw_aim_max_dist, 1)
+	var hit := _camera.get_world_3d().direct_space_state.intersect_ray(ray)
+	if not hit.is_empty():
+		return hit["position"]
+	return from + dir * throw_aim_fallback_dist
+
+
+func _launch_params() -> Dictionary:
+	# 单一来源：预览与真实投掷共用（同原点/方向/强度 → 轨迹一致——设计 §2.3）。
+	var origin := _throw_origin()
+	var direction := (_aim_point() - origin).normalized()
+	return {"origin": origin, "direction": direction}
 
 
 func switch_to(slot: int) -> void:
@@ -269,8 +308,8 @@ func _physics_process(delta: float) -> void:
 		if not Input.is_action_pressed(&"fire"):
 			_throw_grenade()
 		elif _trajectory != null and _camera != null:
-			_trajectory.update_trajectory(_camera.global_position,
-					-_camera.global_transform.basis.z, throw_strength)
+			var lp := _launch_params()
+			_trajectory.update_trajectory(lp["origin"], lp["direction"], throw_strength)
 	# 开火轮询契约：开火键按住期间每物理帧轮询 try_fire（全自动维持射速节流，半自动靠 WeaponCore 沿检测）
 	if Input.is_action_pressed(&"fire") and _state == State.ACTIVE:
 		try_fire()
@@ -327,7 +366,8 @@ func _throw_grenade() -> void:
 		tree.root.add_child(grenade)  # 先入树再 init：global_position 按父级变换正确换算
 	else:
 		add_child(grenade)
-	grenade.init(_camera.global_position, -_camera.global_transform.basis.z, throw_strength)
+	var lp := _launch_params()
+	grenade.init(lp["origin"], lp["direction"], throw_strength)
 	# M1.5：投掷出手后自动切回主武器（CS 式——投完即回步枪；用户拍板）
 	_auto_switch_to_primary()
 

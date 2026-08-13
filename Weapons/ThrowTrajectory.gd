@@ -11,8 +11,8 @@
 class_name ThrowTrajectory
 extends Node3D
 
-const POINT_COUNT := 50  # 预览点列长度（M2：30→50，弹道更长更完整）
-const STEP_SECONDS := 0.02  # 积分步长（s）：50 点 → 0.98s 弹道弧
+const POINT_COUNT := 200  # 预览点列上限（M2 手感修复：50→200；STEP 1/60 → 3.33s 覆盖垂直上抛 3.06s 全弧）
+const STEP_SECONDS := 1.0 / 60.0  # 积分步长 = 物理帧长（与 RigidBody3D 积分同构 → 预览≈实际轨迹）
 const DASH_RATIO := 0.7  # 虚线：每段画前 70%，留 30% 空隙（更连续醒目）
 
 var points: PackedVector3Array = PackedVector3Array()  # 点列（全局坐标，供测试/渲染）
@@ -40,19 +40,28 @@ func _ready() -> void:
 	add_child(_landing_mesh)
 
 
-# 沿 origin（相机位置）/direction（相机视向）以 strength 初速积分弹道并刷新渲染。
+# 沿 origin（投掷原点=右手雷处）/direction（向视角目标点）以 strength 初速积分弹道并刷新渲染。
+# M2 手感修复（2026-08-13）：落地判定 = 首次穿越 y≤0 线性插值求精确落点；可见点列截至触地点
+# （不再画入地下）；旧"末点投影 y=0"作废（长弧时末点浮空错标）。全程不落地兜底 = 末点投影。
 func update_trajectory(origin: Vector3, direction: Vector3, strength: float) -> void:
 	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 	var velocity := direction.normalized() * strength
 	var position := origin
-	points.resize(POINT_COUNT)
+	points.clear()
+	var landed := false
 	for i in POINT_COUNT:
-		points[i] = position
+		points.append(position)
 		velocity.y -= gravity * STEP_SECONDS
-		position += velocity * STEP_SECONDS
-	# 落点：弹道末点投影到地面（y=0）
-	landing_point = points[POINT_COUNT - 1]
-	landing_point.y = 0.0
+		var next := position + velocity * STEP_SECONDS
+		if next.y <= 0.0:
+			var t := position.y / (position.y - next.y)  # 两已知点线性插值：y=0 处
+			landing_point = position.lerp(next, clampf(t, 0.0, 1.0))
+			landed = true
+			break
+		position = next
+	if not landed:
+		landing_point = position  # 兜底：全程不落地（极端）→ 末点投影（旧行为）
+		landing_point.y = 0.0
 	_render()
 
 
@@ -72,13 +81,13 @@ func _render() -> void:
 
 
 func _render_landing() -> void:
-	if _landing_ring == null or points.size() < 2:
+	if _landing_ring == null or points.is_empty():
 		return
 	_landing_ring.clear_surfaces()
 	# 地面落点圆环（半径 0.25m，16 段），绿色描边——蓄力时标记落点
 	var center := landing_point
 	var segs := 16
-	var radius := 0.25
+	var radius := 0.3
 	_landing_ring.surface_begin(Mesh.PRIMITIVE_LINES, _get_landing_material())
 	for i in segs:
 		var a0 := float(i) / segs * TAU
@@ -87,6 +96,10 @@ func _render_landing() -> void:
 		var p1 := center + Vector3(cos(a1) * radius, 0.02, sin(a1) * radius)
 		_landing_ring.surface_add_vertex(p0)
 		_landing_ring.surface_add_vertex(p1)
+	# 竖直落点线：可见点列末端 → 落点环（M2 手感修复：落点清晰明了——弧线止于空中点，垂直线指向落点）
+	var top := points[points.size() - 1]
+	_landing_ring.surface_add_vertex(top)
+	_landing_ring.surface_add_vertex(center)
 	_landing_ring.surface_end()
 
 

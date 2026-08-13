@@ -1,8 +1,10 @@
 # test/unit/test_throw_trajectory.gd
 # M1 任务8：ThrowTrajectory 投掷抛物线预览测试（TDD RED 先行）
-# 行为（brief §9.1 + M2 增强）：50 点重力积分弹道（半隐式欧拉，重力与 Grenade 同源 default_gravity）、
-#   首点 = 投掷原点、终点 = 弹道末点（解析式派生期望）、随方向实时更新；
-#   M2：落点（landing_point）= 末点投影到地面 y=0。
+# M2 手感修复（2026-08-13）重写：
+#   - 积分步长 STEP_SECONDS=1/60（=物理帧长，与 RigidBody3D 同构）、点列上限 POINT_COUNT=200（3.33s）
+#   - 落地判定 = 首次穿越 y≤0 线性插值（旧"末点投影 y=0"作废——长弧浮空错标）
+#   - 可见点列截至触地点（最后一点 y>0，不画入地下）；不落地兜底 = 末点投影
+# 行为：半隐式欧拉积分（重力与 Grenade 同源 default_gravity）；首点 = 投掷原点。
 # 全局约束：不硬编码散值——期望由解析式 + ProjectSettings 重力派生；
 #   Vector3 断言按分量比较（GUT assert_almost_eq 不支持 Vector3 操作数）。
 extends GutTest
@@ -15,50 +17,43 @@ func before_each() -> void:
 	add_child_autofree(trajectory)
 
 
-# ================= 1. 点列生成 =================
-func test_generates_50_points_from_origin() -> void:
+# ================= 1. 常量 =================
+func test_step_and_point_count_constants() -> void:
+	assert_almost_eq(ThrowTrajectory.STEP_SECONDS, 1.0 / 60.0, 0.00001, "积分步长 = 物理帧长（同构）")
+	assert_eq(ThrowTrajectory.POINT_COUNT, 200, "点列上限 200（3.33s 覆盖垂直抛 3.06s）")
+
+
+# ================= 2. 点列生成（落地截止） =================
+func test_generates_points_until_ground_crossing() -> void:
+	# dt=1/60 平抛 y=2：t_land=√(2·2/g)≈0.6389s → y>0 的 i<38.33 → 39 点（i=0..38，解析确定）
 	var origin := Vector3(0, 2, 0)
 	trajectory.update_trajectory(origin, Vector3(0, 0, -1), 15.0)
-	assert_eq(trajectory.points.size(), 50, "点列 = 50 点")
+	assert_eq(trajectory.points.size(), 39, "落地前点列 = 39 点（解析确定）")
 	assert_eq(trajectory.points[0], origin, "首点 = 投掷原点")
 	assert_lt(trajectory.points[1].z, 0.0, "水平沿投掷方向（-Z）")
-	assert_almost_eq(trajectory.points[1].x, origin.x, 0.001, "水平无横向漂移")
+	assert_gt(trajectory.points[38].y, 0.0, "最后可见点在空中（不画入地下）")
 
 
-# ================= 2. 重力积分正确性 =================
-func test_endpoint_matches_gravity_integration() -> void:
-	# 半隐式欧拉解析式（重力恒定、无空气阻力）——实现先更新速度再位移、点列在更新前捕获：
-	#   pos_n = origin + v0×n×dt - ½ g dt² n(n+1)   （第 n 点 t = n×dt，50 点末点 n = 49）
-	var origin := Vector3(0, 2, 0)
-	var dir := Vector3(0, 0, -1)
-	var strength := 15.0
-	trajectory.update_trajectory(origin, dir, strength)
-	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
-	var dt := 0.02
-	var n := 49  # 第 50 点索引（0 起）
-	var expected := origin + dir * (strength * n * dt) - Vector3(0, 1, 0) * (0.5 * g * dt * dt * n * (n + 1))
-	assert_almost_eq(trajectory.points[49].x, expected.x, 0.001, "终点 x = 解析解")
-	assert_almost_eq(trajectory.points[49].y, expected.y, 0.001, "终点 y = 重力积分解析解")
-	assert_almost_eq(trajectory.points[49].z, expected.z, 0.001, "终点 z = 解析解")
-
-
-# ================= 2b. 落点标记（M2）=================
-func test_landing_point_is_endpoint_on_ground() -> void:
+# ================= 3. 落地穿越插值 =================
+func test_landing_point_is_ground_crossing_interpolation() -> void:
+	# 落点 = 穿越区间线性插值：y 精确 0；x/z 与解析值 15×t_land 容差 0.25（单步穿越离散化误差）
 	var origin := Vector3(0, 2, 0)
 	trajectory.update_trajectory(origin, Vector3(0, 0, -1), 15.0)
-	assert_almost_eq(trajectory.landing_point.x, trajectory.points[49].x, 0.001, "落点 x = 末点 x")
-	assert_almost_eq(trajectory.landing_point.z, trajectory.points[49].z, 0.001, "落点 z = 末点 z")
-	assert_eq(trajectory.landing_point.y, 0.0, "落点 y = 地面 0")
+	assert_eq(trajectory.landing_point.y, 0.0, "落点 y = 地面 0（插值穿越点）")
+	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+	var t_land := sqrt(2.0 * 2.0 / g)
+	assert_almost_eq(trajectory.landing_point.z, -15.0 * t_land, 0.25, "落点 z ≈ 解析平抛距离")
+	assert_almost_eq(trajectory.landing_point.x, 0.0, 0.001, "无横向漂移")
 
 
-func test_y_monotonic_descent_under_gravity() -> void:
-	trajectory.update_trajectory(Vector3(0, 2, 0), Vector3(0, 0, -1), 15.0)
-	for i in range(1, trajectory.points.size()):
-		assert_lt(trajectory.points[i].y, trajectory.points[i - 1].y,
-				"第 %d 点 y 递减（重力下落）" % i)
+func test_vertical_throw_lands_within_coverage() -> void:
+	# 90° 上抛 t_land=(15+√(15²+2·9.8·2))/9.8≈3.19s → ~192 点 < 200 上限
+	trajectory.update_trajectory(Vector3(0, 2, 0), Vector3(0, 1, 0), 15.0)
+	assert_lt(trajectory.points.size(), ThrowTrajectory.POINT_COUNT, "垂直抛在点列上限内落地")
+	assert_eq(trajectory.landing_point.y, 0.0, "垂直抛落点在地面")
 
 
-# ================= 3. 实时更新 =================
+# ================= 4. 实时更新 =================
 func test_update_with_new_direction_recomputes_points() -> void:
 	var origin := Vector3(0, 2, 0)
 	trajectory.update_trajectory(origin, Vector3(0, 0, -1), 15.0)
