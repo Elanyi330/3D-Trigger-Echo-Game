@@ -10,7 +10,7 @@
 |------|------|--------|------|------|
 | T1 | .tres 资源字段（机械） | impl-t1（haiku，a1ee0c7e） | review-t1 ✅✅ | **完成**（276/276；偏差声明：knife.tres 锚点实际值 0.5 为生产正确值） |
 | T2 | MeleeController 三项 | impl-t2（a0a7080e） | review-t2 ✅✅（e87b3c8 收敛） | **完成**（281 全绿）。审查 Minor×3 裁决记录：①下蹲姿态不对称（EYE_HEIGHT 固定→下蹲脚部−0.46m 偏移，边缘姿态组合才触发，容差内可接受）②新字段零值默认 fail-safe ③2 条 GUT warning 为存量非本任务引入 |
-| T3 | Grenade LOS | - | - | 待派发 |
+| T3 | Grenade LOS | impl-t3（a99de0ae） | review-t3（后台运行中） | 实现 DONE（287 全绿；修复轮 1：flaky 测试确定性化 freeze+高空传送）。偏差×3 已批准（:= 编译修复/同帧夹具 await/3D 距离修正） |
 | T4 | 投掷手感 | - | - | 未开始 |
 | T5 | 回归+文档同步 | 控制器 | - | 未开始 |
 | 终审 | 全分支 | - | - | 未开始 |

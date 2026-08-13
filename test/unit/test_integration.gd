@@ -177,7 +177,12 @@ func test_m67_throw_explodes_and_damages_target() -> void:
 	await wait_physics_frames(70)  # 飞到引信将尽（未爆）
 	var grenade := _find_grenade_in_scene()
 	if grenade != null:
-		target_a.global_position = grenade.global_position + Vector3(0, 0.3, 0)  # 落点正上方（必在 2m 内）
+		# M2 手感修复（2026-08-13）：LOS 挡伤后手雷弹道落点随机（旋转+反弹），落入洼地/墙根时
+		# 胸口射线被几何遮挡 → 正确挡伤 → 原"落点正上方"断言随机红。确定性化：冻结雷体传送到
+		# 开阔高空（LOS 纯净区），目标贴身正上方——接线断言不再依赖随机落点。
+		grenade.freeze = true
+		grenade.global_position = Vector3(0, 20, 0)
+		target_a.global_position = grenade.global_position + Vector3(0, 0.3, 0)
 	await wait_physics_frames(40)  # 引信到 → 爆炸
 	assert_eq(_count_grenades_in_scene(), 0, "引信到 → Grenade 爆炸自清")
 	assert_lt(target_a.health, 100.0, "目标受到爆炸伤害（Manager→Grenade→explode→take_damage 接线有效）")
