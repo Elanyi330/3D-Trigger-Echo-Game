@@ -6,7 +6,7 @@ class_name Minimap
 extends Control
 
 @export var world_radius_m: float = 12.0  # 覆盖半径（用户拍板 12m）
-@export var map_radius_px: float = 90.0  # 地图半径（像素）
+@export var map_radius_px: float = 135.0  # 地图半径（像素；用户拍板 1.5×，135px）
 @export var bg_color := Color(0.05, 0.08, 0.06, 0.5)
 @export var ring_color := Color(0.8, 0.9, 0.8, 0.9)
 @export var line_color := Color(0.75, 0.9, 0.8, 0.7)

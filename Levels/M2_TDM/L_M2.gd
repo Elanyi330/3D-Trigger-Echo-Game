@@ -148,7 +148,7 @@ func _setup_hud() -> void:
 	_weapon_label.add_theme_constant_override("outline_size", 8)
 	layer.add_child(_weapon_label)
 	_weapon_label.position = Vector2(30, vp.y - 70)
-	# 波次（左上角：「波次 N · 剩余 X」，WaveSpawner 信号驱动）
+	# 波次（右上角·临时，未来正式游戏去除：「波次 N · 剩余 X」，WaveSpawner 信号驱动）
 	_wave_label = Label.new()
 	_wave_label.text = "波次 1 · 剩余 %d" % WaveSpawner.WAVE_SIZE
 	_wave_label.add_theme_font_size_override("font_size", 28)
@@ -156,7 +156,9 @@ func _setup_hud() -> void:
 	_wave_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	_wave_label.add_theme_constant_override("outline_size", 8)
 	layer.add_child(_wave_label)
-	_wave_label.position = Vector2(30, 24)
+	_wave_label.position = Vector2(vp.x - 380, 24)
+	_wave_label.size = Vector2(350, 40)
+	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	# 小地图（M2 左上角圆形雷达）：数据驱动蓝图投影 + 12m 内敌我标志
 	var minimap := Minimap.new()
 	minimap.name = "Minimap"
