@@ -93,8 +93,9 @@ static func _in_rect(f: Dictionary, p: Vector3, inflate: float) -> bool:
 
 
 ## 端点找归属面：先严格匹配（|y − top_y| ≤ Y_TOL 且 xz 在面矩形内），
-## 无则矩形膨胀 INFLATE 再匹配，仍无 → ""（不抛错：已知有 2 条疑似数据错误
-## 链接端点不在任何面上，白名单 PavToSpur_WS/PavToSpur_ES）。
+## 无则矩形膨胀 INFLATE 再匹配，仍无 → ""（不抛错：已知有 4 条疑似数据错误
+## 链接端点不在任何面上，白名单 PavToSpur_WS/ES（镜像笔误）、ClusterToRim_WS/ES
+## （簇板 2026-08-11 迁离后端点未更新）；修复待用户拍板，修复后白名单应收敛）。
 ## 两轮均按 faces() 顺序取首个命中（确定性）。
 static func _find_face(face_list: Array, p: Vector3) -> String:
 	for f0 in face_list:

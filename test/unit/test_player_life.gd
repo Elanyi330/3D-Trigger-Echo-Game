@@ -10,14 +10,14 @@ const LIFE := preload("res://Levels/M2_TDM/player_life.gd")
 func _make_life() -> Dictionary:
 	var life = LIFE.new()
 	add_child_autofree(life)
-	var dummy := Node.new()
+	var dummy := Node3D.new()  # 玩家替身须 Node3D：_do_respawn 写 global_position（2026-08-14 修复）
 	add_child_autofree(dummy)
 	return {"life": life, "dummy": dummy}
 
 
 func test_take_damage_reduces_health() -> void:
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	var hps := []
 	life.health_changed.connect(func(h: float) -> void: hps.append(h))
@@ -29,7 +29,7 @@ func test_take_damage_reduces_health() -> void:
 
 func test_fatal_damage_dies_and_locks_input() -> void:
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	var died := []
 	life.died.connect(func() -> void: died.append(true))
@@ -42,7 +42,7 @@ func test_fatal_damage_dies_and_locks_input() -> void:
 
 func test_damage_ignored_while_dead() -> void:
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	life.setup(dummy)
 	life.take_damage(200.0)
@@ -53,7 +53,7 @@ func test_damage_ignored_while_dead() -> void:
 
 func test_respawn_after_delay() -> void:
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	var deaths := []
 	var respawns := []
@@ -72,7 +72,7 @@ func test_respawn_after_delay() -> void:
 
 func test_death_and_reset_callbacks_fire() -> void:
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	var on_death := []
 	var on_reset := []
@@ -90,7 +90,7 @@ func test_death_and_reset_callbacks_fire() -> void:
 
 func test_respawn_now_overrides_pending_timer() -> void:
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	var respawns := []
 	life.respawned.connect(func() -> void: respawns.append(true))
@@ -107,7 +107,7 @@ func test_respawn_now_overrides_pending_timer() -> void:
 func test_spawn_protection_blocks_damage() -> void:
 	# 出生保护（2026-08-13 用户拍板）：复活后 2s 无敌
 	var d := _make_life()
-	var life: Node = d["life"]
+	var life: PlayerLife = d["life"]
 	var dummy: Node = d["dummy"]
 	life.setup(dummy, Callable(), Callable(), Callable(), 0.05)
 	life.take_damage(999.0)

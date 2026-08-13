@@ -33,12 +33,15 @@
 
 **流程记录**：T2/T4 各 1 轮裁决（控制器不亲自改码，裁决发回原实现者）；T3 实现者以公式为准纠正控制器 brief 手算错误（5 处，全部独立复算确认）；auto-push hook 中途提交了 T4 第一版数据集（HEAD 3113 行），T6 提交工作区终版（复跑管线逐字节一致验证）。
 
-## 验证基线（T6 全量复跑）
+## 验证基线（T6 全量复跑 + 终审 APPROVE_WITH_NOTES）
 
-- GUT：**357/357**（基线 339 + T1 6 + T2 6 + T3 6）
-- probe_v3_walk 79/79（边界墙无副作用实证）、probe_navmesh 全过、probe_jump_edges 退出 0
+- GUT：**364/364**（基线 339 + T1 6 + T2 6 + T3 6 + **test_player_life 复活 7**）
+- probe_v3_walk 79/79（边界墙无副作用实证）、probe_navmesh 全过、probe_jump_edges 退出 0（门禁 A/B/C）、sightlines 硬门控 0 对、angles 全通、timing 4.93s ✓、theme 193 实体 41 抽查 0 失败、scan_gaps 0 窄缝
 - 布局不变量：193 实体、布局哈希 f935ccd7… 不变（跳跃记录不重置，577 episode 保留）
-- 其余门禁（sightlines/angles/timing/theme/scan_gaps）：不受本轮改动影响（均消费 all_solids），复跑确认
+- **验证阶段两个诚实发现（已修复+记录）**：
+  1. **test_player_life.gd 自 TDM 轮起因解析错误被 GUT 静默跳过**（`var life: Node` 上 `:= life.health` 推断失败 → 整个脚本不加载、退出码仍 0——"全绿 ≠ 全跑"）。本轮修复（`life: PlayerLife` ×7 + dummy Node→Node3D 满足 _do_respawn 写 global_position），复活 7 测试，**此前各轮 339/345/351/357 计数均不含这 7 个测试**（诚实口径）。终审 Major 建议：M3/M4 轮落地"GUT 日志解析/加载错误硬门禁"。
+  2. **外环视线基线 178→180**：HANDOFF 旧记 178 系文档过时——A/B 实测（临时换旧版 map_greybox 跑同探针）**旧灰盒同样 180 对**，边界墙对视线世界零影响，已修正文档。
+- 终审（opus）：接口链四重验证（代码比对+门禁交叉校验+独立数学复算+管线逐字节复现）全 PASS；数据集与管线产物 BYTE-IDENTICAL；改动文件 23 个全部在范围内（无 map_layout_v3.gd/Player/Weapons 越界）。Minor 同步项已处理（jump_edges 头注释 2→4 条、HANDOFF 357→364）。遗留 Minor：白名单三处维护（双门禁兜底）、M4 必须消费 dist_zone 而非面距 dist、数据集是语料快照（M4 前重跑管线）。
 
 ## 遗留（待用户拍板）
 
