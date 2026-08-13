@@ -6,6 +6,7 @@ class_name MapGreybox
 extends Node3D
 
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
+const TEX := preload("res://Levels/M2_TDM/map_textures.gd")
 
 # 灰盒材质：墙/地面/掩体/屋顶 分色便于识别（kind 兜底色；模块名称主题优先，见 NAME_THEME）
 const MAT_WALL := Color(0.55, 0.55, 0.6)
@@ -97,13 +98,9 @@ func _spawn_solid(e: Dictionary) -> void:
 	body.add_child(col)
 
 	var mesh := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = s
-	mesh.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = _color_for(kind, e["name"])
-	mat.roughness = 0.85
-	mesh.material_override = mat
+	# 2026-08-13 纹理级视觉升级：定制 UV BoxMesh（几何与 BoxMesh(size) 一致，UV 按米展开）+ 主题纹理材质
+	mesh.mesh = TEX.box_mesh(s)
+	mesh.material_override = TEX.material_for(_color_for(kind, e["name"]), s)
 	body.add_child(mesh)
 
 
@@ -178,7 +175,7 @@ func _spawn_big_tree(e: Dictionary) -> void:
 
 # 装饰（小树/植物）：无碰撞纯视觉——树干圆柱 + 树冠球
 # 注意：decor 数据 center.y 是视觉中心高度——root 放地面（y=0），树干从地面起。
-# 钟饰（BellDecor）复用此生成器：金色微自发光（2026-08-13 视觉提升，只改材质不改几何）。
+# 钟饰（BellDecor）专用钟形几何——2026-08-13 纹理级视觉升级唯一豁免的几何改动（用户拍板）。
 func _spawn_decor(e: Dictionary) -> void:
 	var c: Vector3 = e["center"]
 	var s: Vector3 = e["size"]
@@ -187,7 +184,58 @@ func _spawn_decor(e: Dictionary) -> void:
 	root_node.name = e["name"]
 	add_child(root_node)
 	root_node.position = Vector3(c.x, 0, c.z)
-	# 树干（深棕圆柱，从地面到 1.0m；钟饰为金）
+	if is_bell:
+		_build_bell(root_node, s)
+	else:
+		_build_tree(root_node, s)
+
+
+# MC 钟形：钟体（上收下张）+ 口沿环 + 钟钮 + 顶球。无碰撞（decor 语义不变）；
+# 金纹理金属材质 + 微自发光。
+func _build_bell(root_node: Node3D, _s: Vector3) -> void:
+	var mat := TEX.material_for(Color(0.95, 0.75, 0.25), Vector3.ONE)
+	mat.emission_enabled = true
+	mat.emission = Color(0.35, 0.25, 0.06)
+	var body := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.22
+	cyl.bottom_radius = 0.5
+	cyl.height = 0.95
+	body.mesh = cyl
+	body.material_override = mat
+	body.position = Vector3(0, 0.475, 0)
+	root_node.add_child(body)
+	var rim := MeshInstance3D.new()
+	var rcyl := CylinderMesh.new()
+	rcyl.top_radius = 0.5
+	rcyl.bottom_radius = 0.56
+	rcyl.height = 0.1
+	rim.mesh = rcyl
+	rim.material_override = mat
+	rim.position = Vector3(0, 0.05, 0)
+	root_node.add_child(rim)
+	var knob := MeshInstance3D.new()
+	var kcyl := CylinderMesh.new()
+	kcyl.top_radius = 0.07
+	kcyl.bottom_radius = 0.07
+	kcyl.height = 0.18
+	knob.mesh = kcyl
+	knob.material_override = mat
+	knob.position = Vector3(0, 1.01, 0)
+	root_node.add_child(knob)
+	var ball := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 0.11
+	sph.height = 0.22
+	ball.mesh = sph
+	ball.material_override = mat
+	ball.position = Vector3(0, 1.13, 0)
+	root_node.add_child(ball)
+
+
+# 小树：树干圆柱 + 树冠球（纯色，自然形体不贴纹理）
+func _build_tree(root_node: Node3D, s: Vector3) -> void:
+	# 树干（深棕圆柱，从地面到 1.0m）
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.12
@@ -195,27 +243,21 @@ func _spawn_decor(e: Dictionary) -> void:
 	cyl.height = s.y * 0.5
 	trunk.mesh = cyl
 	var trunk_mat := StandardMaterial3D.new()
-	trunk_mat.albedo_color = Color(0.95, 0.75, 0.25) if is_bell else Color(0.35, 0.25, 0.15)
+	trunk_mat.albedo_color = Color(0.35, 0.25, 0.15)
 	trunk.material_override = trunk_mat
 	trunk.position = Vector3(0, s.y * 0.25, 0)
 	root_node.add_child(trunk)
-	# 树冠（绿色球，在树干顶部上方；钟饰为金）
+	# 树冠（绿色球，在树干顶部上方）
 	var crown := MeshInstance3D.new()
 	var sph := SphereMesh.new()
 	sph.radius = s.x * 0.7
 	sph.height = s.x * 1.4
 	crown.mesh = sph
 	var crown_mat := StandardMaterial3D.new()
-	crown_mat.albedo_color = Color(0.95, 0.75, 0.25) if is_bell else Color(0.2, 0.6, 0.25)
+	crown_mat.albedo_color = Color(0.2, 0.6, 0.25)
 	crown.material_override = crown_mat
 	crown.position = Vector3(0, s.y * 0.5 + 0.5, 0)
 	root_node.add_child(crown)
-	# 钟饰微自发光（material 属性，不改几何）
-	if is_bell:
-		trunk_mat.emission_enabled = true
-		trunk_mat.emission = Color(0.45, 0.3, 0.08)
-		crown_mat.emission_enabled = true
-		crown_mat.emission = Color(0.45, 0.3, 0.08)
 
 
 # ---- 提供导航层所需的静态体集合（T6 navmesh 烘焙用）----
