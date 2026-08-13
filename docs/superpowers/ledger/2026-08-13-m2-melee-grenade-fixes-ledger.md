@@ -9,7 +9,7 @@
 | 任务 | 内容 | 实现者 | 审查 | 状态 |
 |------|------|--------|------|------|
 | T1 | .tres 资源字段（机械） | impl-t1（haiku，a1ee0c7e） | review-t1 ✅✅ | **完成**（276/276；偏差声明：knife.tres 锚点实际值 0.5 为生产正确值） |
-| T2 | MeleeController 三项 | impl-t2（a0a7080e） | - | 进行中（实现者发现夹具矛盾 → 控制器裁决：夹具 origin 放眼位 1.63 + 连击测试改两挥版 RED） |
+| T2 | MeleeController 三项 | impl-t2（a0a7080e） | review-t2（后台运行中） | 实现 DONE_WITH_CONCERNS（281 全绿；3 条 concern 均经控制器裁决修正：夹具眼位/连击测试两挥版/文件范围授权）。⚠️ hook 在 RED 重验期把旧控制器提交成 HEAD 772e2ba——工作树为正确代码，hook 会自动收敛 |
 | T3 | Grenade LOS | - | - | 未开始 |
 | T4 | 投掷手感 | - | - | 未开始 |
 | T5 | 回归+文档同步 | 控制器 | - | 未开始 |
