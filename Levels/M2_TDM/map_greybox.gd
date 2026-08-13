@@ -7,13 +7,58 @@ extends Node3D
 
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 
-# 灰盒材质：墙/地面/掩体/屋顶 分色便于识别
+# 灰盒材质：墙/地面/掩体/屋顶 分色便于识别（kind 兜底色；模块名称主题优先，见 NAME_THEME）
 const MAT_WALL := Color(0.55, 0.55, 0.6)
-const MAT_GROUND := Color(0.4, 0.42, 0.45)
+const MAT_GROUND := Color(0.62, 0.6, 0.55)  # 石板广场（2026-08-13 视觉提升：浅暖灰）
 const MAT_COVER := Color(0.7, 0.55, 0.35)
 const MAT_ROOF := Color(0.5, 0.6, 0.7)
 const MAT_RAMP := Color(0.6, 0.6, 0.4)
 const MAT_SPAWN := Color(0.3, 0.7, 0.3)
+
+# ---- 模块主题配色（2026-08-13 视觉提升）----
+# 只改 material_override 颜色，不动任何结构/碰撞/尺寸。
+# 名称子串规则，数组顺序 = 优先级（先命中先得）；未命中回退 kind 兜底色。
+# 注意顺序陷阱：TowerRail 必须先于 Rail、Box 先于 Cluster/Tower、Camp 先于 Wall——
+# 子串匹配会吞掉更具体的前缀（详见注释）。
+# 主题：古城祭坛 MC 风——中央圣地（金砂岩/红砂岩/石英/青铜/金）、市集（橡木/云杉/红陶瓦帆布）、
+#       市街（苔石长墙/深橡木望楼）、背街（深橡木板）、营（泥砖/军绿货车）、边界（深板岩）。
+const NAME_THEME := [
+	# —— 中央圣地 · 钟楼 ——
+	["Umbrella", Color(0.31, 0.22, 0.13)],      # 伞顶：深橡木
+	["Lintel", Color(0.85, 0.68, 0.3)],         # 钟门过梁：金饰
+	["Gate", Color(0.86, 0.83, 0.78)],          # 钟门柱/翼墙：白石英
+	["Pillar_", Color(0.72, 0.58, 0.32)],       # 钟楼组合柱：青铜
+	["CorridorSlab", Color(0.9, 0.87, 0.82)],   # 回廊行走面：亮石英
+	["Pedestal", Color(0.33, 0.33, 0.37)],      # 钟基座：深板岩
+	["AltarSlab", Color(0.69, 0.4, 0.23)],      # 祭坛斜板：红砂岩
+	["AltarPlatform", Color(0.86, 0.79, 0.59)], # 祭坛台：金砂岩
+	["Micro", Color(0.86, 0.79, 0.59)],         # 微台阶：随祭坛台
+	["Rim", Color(0.47, 0.47, 0.51)],           # 广场 rim 围墙：石砖
+	["RampE", Color(0.53, 0.53, 0.57)],         # 东坡道：磨制石砖
+	["RampW", Color(0.53, 0.53, 0.57)],         # 西坡道：磨制石砖
+	# —— 市集带 / 市街 / 角场 ——
+	["Canopy", Color(0.56, 0.29, 0.24)],        # 市集高棚：红陶瓦帆布
+	["PavStep", Color(0.45, 0.33, 0.19)],       # 摊阁台阶：云杉木
+	["PavilionStep", Color(0.45, 0.33, 0.19)],  # 市街摊阁台阶（EastPavilionStep 命名系）：云杉木
+	["Pav", Color(0.65, 0.51, 0.33)],           # 摊阁：橡木
+	["Box", Color(0.52, 0.4, 0.24)],            # 货箱/塔顶箱：货物箱
+	["EastWall", Color(0.42, 0.48, 0.4)],       # 东市街长墙：苔石
+	["WestWall", Color(0.42, 0.48, 0.4)],       # 西市街长墙：苔石
+	["TowerRamp", Color(0.45, 0.33, 0.19)],     # 塔坡道：云杉木
+	["TowerRail", Color(0.45, 0.33, 0.19)],     # 塔栏板：云杉木
+	["Rail", Color(0.84, 0.81, 0.76)],          # 回廊栏板：白石英（必须在 TowerRail 之后）
+	["Tower", Color(0.31, 0.22, 0.13)],         # 望楼/水塔塔体：深橡木
+	["Cluster", Color(0.65, 0.51, 0.33)],       # 摊位簇板：橡木
+	["Spur", Color(0.47, 0.47, 0.51)],          # 横脊墙：石砖
+	# —— 背街 ——
+	["LOS", Color(0.31, 0.22, 0.13)],           # 断视板：深橡木
+	# —— 营 ——
+	["Truck", Color(0.28, 0.42, 0.3)],          # 货车：军绿
+	["Roof", Color(0.31, 0.22, 0.13)],          # 营顶板：深橡木
+	["Camp", Color(0.55, 0.47, 0.38)],          # 营墙/影壁：泥砖
+	# —— 边界 ——
+	["Wall", Color(0.33, 0.33, 0.37)],          # 外边界墙：深板岩
+]
 
 var built := false
 
@@ -56,13 +101,18 @@ func _spawn_solid(e: Dictionary) -> void:
 	bm.size = s
 	mesh.mesh = bm
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = _color_for(kind)
+	mat.albedo_color = _color_for(kind, e["name"])
 	mat.roughness = 0.85
 	mesh.material_override = mat
 	body.add_child(mesh)
 
 
-func _color_for(kind: String) -> Color:
+func _color_for(kind: String, name: String = "") -> Color:
+	# 模块名称主题优先（2026-08-13 视觉提升）；未命中回退 kind 兜底色
+	if name != "":
+		for rule in NAME_THEME:
+			if name.contains(rule[0]):
+				return rule[1]
 	match kind:
 		"wall":
 			return MAT_WALL
@@ -110,7 +160,7 @@ func _spawn_big_tree(e: Dictionary) -> void:
 	cyl.height = s.y
 	trunk.mesh = cyl
 	var trunk_mat := StandardMaterial3D.new()
-	trunk_mat.albedo_color = Color(0.4, 0.28, 0.15)
+	trunk_mat.albedo_color = Color(0.35, 0.25, 0.15)  # 深橡木树干（2026-08-13 与 decor 统一）
 	trunk.material_override = trunk_mat
 	trunk.position = Vector3(0, s.y * 0.5, 0)
 	body.add_child(trunk)
@@ -120,7 +170,7 @@ func _spawn_big_tree(e: Dictionary) -> void:
 	sph.height = 3.2
 	crown.mesh = sph
 	var crown_mat := StandardMaterial3D.new()
-	crown_mat.albedo_color = Color(0.15, 0.55, 0.2)
+	crown_mat.albedo_color = Color(0.2, 0.6, 0.25)  # 树叶绿（2026-08-13 与 decor 统一）
 	crown.material_override = crown_mat
 	crown.position = Vector3(0, s.y + 1.0, 0)
 	body.add_child(crown)
@@ -128,14 +178,16 @@ func _spawn_big_tree(e: Dictionary) -> void:
 
 # 装饰（小树/植物）：无碰撞纯视觉——树干圆柱 + 树冠球
 # 注意：decor 数据 center.y 是视觉中心高度——root 放地面（y=0），树干从地面起。
+# 钟饰（BellDecor）复用此生成器：金色微自发光（2026-08-13 视觉提升，只改材质不改几何）。
 func _spawn_decor(e: Dictionary) -> void:
 	var c: Vector3 = e["center"]
 	var s: Vector3 = e["size"]
+	var is_bell: bool = str(e["name"]).contains("Bell")
 	var root_node := Node3D.new()
 	root_node.name = e["name"]
 	add_child(root_node)
 	root_node.position = Vector3(c.x, 0, c.z)
-	# 树干（深棕圆柱，从地面到 1.0m）
+	# 树干（深棕圆柱，从地面到 1.0m；钟饰为金）
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.12
@@ -143,21 +195,27 @@ func _spawn_decor(e: Dictionary) -> void:
 	cyl.height = s.y * 0.5
 	trunk.mesh = cyl
 	var trunk_mat := StandardMaterial3D.new()
-	trunk_mat.albedo_color = Color(0.35, 0.25, 0.15)
+	trunk_mat.albedo_color = Color(0.95, 0.75, 0.25) if is_bell else Color(0.35, 0.25, 0.15)
 	trunk.material_override = trunk_mat
 	trunk.position = Vector3(0, s.y * 0.25, 0)
 	root_node.add_child(trunk)
-	# 树冠（绿色球，在树干顶部上方）
+	# 树冠（绿色球，在树干顶部上方；钟饰为金）
 	var crown := MeshInstance3D.new()
 	var sph := SphereMesh.new()
 	sph.radius = s.x * 0.7
 	sph.height = s.x * 1.4
 	crown.mesh = sph
 	var crown_mat := StandardMaterial3D.new()
-	crown_mat.albedo_color = Color(0.2, 0.6, 0.25)
+	crown_mat.albedo_color = Color(0.95, 0.75, 0.25) if is_bell else Color(0.2, 0.6, 0.25)
 	crown.material_override = crown_mat
 	crown.position = Vector3(0, s.y * 0.5 + 0.5, 0)
 	root_node.add_child(crown)
+	# 钟饰微自发光（material 属性，不改几何）
+	if is_bell:
+		trunk_mat.emission_enabled = true
+		trunk_mat.emission = Color(0.45, 0.3, 0.08)
+		crown_mat.emission_enabled = true
+		crown_mat.emission = Color(0.45, 0.3, 0.08)
 
 
 # ---- 提供导航层所需的静态体集合（T6 navmesh 烘焙用）----
