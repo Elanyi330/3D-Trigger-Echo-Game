@@ -1,11 +1,13 @@
 # test/unit/test_grenade_los.gd
-# M2 手感修复（2026-08-13）：手雷爆炸 LOS 墙体遮挡（TDD RED 先行）
-# 行为（设计 2026-08-13-m2-melee-grenade-fixes-design §一）：
-#   - 墙在爆心与目标之间（射线路径相交）→ 伤害 0（CS 全遮挡语义，无穿透衰减）
+# M2 修复轮2（2026-08-13）：手雷爆炸厚度穿透衰减 + CCD（TDD）
+# 行为（设计 2026-08-13-m2-combat-fixes-round2-design §一）：
+#   - 沿"爆心→目标胸口参考点"线段点采样累计墙厚 T（步长 0.25m）→ 伤害 × clamp(1−T/3.0,0,1)
+#     （线性截断：越厚挡越多、越薄挡越少、3m 全挡——用户拍板方案 A，替代旧二值 LOS 全挡）
 #   - 无遮挡 → 距离线性衰减满值
-#   - 贴地爆炸同层目标不假遮挡（胸口参考点防地板挡射线——回归重点）
-#   - 头 hitbox 自挡回归：爆心在头顶上方时射线穿过头 hitbox——exclude 本体+子 CollisionObject3D RID
-#   - 矮掩体 0.9 墙：贴地爆炸射线路径相交 → 遮挡（CS trace 语义）；爆心抬高 1.2m → 射线过顶不遮挡
+#   - 贴地爆炸同层目标不假遮挡（胸口参考点防地板计入厚度——回归重点）
+#   - 头 hitbox 自挡回归：爆心在头顶上方时采样点穿过头 hitbox——exclude 本体+子 CollisionObject3D RID
+#   - 矮掩体 0.9 墙：贴地爆炸采样点落在墙内 → T=0.5 → ×5/6；爆心抬高 1.2m → 采样点过顶不挡
+#   - CCD：continuous_cd = true（修复高速隧穿穿地）
 # 全局约束：期望值由 m67.tres 派生（damage/blast_radius），不硬编码散值。
 extends GutTest
 
