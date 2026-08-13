@@ -56,3 +56,14 @@ enum RecoilPattern { SET_PATTERN, RANDOM }
 # 取值对齐 WeaponView 挥击包络的接触时刻：轻击斜挥 ~0.35 相位 ×0.4s≈0.15s；重刺前刺满伸 ~0.45 相位 ×1.0s≈0.45s。
 @export var melee_light_hit_delay: float = 0.15  # 轻击接触延迟（CS 左键近乎即时）
 @export var melee_heavy_hit_delay: float = 0.45  # 重刺接触延迟（CS 右键明显蓄力后出伤）
+# M2 手感修复（2026-08-13）：近战连击窗口（s）——自挥击发起帧计时，窗口内轻击=连击 25，超时重置首挥 40。
+@export var melee_combo_window: float = 0.8
+# M2 手感修复（2026-08-13）：重刺射程分级（m）——CS 权威 stab 32u≈1.6 短于 slash 48u≈2.0
+# （docs/superpowers/reference/cs2-weapon-data.md 近战表"攻击距离"行：CS 重刺前送触及短于斜挥弧线）。
+@export var melee_stab_range: float = 0.0
+# M2 手感修复（2026-08-13）：近战垂直差上限（m，脚部-脚部）——1.5 允许同层/1.2m 摊阁/0.6m 祭坛台，
+# 禁止 2.5m 望楼 / 3.0m 回廊隔层刀人。
+@export var melee_vertical_range: float = 0.0
+# M2 手感修复（2026-08-13）：手雷爆炸 LOS 探测点高度（m，目标脚部上方=胸口参考点）——
+# LOS 射线打此点而不打脚部：防贴地射线打中地板造成假遮挡。
+@export var blast_los_probe_height: float = 1.0

@@ -58,9 +58,9 @@
 
 **现状**：纯水平面（XZ）判定，垂直方向无约束——隔 3m 层高差水平距离够近也能刀中。
 
-**方案**：`melee_vertical_range`（新 .tres 字段，默认 **1.5m**），`_in_cone` 增加 `abs(target_pos.y − origin_pos.y) ≤ melee_vertical_range`（脚部-脚部，origin=眼位）。
+**方案**：`melee_vertical_range`（新 .tres 字段，默认 **1.5m**），`_in_cone` 增加**脚部-脚部**垂直判定：`abs(target_pos.y − (origin_pos.y − EYE_HEIGHT)) ≤ melee_vertical_range`（origin=眼位相机，须减眼高 1.63 换算回脚部——CS 眼位 64u≈1.63，`GripRig.EYE_Y` 同源；MeleeController 定义 `const EYE_HEIGHT := 1.63`）。
 
-**语义验证**：同层 0 ✓；摊阁 1.2m 位差（上打）= |1.2−1.63|=0.43 ✓；祭坛台 0.6m 下打上 = |0−2.23|=2.23 ✗（禁止隔台刀人，眼位基准使"上打容易、下打难"，符合直觉）；望楼 2.5m / 回廊 3.0m ✗。
+**语义验证**（脚部-脚部）：同层 0 ✓；摊阁 1.2m 位差 = 1.2 ✓；祭坛台 0.6m 下打上 = 0.6 ✓（一阶台阶允许）；望楼 2.5m / 回廊 3.0m ✗（禁止隔层刀人）。眼位直减会误判（同层 |0−1.63|=1.63>1.5 全挡），换算为脚部后语义正确。
 
 ## 五、.tres 新字段总表（数值唯一来源）
 

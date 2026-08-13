@@ -15,4 +15,5 @@ deploy_time = 0.5
 fire_mode = 3
 fuse_time = 1.5
 blast_radius = 8.89
+blast_los_probe_height = 1.0
 ads_multiplier = 1.0

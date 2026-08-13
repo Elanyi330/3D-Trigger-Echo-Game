@@ -25,3 +25,6 @@ melee_angle = 60.0
 melee_backstab_angle = 150.0
 melee_light_hit_delay = 0.15
 melee_heavy_hit_delay = 0.5
+melee_combo_window = 0.8
+melee_stab_range = 1.6
+melee_vertical_range = 1.5
