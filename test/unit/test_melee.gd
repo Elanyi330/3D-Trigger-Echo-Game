@@ -41,6 +41,7 @@ func before_each() -> void:
 	origin = Node3D.new()
 	add_child_autofree(origin)
 	melee.origin = origin
+	origin.position = Vector3(0, 1.63, 0)  # 眼位（M2 手感修复：垂直判定需真实眼高；既有显式设置的测试不受影响）
 	last_hit_target = null
 	last_hit_damage = -1.0
 	melee.melee_hit.connect(_on_melee_hit)
@@ -331,13 +332,9 @@ func test_combo_resets_after_window_expiry() -> void:
 	manager.try_fire()  # 首挥 40
 	await _await_hit(false)
 	assert_almost_eq(t.health, 100.0 - knife.melee_primary_damage, 0.001, "首挥 40")
-	await _await_cooldown(knife.melee_light_time)
-	manager.try_fire()  # 窗口内（自首挥 0.4s < 0.8s）→ 连击 25
-	await _await_hit(false)
-	assert_almost_eq(t.health, 100.0 - knife.melee_primary_damage - knife.melee_secondary_damage,
-			0.001, "窗口内连击 25")
-	# 自第二次挥击起等窗口过期（0.8s + 0.1s 余量）→ 第三击回首挥 40（用信号断言防血量到 0）
-	await _await_cooldown(knife.melee_combo_window + 0.1)
+	# 冷却 0.4s 满后继续等窗口 0.8s 过期（+0.1s 余量，自首挥起 >0.8s）→ 第二挥应回首挥 40
+	# （旧代码无条件交替给 25 → 红；新代码窗口重置给 40 → 绿）
+	await _await_cooldown(knife.melee_light_time + knife.melee_combo_window + 0.1)
 	manager.try_fire()
 	await _await_hit(false)
 	assert_almost_eq(last_hit_damage, knife.melee_primary_damage, 0.001,

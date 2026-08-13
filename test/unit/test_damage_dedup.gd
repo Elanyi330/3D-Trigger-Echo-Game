@@ -24,6 +24,7 @@ func before_each() -> void:
 	origin = Node3D.new()
 	add_child_autofree(origin)
 	melee.origin = origin
+	origin.position = Vector3(0, 1.63, 0)  # 眼位（M2 手感修复：垂直判定需真实眼高）
 
 
 func _spawn_enemy(at: Vector3) -> Enemy:
