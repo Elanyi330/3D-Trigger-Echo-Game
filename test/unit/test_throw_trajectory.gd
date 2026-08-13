@@ -25,13 +25,14 @@ func test_step_and_point_count_constants() -> void:
 
 # ================= 2. 点列生成（落地截止） =================
 func test_generates_points_until_ground_crossing() -> void:
-	# dt=1/60 平抛 y=2：t_land=√(2·2/g)≈0.6389s → y>0 的 i<38.33 → 39 点（i=0..38，解析确定）
+	# dt=1/60 平抛 y=2：半隐式欧拉离散 y_i = 2 − ½·g·dt²·i(i+1)（每点比连续解析低 ½·g·dt²·i）——
+	#   i=37 → y=+0.0863（最后 y>0 可见点）、i=38 → y=−0.0172（已入地）→ 落地前 38 点（i=0..37）
 	var origin := Vector3(0, 2, 0)
 	trajectory.update_trajectory(origin, Vector3(0, 0, -1), 15.0)
-	assert_eq(trajectory.points.size(), 39, "落地前点列 = 39 点（解析确定）")
+	assert_eq(trajectory.points.size(), 38, "落地前点列 = 38 点（离散半隐式欧拉确定）")
 	assert_eq(trajectory.points[0], origin, "首点 = 投掷原点")
 	assert_lt(trajectory.points[1].z, 0.0, "水平沿投掷方向（-Z）")
-	assert_gt(trajectory.points[38].y, 0.0, "最后可见点在空中（不画入地下）")
+	assert_gt(trajectory.points[37].y, 0.0, "最后可见点在空中（不画入地下）")
 
 
 # ================= 3. 落地穿越插值 =================

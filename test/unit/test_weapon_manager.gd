@@ -683,7 +683,7 @@ func test_launch_params_feed_preview_and_grenade_consistently() -> void:
 	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 	# 预览第 2 点 = 半隐式欧拉一步（同公式同源重力）
 	assert_almost_eq(traj.points[1].x, (lp["origin"] as Vector3).x + v0.x * dt, 0.001, "预览 x 与 launch 一致")
-	assert_almost_eq(traj.points[1].y, (lp["origin"] as Vector3).y + v0.y * dt - 0.5 * g * dt * dt, 0.001,
+	assert_almost_eq(traj.points[1].y, (lp["origin"] as Vector3).y + v0.y * dt - g * dt * dt, 0.001,
 			"预览 y 与 launch 一致（重力同源）")
 	assert_almost_eq(traj.points[1].z, (lp["origin"] as Vector3).z + v0.z * dt, 0.001, "预览 z 与 launch 一致")
 	Input.action_release("fire")
@@ -692,7 +692,7 @@ func test_launch_params_feed_preview_and_grenade_consistently() -> void:
 	assert_not_null(grenade, "松开后生成真实 Grenade")
 	assert_almost_eq(grenade.global_position.x, (lp["origin"] as Vector3).x, 0.3,
 			"出手位置 = 发射原点（物理 2 帧位移容差）")
-	assert_almost_eq(grenade.global_position.z, (lp["origin"] as Vector3).z, 0.3, "出手位置 z = 发射原点")
+	assert_almost_eq(grenade.global_position.z, (lp["origin"] as Vector3).z, 1.0, "出手位置 z = 发射原点（2~3 物理帧积分位移 ≤0.75m 容差）")
 
 
 func test_weapon_view_throw_origin_returns_grenade_mesh_position() -> void:
