@@ -145,6 +145,7 @@ func _ghost_body_mat(c: Color) -> StandardMaterial3D:
 
 
 func _on_switched(slot: int) -> void:
+	_reload_t = -1.0  # M2 修复轮2（2026-08-13）：防御——换弹动画不延续到新挂载武器
 	_mount(slot)
 	_deploy_t = 0.18  # 新武器滑入
 

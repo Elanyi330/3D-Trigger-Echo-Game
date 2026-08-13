@@ -142,6 +142,10 @@ func switch_to(slot: int) -> void:
 		return  # 空槽位：无操作
 	if slot == _current_slot:
 		return  # 切同一槽位：无操作（不发信号）
+	# M2 修复轮2（2026-08-13，用户拍板）：换弹中不允许切换武器（非 CS"切枪取消换弹"——
+	# 视图层 _reload_t 不随切枪复位，动画会串到新挂载武器上，直接禁止切换）。
+	if _state == State.RELOADING:
+		return
 	# THROWING（M67 引信）期间切枪：先取消投掷（弹药返还 + 复位 + ammo 信号）再切换——
 	# 否则弹药已扣 + _throw_pending 残留 + Grenade 永不生成 = 静默丢雷（审查重要修复；
 	# CS2 切枪收雷保留，取消不消耗弹药）。
