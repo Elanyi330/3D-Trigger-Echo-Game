@@ -273,6 +273,7 @@ func test_enemies_left_decrement() -> void:
 
 # ---- 7. 组合多样性：连续 6 波的面名多重集至少出现 2 种 ----
 func test_wave_combo_variety() -> void:
+	seed(20260813)  # 确定性种子（T5a 2026-08-13）：根治"6 波全同组合"RNG flake（P≈1/243 随机红）
 	var s := _make_spawner()
 	if s == null:
 		return

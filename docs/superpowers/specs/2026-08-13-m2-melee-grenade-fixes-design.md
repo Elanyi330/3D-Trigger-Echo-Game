@@ -1,7 +1,7 @@
 # M2 战斗手感三项修复设计：手雷 LOS 挡伤 + 投掷手感、近战连击窗口/stab 射程分级、`_in_cone` 垂直差上限
 
 > 日期：2026-08-13 · 分支 feat/m1-assets（单目录 /Users/elanyi/Projects/Trigger-Echo）
-> 状态：设计待用户批准。用户 2026-08-13 指令：2/3 按已提方案改；第 1 项在 LOS 挡伤之外**增加投掷手感优化**（蓄力抛物线起点 = 右手手雷处，向玩家视角中间目标点延伸，弧线完整可见、落点清晰、实际轨迹与预览一致），实现逻辑参考网上 FPS 投掷系统资料。
+> 状态：**已批准并实施完成（2026-08-13）**——T1-T4 逐任务两阶段审查全 PASS，GUT 289/289；T5a 顺带根治既有 wave_spawner RNG flake。用户 2026-08-13 指令：2/3 按已提方案改；第 1 项在 LOS 挡伤之外**增加投掷手感优化**（蓄力抛物线起点 = 右手手雷处，向玩家视角中间目标点延伸，弧线完整可见、落点清晰、实际轨迹与预览一致），实现逻辑参考网上 FPS 投掷系统资料。
 > 网上调研：[CS2 手雷指南（swap.gg）](https://swap.gg/id/blog/cs2-grenade-guide-2026)（三种固定投掷力度/准星指向瞄准法）、[Godot 论坛抛物线瞄准辅助讨论](https://forum.godotengine.org/t/parabolic-arc-as-aim-assist/141969/9)、[Godot 论坛手雷轨迹实现帖](https://godotforums.org/d/34759-how-do-i-code-the-trajectory-for-throwing-grenades/4)（未加载成功）。Source 引擎 RadiusDamage LOS 机制 + 视图模型投掷原点为设计依据（自研实现，非复制代码）。
 
 ---

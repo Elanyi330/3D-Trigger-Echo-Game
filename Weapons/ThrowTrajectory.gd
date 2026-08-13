@@ -3,7 +3,7 @@
 # M2 增强（2026-08-10）：更醒目——更长弹道 + 加粗亮绿虚线 + 蓄力落点标记（圆环）。
 #
 # 需求（spec §9.1）：每物理帧沿投掷方向积分重力抛体弹道（v0 = throw_strength），
-#   生成 50 点虚线预览，终点 = 弹道末点；THROWING 显示、取消/投出隐藏（WeaponManager 控制 visible）。
+#   生成 200 点虚线预览，落点 = 首次穿越地面插值点；THROWING 显示、取消/投出隐藏（WeaponManager 控制 visible）。
 # 积分：半隐式欧拉，重力与 Grenade（RigidBody3D）同源 ProjectSettings default_gravity——
 #   预览与真实投掷落点一致（测试以同公式解析式派生期望，不硬编码散值）。
 # 渲染：ImmediateMesh 虚线（PRIMITIVE_LINES 每段画前 70% 留空），top_level 世界空间（点在全局坐标系）；
@@ -84,7 +84,7 @@ func _render_landing() -> void:
 	if _landing_ring == null or points.is_empty():
 		return
 	_landing_ring.clear_surfaces()
-	# 地面落点圆环（半径 0.25m，16 段），绿色描边——蓄力时标记落点
+	# 地面落点圆环（半径 0.3m，16 段），绿色描边——蓄力时标记落点
 	var center := landing_point
 	var segs := 16
 	var radius := 0.3
