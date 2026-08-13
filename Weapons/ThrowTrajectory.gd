@@ -7,7 +7,7 @@
 # 积分：半隐式欧拉，重力与 Grenade（RigidBody3D）同源 ProjectSettings default_gravity——
 #   预览与真实投掷落点一致（测试以同公式解析式派生期望，不硬编码散值）。
 # 渲染：ImmediateMesh 虚线（PRIMITIVE_LINES 每段画前 70% 留空），top_level 世界空间（点在全局坐标系）；
-#   落点 = 弹道最后一点下方 0.1m（地面标记圆环），绿色描边更醒目。
+#   落点 = 首次穿越地面 y=0 的线性插值点 + 竖直落点线（可见点列末端 → 落点环，绿色描边更醒目）。
 class_name ThrowTrajectory
 extends Node3D
 

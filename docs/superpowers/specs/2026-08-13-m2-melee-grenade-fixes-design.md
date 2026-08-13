@@ -64,7 +64,7 @@
 
 ## 五、.tres 新字段总表（数值唯一来源）
 
-| 字段 | 默认值 | 所属资源 | 用途 |
+| 字段 | 配置值（.tres；脚本默认 fail-closed 0.0） | 所属资源 | 用途 |
 |---|---|---|---|
 | `blast_los_probe_height` | 1.0 | weapon_m67.tres | LOS 探测点高（胸口） |
 | `melee_combo_window` | 0.8 | weapon_knife.tres | 连击窗口（s） |
