@@ -98,6 +98,7 @@ var _ammo_label: Label
 var _weapon_label: Label
 var _wave_label: Label
 var _hitmarker: Label
+var _minimap: Minimap  # M2 小地图（左上角圆形雷达）
 
 
 func _setup_hud() -> void:
@@ -156,11 +157,26 @@ func _setup_hud() -> void:
 	_wave_label.add_theme_constant_override("outline_size", 8)
 	layer.add_child(_wave_label)
 	_wave_label.position = Vector2(30, 24)
+	# 小地图（M2 左上角圆形雷达）：数据驱动蓝图投影 + 12m 内敌我标志
+	var minimap := Minimap.new()
+	minimap.name = "Minimap"
+	layer.add_child(minimap)
+	minimap.setup(LAYOUT.all_solids(), _player, _enemy_entities)
 	# 弹药/切枪信号刷新
 	_manager.weapon_ammo_updated.connect(_on_ammo_updated)
 	_manager.weapon_switched.connect(_on_weapon_switched)
 	_manager.enemy_hit.connect(_on_enemy_hit)
 	_refresh_hud()
+
+
+func _enemy_entities() -> Array:
+	# 小地图实体提供者：L_M2 直接子节点中的 Enemy（≤5 个，每帧枚举零成本）。
+	# M3 队友出现后在此追加 is_enemy=false 条目（同一接口）。
+	var out: Array = []
+	for c in get_children():
+		if c is Enemy:
+			out.append({"pos": c.global_position, "is_enemy": true})
+	return out
 
 
 func _on_ammo_updated(_slot: int, _mag: int, _reserve: int) -> void:
