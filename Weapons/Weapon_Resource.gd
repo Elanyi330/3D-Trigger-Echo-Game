@@ -67,3 +67,7 @@ enum RecoilPattern { SET_PATTERN, RANDOM }
 # M2 手感修复（2026-08-13）：手雷爆炸 LOS 探测点高度（m，目标脚部上方=胸口参考点）——
 # LOS 射线打此点而不打脚部：防贴地射线打中地板造成假遮挡。
 @export var blast_los_probe_height: float = 1.0
+# M2 修复轮2（2026-08-13）：爆炸穿透衰减——全挡厚度（m，线性截断：mult=clamp(1−T/3.0,0,1)，3m 全挡）
+# 与 LOS 采样步长（m，沿爆心→目标胸口线段点采样累计墙厚；越厚挡越多、越薄挡越少——用户拍板方案 A）。
+@export var blast_penetration_max: float = 3.0
+@export var blast_los_sample_step: float = 0.25
