@@ -77,7 +77,7 @@ func test_near_edge_kept() -> void:
 # ================= 4. 线段-圆裁剪 =================
 func test_spanning_wall_clipped_to_circle() -> void:
 	# 贯穿地图的大墙：可见段端点恰在圆上
-	var solids: Array = [_wall(Vector3(0, 1, 0), Vector3(40, 1, 40))]
+	var solids: Array = [_wall(Vector3(0, 1, 0), Vector3(40, 1, 4))]
 	core.project(Vector3.ZERO, Vector3(0, 0, -1), solids, [])
 	assert_gt(core.segments.size(), 0, "有可见段")
 	for s in core.segments:
