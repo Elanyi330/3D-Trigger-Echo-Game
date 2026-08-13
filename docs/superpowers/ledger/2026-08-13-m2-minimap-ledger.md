@@ -11,7 +11,7 @@
 | MM1 | MinimapCore 投影数学 | impl-mm1（a93dd12c） | review-mm1 ✅✅（e78e22c） | **完成**（299 全绿；偏差×2 批准：typed 迭代编译修复/测试墙 (40,1,4) 几何修正；数学值独立验算全吻合） |
 | MM2 | Minimap 渲染 + L_M2 装配 | impl-mm2（a3e0131d） | review-mm2 ✅✅（5bfe3b0） | **完成**（300 全绿+冒烟干净；Minor：_minimap 成员赋值 → MM2a 修复） |
 | MM2a | 成员赋值 + 测试时序修复 | impl-mm2a（add9a9e） | - | **完成**（单跑 10/10×2；测试首帧等待改 wait_process_frames(2)——物理帧信号先于 process 派发，证据确凿） |
-| MM3 | 回归+实机+文档+终审 | 控制器 | final-review-mm（opus）APPROVE_WITH_NOTES | **完成**（301/301；终审 Major=文档计数→已同步；用户复测两轮拍板：放大 1.5×/波次标签右上角；用户发现"方向整个弄反了"→根因 CanvasItem +Y 向下 vs 核心前方=+Y → map_to_screen y 翻转修复+回归测试） |
+| MM3 | 回归+实机+文档+终审 | 控制器 | final-review-mm（opus）APPROVE_WITH_NOTES | **完成**（301/301；终审 Major=文档计数→已同步；用户复测三轮：放大 1.5×/波次标签右上角/方向反转修复——**用户实机验收 OK**） |
 
 ## 决策记录
 
