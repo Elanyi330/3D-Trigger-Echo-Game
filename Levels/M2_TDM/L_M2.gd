@@ -162,6 +162,7 @@ func _setup_hud() -> void:
 	minimap.name = "Minimap"
 	layer.add_child(minimap)
 	minimap.setup(LAYOUT.all_solids(), _player, _enemy_entities)
+	_minimap = minimap  # 成员句柄（M3 操作小地图用；审查 MM2a 修复）
 	# 弹药/切枪信号刷新
 	_manager.weapon_ammo_updated.connect(_on_ammo_updated)
 	_manager.weapon_switched.connect(_on_weapon_switched)
