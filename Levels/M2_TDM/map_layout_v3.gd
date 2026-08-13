@@ -405,3 +405,29 @@ static func camp_spawn_points(side: int) -> Array:
 		for z in [25.5, 27.5]:
 			pts.append(Vector3(x, 0.0, z * side))
 	return pts
+
+
+## 弹药箱固定刷新点（2026-08-13 用户需求）：总计 10 处，180° 旋转对称（5 对）。
+## 约束：①不在双方营地（营矩形 x∈[-6,6]×z∈[±24.5,±28.5] 之外）②两两水平距 ≥5m
+## ③覆盖点名位置：中心塔二楼（钟楼回廊 ×2）、两边祭坛（祭坛台东/西 ×2）、
+##   东西望楼/水塔顶 ×2、背街 ×2、外环街 ×2。
+## y = 放置面高度（箱底贴面）：回廊 3.0 / 祭坛台 0.6 / 塔顶 2.5 / 地面 0。
+## 位置复核：全部避开实体 AABB（塔顶箱/坡道/斜板/基座/影壁/货车/角场摊阁），间距最小 5.05m。
+static func ammo_box_points() -> Array:
+	return [
+		# 钟楼回廊（塔二楼）东/西
+		{"name": "CorridorE", "pos": Vector3(2.8, 3.0, 0.0)},
+		{"name": "CorridorW", "pos": Vector3(-2.8, 3.0, 0.0)},
+		# 祭坛台东/西（两边祭坛上；避开基座/坡道/斜板投影）
+		{"name": "AltarE", "pos": Vector3(5.6, 0.6, 4.2)},
+		{"name": "AltarW", "pos": Vector3(-5.6, 0.6, -4.2)},
+		# 东/西望楼水塔顶（塔顶箱南/北侧 0.6m）
+		{"name": "EastTower", "pos": Vector3(18.5, 2.5, 1.0)},
+		{"name": "WestTower", "pos": Vector3(-18.5, 2.5, -1.0)},
+		# 背街北/南（营前场开阔处，影壁南侧）
+		{"name": "BackN", "pos": Vector3(0.0, 0.0, 19.0)},
+		{"name": "BackS", "pos": Vector3(0.0, 0.0, -19.0)},
+		# 外环街北/南
+		{"name": "OuterN", "pos": Vector3(27.0, 0.0, 17.5)},
+		{"name": "OuterS", "pos": Vector3(-27.0, 0.0, -17.5)},
+	]

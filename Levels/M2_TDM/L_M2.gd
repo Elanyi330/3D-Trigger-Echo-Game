@@ -25,7 +25,7 @@ const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 const FRIENDLY_TINT := Color(0.3, 0.65, 0.35)  # 友方绿（与玩家本色一致）
 
-@export var range_mode := true  # 测试模式：枪械备弹无限（弹匣有限正常换弹）+ 手雷无限（投完切回主武器但可再切回投）
+@export var range_mode := false  # 2026-08-13 用户需求：取消无限弹药/无限手雷——全部有限（弹药箱补给）
 
 var _player: CharacterBody3D
 var _head: Node3D
@@ -51,6 +51,7 @@ var _minimap: Minimap
 var _score_f_val: Label   # 我方得分数字
 var _score_t_val: Label   # 对局时间数字
 var _score_e_val: Label   # 敌方得分数字
+var _pickup_label: Label  # 弹药箱拾取提示（闪现）
 var _hp_label: Label
 var _hp_bar_bg: ColorRect   # 血条背景（2026-08-13 血条化）
 var _hp_bar_fill: ColorRect  # 血条填充
@@ -138,8 +139,32 @@ func _setup_tdm() -> void:
 	# 开局（玩家也有出生保护；初始化血条显示）
 	_respawner.start()
 	_match.start()
+	_setup_ammo_boxes()
 	_on_health_changed(_life.health)
 	_begin_player_protection()
+
+
+## 弹药箱 ×10（2026-08-13 用户需求）：固定刷新点，玩家靠近自动拾取
+## （弹药回归上限 + 新手雷一枚），拾取后 30s 自动重新刷新。
+func _setup_ammo_boxes() -> void:
+	for p0 in LAYOUT.ammo_box_points():
+		var p: Dictionary = p0
+		var box := AmmoBox.new()
+		box.name = "AmmoBox_" + str(p["name"])
+		add_child(box)
+		box.global_position = p["pos"]
+		box.setup(_player)
+		box.picked_up.connect(_on_ammo_picked)
+
+
+func _on_ammo_picked() -> void:
+	_manager.collect_ammo_box()
+	_refresh_hud()
+	# 拾取提示闪现（顶部计分板下方）
+	_pickup_label.visible = true
+	_pickup_label.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_property(_pickup_label, "modulate:a", 0.0, 1.2)
 
 
 ## 每局名字分配：玩家固定 "player"（2026-08-13 用户拍板：玩家不需要随机名）；
@@ -229,17 +254,8 @@ func _setup_weapons() -> void:
 		slots.append(r)
 	_manager.setup(slots, _player)
 	_manager.set_head(_head)
-	if range_mode:
-		# 测试模式（L_Main 同款）：枪械备弹无限（弹匣有限正常换弹）；手雷无限（投完自动切回主武器，可再切回投）
-		for i in slots.size():
-			var core := _manager.get_core(i)
-			if core == null:
-				continue
-			var res := _manager.get_resource(i)
-			if res.fire_mode == WeaponResource.FireMode.THROWABLE:
-				core.infinite_ammo = true  # 手雷无限（投出后 refund 回 1 枚）
-			elif res.fire_mode != WeaponResource.FireMode.MELEE:
-				core.infinite_reserve = true  # 枪械备弹无限、弹匣有限
+	# 2026-08-13 用户需求：取消无限弹药/无限手雷——全部有限（弹药箱补给）；
+	# range_mode 保留 false（L_Main 靶场模式用；L_M2 有限制）。
 	# 开火即刷新弹药 HUD（WeaponManager 不在逐发时发 ammo 信号——L_Main 同款修复）
 	for i in slots.size():
 		var c := _manager.get_core(i)
@@ -325,6 +341,9 @@ func _setup_hud() -> void:
 	# 段间分隔符 "｜"
 	for seg in [1, 2]:
 		_hud_label(layer, Vector2(board_x + seg * seg_w - 10, 32), "｜", 40, Color(0.35, 0.55, 0.75))
+	# 弹药箱拾取提示（计分板下方，初始隐藏）
+	_pickup_label = _hud_label(layer, Vector2(vp.x * 0.5 - 90, 110), "弹药箱 +", 26, Color(0.5, 0.95, 1))
+	_pickup_label.visible = false
 	# 弹药背板（右下）
 	var panel := Panel.new()
 	var sb := StyleBoxFlat.new()
@@ -569,6 +588,9 @@ func _restart_match() -> void:
 	_life.respawn_now()                # 满血满弹 + 取点 + 恢复输入（存活/死亡/倒计时中均安全）
 	_player.rotation.y = 0.0
 	_respawner.start()                 # 清场南营敌 + 重新刷 5 敌（新敌名队列）
+	for c in get_children():           # 弹药箱全部恢复激活（新一局）
+		if c is AmmoBox:
+			(c as AmmoBox).force_respawn()
 	_begin_player_protection()
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 

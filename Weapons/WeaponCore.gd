@@ -159,6 +159,17 @@ func refill() -> void:
 	recoil_accum = Vector2.ZERO
 
 
+## 弹药箱拾取补充（2026-08-13 用户需求）：备弹回归上限（**当前弹匣不自动补充**）；
+## 手雷为弹匣型（magazine=1）：mag +1 上限 1——拾取补一枚新手雷。
+func ammo_box_refill() -> void:
+	if _resource == null:
+		return
+	if _resource.fire_mode == WeaponResource.FireMode.THROWABLE:
+		_mag = mini(_mag + 1, _resource.magazine)
+	else:
+		_reserve = _resource.max_ammo
+
+
 func _refill_infinite_ammo() -> void:
 	# 无限弹药补满（spec §9.9）：弹匣满 + 备弹回满（备弹无穷）。调用方：try_fire 空匣补满、
 	# start_reload 瞬时满。L_Main.cheats 注入在 setup 之后设置标志（无资源防御）。

@@ -142,6 +142,11 @@ func switch_to(slot: int) -> void:
 		return  # 空槽位：无操作
 	if slot == _current_slot:
 		return  # 切同一槽位：无操作（不发信号）
+	# 2026-08-13 有限弹药（用户需求）：手雷用完（弹匣 0）按 4 无反应——
+	# 只有手中还有手雷才允许切入手雷槽；拾取弹药箱补 1 枚后恢复。
+	if _resources[slot].fire_mode == WeaponResource.FireMode.THROWABLE \
+			and _cores[slot].get_ammo().x <= 0:
+		return
 	# M2 修复轮2（2026-08-13，用户拍板）：换弹中不允许切换武器（非 CS"切枪取消换弹"——
 	# 视图层 _reload_t 不随切枪复位，动画会串到新挂载武器上，直接禁止切换）。
 	if _state == State.RELOADING:
@@ -184,6 +189,17 @@ func next_weapon() -> void:
 
 func get_current_slot() -> int:
 	return _current_slot
+
+
+## 弹药箱拾取（2026-08-13 用户需求）：全部槽位补充——枪械备弹回归上限（弹匣不动）、
+## 手雷补 1 枚（上限 1）；发弹药信号刷新 HUD。
+func collect_ammo_box() -> void:
+	for i in _cores.size():
+		var core := _cores[i]
+		if core != null:
+			core.ammo_box_refill()
+	var ammo: Vector2 = _cores[_current_slot].get_ammo() if _cores[_current_slot] != null else Vector2.ZERO
+	weapon_ammo_updated.emit(_current_slot, int(ammo.x), int(ammo.y))
 
 
 func get_state() -> int:
