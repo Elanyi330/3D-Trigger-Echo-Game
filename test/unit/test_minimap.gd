@@ -11,7 +11,7 @@ func test_minimap_setup_and_projection_smoke() -> void:
 	var solids: Array = [{"name": "TestWall", "kind": "wall", "center": Vector3(0, 1, -4), "size": Vector3(4, 2, 1)}]
 	var ents: Array = []
 	m.setup(solids, player, func() -> Array: return ents)
-	await wait_physics_frames(1)
+	await wait_process_frames(2)
 	assert_gt(m._core.segments.size(), 0, "投影产出 ≥1 段")
 	assert_eq(m._core.markers.size(), 0, "无实体标志")
 	ents.append({"pos": Vector3(0, 0, -4), "is_enemy": true})
