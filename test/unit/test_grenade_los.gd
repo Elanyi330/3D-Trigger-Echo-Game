@@ -51,13 +51,14 @@ func _dist_damage(dist: float) -> float:
 	return m67.damage * (1.0 - dist / m67.blast_radius)
 
 
-func test_wall_blocks_blast_damage() -> void:
+func test_wall_attenuates_damage_by_thickness() -> void:
 	var e := _spawn_enemy(Vector3(0, 0, -4))
 	await wait_physics_frames(2)
 	_wall(Vector3(0, 1.5, -2), Vector3(4, 3, 1))  # 爆心(0)与目标(-4)之间：3m 高墙
 	await wait_physics_frames(1)  # 墙形状入空间需一物理帧（同帧 raycast 不可见——Godot 4.7.1 实测）
 	_explode_at(Vector3.ZERO)
-	assert_almost_eq(e.health, 100.0, 0.001, "墙后目标 0 伤（CS 全遮挡）")
+	assert_almost_eq(e.health, 100.0 - _dist_damage(4.0) * (2.0 / 3.0), 1.0,
+			"1m 厚墙：伤害 = 距离衰减 × 2/3（线性截断 1−1/3）")
 
 
 func test_no_wall_full_distance_damage() -> void:
@@ -85,14 +86,15 @@ func test_elevated_blast_does_not_self_block_via_head() -> void:
 			"头顶爆炸：射线穿头 hitbox 不自挡（exclude 本体+头 RID）")
 
 
-func test_low_cover_blocks_ground_blast() -> void:
+func test_low_cover_attenuates_ground_blast() -> void:
 	# 0.9m 矮墙在贴地爆心与目标之间：射线路径相交（射线从 y=0 升到 y=1，中点 ~0.5 < 0.9）→ 遮挡
 	var e := _spawn_enemy(Vector3(0, 0, -4))
 	await wait_physics_frames(2)
 	_wall(Vector3(0, 0.45, -2), Vector3(4, 0.9, 0.6))
 	await wait_physics_frames(1)  # 墙形状入空间需一物理帧
 	_explode_at(Vector3.ZERO)
-	assert_almost_eq(e.health, 100.0, 0.001, "0.9m 矮墙遮挡贴地爆炸（射线相交即挡）")
+	assert_almost_eq(e.health, 100.0 - _dist_damage(4.0) * (5.0 / 6.0), 1.0,
+			"0.9m 矮墙：离散采样 T=0.5（2 个采样点 ×0.25）→ 伤害 × 5/6（容差 1.0 含 ±δ）")
 
 
 func test_elevated_blast_clears_low_cover() -> void:
@@ -104,3 +106,10 @@ func test_elevated_blast_clears_low_cover() -> void:
 	_explode_at(Vector3(0, 1.2, 0))
 	assert_almost_eq(e.health, 100.0 - _dist_damage(sqrt(4.0 * 4.0 + 1.2 * 1.2)), 0.001,
 			"爆心抬高 → 射线过顶矮墙")
+
+
+func test_grenade_continuous_cd_enabled() -> void:
+	var g := Grenade.new()
+	add_child_autofree(g)
+	await wait_physics_frames(1)
+	assert_true(g.continuous_cd, "CCD 开启（修复高速隧穿穿地）")

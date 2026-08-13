@@ -77,6 +77,8 @@ func _ready() -> void:
 	# 物理弹道：球体碰撞体；本体 Player 层(2)、仅与 Objects 层(1) 碰撞（全局约束 §4）
 	collision_layer = 2
 	collision_mask = 1
+	continuous_cd = true  # M2 修复轮2（2026-08-13）：CCD 连续碰撞——15m/s+平台下坠≈0.25m/帧 > 球径 0.2m，
+	# 离散检测漏检薄板（平台板 0.4-0.6m/地面）→ 概率穿地。CCD 扫掠根治（代价仅投掷物，可忽略）。
 	var shape := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
 	sphere.radius = 0.1
@@ -110,25 +112,44 @@ func _apply_blast_damage() -> void:
 			continue  # 头部 hitbox 转发本体 → 爆炸无头部倍率，跳过防双结算
 		seen[hit["collider_id"]] = true
 		var dmg := damage_in_radius(global_position.distance_to(target.global_position))
-		if dmg > 0.0 and target.has_method("take_damage") and not _los_blocked(target):
-			target.take_damage(dmg)
+		if dmg > 0.0 and target.has_method("take_damage"):
+			var pen_mult := _penetration_mult(target)
+			if pen_mult > 0.0:
+				target.take_damage(dmg * pen_mult)
 
 
-# M2 手感修复（2026-08-13）：爆炸 LOS 墙体遮挡（Source RadiusDamage 每受害者 trace 思路，自研实现）。
-# 从爆心向目标胸口参考点（脚部 + blast_los_probe_height）打射线——不打脚部：贴地射线会打中地板假遮挡；
-# exclude 目标自身全部碰撞 RID（本体 + 子 CollisionObject3D——头 hitbox 是独立 body，不排除会自挡）；
-# 任何剩余命中 = 墙体遮挡 → 该目标伤害 0（CS 全遮挡语义，无穿透衰减）。
-func _los_blocked(target: Node) -> bool:
+# M2 修复轮2（2026-08-13，用户拍板方案 A）：墙体厚度穿透衰减——替代旧二值 LOS 全挡
+# （"雷丢小平台下全挡"反馈根因）。沿"爆心 → 目标胸口参考点"线段以 blast_los_sample_step
+# 点采样累计墙厚 T（采样点落在实心几何内 = 计入；半步偏移起点避开爆心贴面歧义）；
+# 倍率 = clamp(1 − T/blast_penetration_max, 0, 1)：越厚挡越多、越薄挡越少、3m 全挡。
+# exclude 目标自身全部碰撞 RID（本体+子 CollisionObject3D——头 hitbox/躯干胶囊不计入墙厚）。
+func _penetration_mult(target: Node) -> float:
 	if resource == null or not target is CollisionObject3D:
-		return false
+		return 1.0
 	var probe: Vector3 = target.global_position + Vector3(0, resource.blast_los_probe_height, 0)
-	var ray := PhysicsRayQueryParameters3D.create(global_position, probe, 1)
+	var dir: Vector3 = probe - global_position
+	var dist: float = dir.length()
+	var step := resource.blast_los_sample_step
+	if dist < step:
+		return 1.0
 	var exclude: Array[RID] = [(target as CollisionObject3D).get_rid()]
 	for child in target.get_children():
 		if child is CollisionObject3D:
 			exclude.append((child as CollisionObject3D).get_rid())
-	ray.exclude = exclude
-	return not get_world_3d().direct_space_state.intersect_ray(ray).is_empty()
+	var inside := 0
+	var space := get_world_3d().direct_space_state
+	var k := 0.5  # 半步偏移起点
+	while k * step < dist:
+		var p: Vector3 = global_position + dir * (k * step / dist)
+		var pq := PhysicsPointQueryParameters3D.new()
+		pq.position = p
+		pq.collision_mask = 1
+		pq.exclude = exclude
+		if not space.intersect_point(pq).is_empty():
+			inside += 1
+		k += 1.0
+	var thickness := float(inside) * step
+	return clampf(1.0 - thickness / resource.blast_penetration_max, 0.0, 1.0)
 
 
 # M1 任务11：爆炸视觉（spec §9.8）——生成 ExplosionEffect（火花粒子/闪光/冲击波环）。
