@@ -19,6 +19,12 @@ var _player: Node3D = null
 var _entity_provider: Callable  # () -> Array[{pos: Vector3, is_enemy: bool}]
 
 
+static func map_to_screen(p: Vector2) -> Vector2:
+	# 核心坐标（前方=+Y、右=+X）→ 屏幕坐标（CanvasItem +Y 向下）——y 翻转。
+	# 修复"地图上下颠倒"（前方实体画在中心箭头下方）。
+	return Vector2(p.x, -p.y)
+
+
 func setup(solids: Array, player: Node3D, entity_provider: Callable) -> void:
 	_solids = solids
 	_player = player
@@ -46,12 +52,12 @@ func _draw() -> void:
 	var c := Vector2(map_radius_px + 4.0, map_radius_px + 4.0)  # 圆心（含描边余量）
 	draw_circle(c, map_radius_px, bg_color)
 	for s in _core.segments:
-		draw_line(c + s["a"], c + s["b"], line_color, 1.0)
+		draw_line(c + Minimap.map_to_screen(s["a"]), c + Minimap.map_to_screen(s["b"]), line_color, 1.0)
 	draw_arc(c, map_radius_px, 0.0, TAU, 64, ring_color, 2.0)
 	_draw_player(c)
 	for m in _core.markers:
 		var col: Color = enemy_color if m["is_enemy"] else friendly_color
-		draw_circle(c + m["pos"], 3.0, col)
+		draw_circle(c + Minimap.map_to_screen(m["pos"]), 3.0, col)
 
 
 func _draw_player(c: Vector2) -> void:

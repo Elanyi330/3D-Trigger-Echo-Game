@@ -19,3 +19,8 @@ func test_minimap_setup_and_projection_smoke() -> void:
 	assert_eq(m._core.markers.size(), 1, "敌人标志出现")
 	assert_true(m._core.markers[0]["is_enemy"], "is_enemy 传递")
 	assert_eq(m.mouse_filter, Control.MOUSE_FILTER_IGNORE, "不拦截鼠标（HUD）")
+
+
+func test_map_to_screen_flips_vertical() -> void:
+	assert_eq(Minimap.map_to_screen(Vector2(0, 75)), Vector2(0, -75), "前方（核心 +Y）→ 屏幕上方（−Y）")
+	assert_eq(Minimap.map_to_screen(Vector2(75, 0)), Vector2(75, 0), "右侧不变（+X 同向）")
