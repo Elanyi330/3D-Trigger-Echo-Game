@@ -11,23 +11,53 @@ signal died
 
 const FALL_TIME := 0.3   # 倒地时长（s）
 const FADE_TIME := 0.5   # 淡出时长（s）
+const SPAWN_PROTECTION := 2.0  # 出生保护（2026-08-13 用户拍板）：刚复活 2s 无敌 + 全身白闪
 
 @export var max_health: float = 100.0  # 企划书：所有单位统一 100HP
 @export var tint: Color = Color(0.65, 0.25, 0.22)  # 敌方红（队友绿/玩家本色）
-@export var is_enemy: bool = true  # TDM 友军复用本类（tint 绿 + is_enemy=false，小地图接口）
+@export var is_enemy: bool = true  # 阵营标记（小地图红绿 + 阵营级友伤过滤的阵营来源）
+@export var display_name: String = ""  # 头顶英文名（2026-08-13 用户拍板：取消血量显示，改显示名字）
 
 var health: float = 100.0
 var dead: bool = false
+var spawn_protection: float = 0.0  # 出生保护剩余（>0 免伤 + 白闪）
 
 var _fall_remaining := 0.0
 var _fade_remaining := 0.0
 var _died_fired := false
 var _visual: Node3D
 var _label: Label3D
+var _flash_mats: Array = []  # [{mat: StandardMaterial3D, base: Color}] 保护白闪用（_ready 缓存）
+
+
+## 阵营查询（2026-08-13 阵营级友伤过滤接口）：角色阵营 = "enemy"/"friendly"。
+## 玩家侧由 PlayerLife.get_faction() 提供 "friendly"（同一鸭子接口）。
+func get_faction() -> String:
+	return "enemy" if is_enemy else "friendly"
+
+
+## 更新头顶名（重开换名/运行时改名；标签已建时同步刷新）
+func set_display_name(n: String) -> void:
+	display_name = n
+	if _label:
+		_label.text = n
+
+
+## 友伤过滤通用谓词（2026-08-13 用户拍板：**任何阵营内部均无友伤**，为 M3 预留设计）：
+## 射击方阵营 == 目标阵营 → 跳过伤害。M2 玩家武器系统以 "friendly" 射击；
+## M3 队友 AI 同样 "friendly"（不打玩家/队友）；M3 敌人 AI 以 "enemy" 射击
+## （不打敌人，可打玩家/友军——玩家/友军 get_faction()=="friendly" ≠ "enemy"）。
+## 无阵营目标（地形/训练靶）不拦（返回 false）。
+static func is_friendly_fire(shooter_faction: String, target: Node) -> bool:
+	if target != null and target.has_method("get_faction"):
+		return target.get_faction() == shooter_faction
+	return false
 
 
 func _ready() -> void:
 	health = max_health
+	# 注意：出生保护由生成方显式设置（L_M2 spawn 时 spawn_protection = SPAWN_PROTECTION）——
+	# 不在 _ready 默认开启：既有测试与训练场场景的 Enemy 直建实例不受影响。
 	collision_layer = 1  # Objects 层（hitscan/近战/爆炸 mask=1 命中）
 	collision_mask = 0
 	add_to_group("torso")
@@ -44,19 +74,20 @@ func _ready() -> void:
 	head.enemy = self
 	head.position = Vector3(0, 1.70, 0)
 	add_child(head)
-	# 视觉：Soldier_Echo 换色
+	# 视觉：Soldier_Echo 换色（缓存材质供出生保护白闪）
 	var char_scene: PackedScene = load("res://Assets/Models/Characters/Soldier_Echo/Soldier_Echo.glb")
 	_visual = char_scene.instantiate()
 	_tint(_visual)
 	add_child(_visual)
 	_equip_random_weapon()  # M1.5：随机配备一款武器（第三人称持枪姿态，握法与玩家一致）
-	# 血条
+	# 头顶名字标签（2026-08-13：取消血量显示，改为显示英文名）
 	_label = Label3D.new()
 	_label.position = Vector3(0, 2.1, 0)
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.font_size = 64
+	_label.font_size = 36
 	_label.outline_size = 8
-	_update_label()
+	_label.modulate = Color(1, 1, 1)
+	_label.text = display_name if display_name != "" else "???"
 	add_child(_label)
 
 
@@ -98,22 +129,17 @@ func _tint(n: Node) -> void:
 		m.albedo_color = tint
 		m.roughness = 0.75
 		n.material_override = m
+		_flash_mats.append({"mat": m, "base": tint})
 	for c in n.get_children():
 		_tint(c)
 
 
 func take_damage(dmg: float) -> void:
-	if dead:
-		return
+	if dead or spawn_protection > 0.0:
+		return  # 出生保护（2026-08-13 用户拍板）：2s 无敌
 	health -= dmg
-	_update_label()
 	if health <= 0.0:
 		_die()
-
-
-func _update_label() -> void:
-	if _label:
-		_label.text = "%d" % maxi(0, int(ceil(health)))
 
 
 func _die() -> void:
@@ -127,6 +153,10 @@ func _die() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not dead:
+		# 出生保护白闪（2026-08-13 用户拍板：2s 内全身白色闪烁）
+		if spawn_protection > 0.0:
+			spawn_protection = maxf(spawn_protection - delta, 0.0)
+			_apply_flash()
 		return
 	if _fall_remaining > 0.0:
 		_fall_remaining -= delta
@@ -138,6 +168,15 @@ func _physics_process(delta: float) -> void:
 		_visual.scale = Vector3.ONE * maxf(t, 0.001)
 	if _fade_remaining <= 0.0:
 		queue_free()
+
+
+## 出生保护白闪：全身材质在基色与白色间快速脉冲；保护结束复位基色。
+func _apply_flash() -> void:
+	var pulse: float = 0.5 + 0.5 * sin(spawn_protection * 24.0)
+	for entry in _flash_mats:
+		var m: StandardMaterial3D = entry["mat"]
+		var base: Color = entry["base"]
+		m.albedo_color = base.lerp(Color.WHITE, pulse)
 
 
 ## 头部 hitbox：group "head"（爆头 ×4），take_damage 转发到 Enemy 本体。

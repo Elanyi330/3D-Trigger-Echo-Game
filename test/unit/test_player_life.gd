@@ -102,3 +102,19 @@ func test_respawn_now_overrides_pending_timer() -> void:
 	assert_eq(dummy.position, Vector3(1, 0, 2), "复活到回调点")
 	await wait_seconds(0.5)
 	assert_eq(respawns.size(), 1, "旧计时器失效，不双重复活")
+
+
+func test_spawn_protection_blocks_damage() -> void:
+	# 出生保护（2026-08-13 用户拍板）：复活后 2s 无敌
+	var d := _make_life()
+	var life: Node = d["life"]
+	var dummy: Node = d["dummy"]
+	life.setup(dummy, Callable(), Callable(), Callable(), 0.05)
+	life.take_damage(999.0)
+	await wait_seconds(0.15)  # 复活完成，protection_left=2.0
+	assert_gt(life.protection_left, 0.0, "复活后保护期生效")
+	life.take_damage(999.0)
+	assert_eq(life.health, 100.0, "保护期内伤害无效")
+	life.protection_left = 0.0  # 保护结束
+	life.take_damage(40.0)
+	assert_eq(life.health, 60.0, "保护结束后正常受伤")

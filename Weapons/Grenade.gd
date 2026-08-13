@@ -110,6 +110,9 @@ func _apply_blast_damage() -> void:
 			continue
 		if target.is_in_group("head"):
 			continue  # 头部 hitbox 转发本体 → 爆炸无头部倍率，跳过防双结算
+		# 2026-08-13 友伤过滤（用户拍板：任何阵营内部均无友伤）——爆炸同样不伤友军
+		if Enemy.is_friendly_fire("friendly", target):
+			continue
 		seen[hit["collider_id"]] = true
 		var dmg := damage_in_radius(global_position.distance_to(target.global_position))
 		if dmg > 0.0 and target.has_method("take_damage"):

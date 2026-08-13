@@ -80,6 +80,9 @@ func _resolve_swing(base_damage: float, range_val: float) -> void:
 			continue
 		if target.is_in_group("head"):
 			continue  # CS：近战无部位倍率。头部 hitbox 转发本体会与躯干双结算 → 跳过
+		# 2026-08-13 友伤过滤（用户拍板：任何阵营内部均无友伤）——近战同样不伤友军
+		if Enemy.is_friendly_fire("friendly", target):
+			continue
 		if not _in_cone(target.global_position, o, facing, range_val):
 			continue
 		var damage := base_damage

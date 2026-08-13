@@ -463,6 +463,10 @@ func _on_hit_landed(target: Node, damage: float, position: Vector3, normal: Vect
 	# 任务6 起 hit_landed 仅弹孔消费；伤害结算集中在此信号唯一消费方，与 Grenade/Melee
 	# 的 has_method 目标结算约定一致（企划书：所有单位统一 100HP，Target/Enemy 实现 take_damage）。
 	# null target 防御：单元测试可裸发信号仅验弹孔路径（test_weapon_manager）。
+	# 2026-08-13 友伤过滤（用户拍板：任何阵营内部均无友伤）：玩家（friendly 阵营）
+	# 命中友军 → 不结算/不命中标记/不弹孔（M3 敌人开火系统同谓词以 "enemy" 调用）。
+	if Enemy.is_friendly_fire("friendly", target):
+		return
 	if target != null and target.has_method("take_damage"):
 		target.take_damage(damage)
 	# M1 任务15：hitmarker（仅命中敌人，非训练靶子 Target）——HUD 消费

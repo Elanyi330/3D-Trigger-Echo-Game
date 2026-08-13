@@ -14,9 +14,17 @@ signal respawned
 
 const MAX_HEALTH := 100.0   # 企划书：所有单位统一 100HP
 const RESPAWN_DELAY := 3.0  # 2026-08-11 用户拍板
+const SPAWN_PROTECTION := 2.0  # 出生保护（2026-08-13 用户拍板）：复活 2s 无敌
 
 var health: float = MAX_HEALTH
 var dead: bool = false
+var protection_left: float = 0.0  # 出生保护剩余（>0 免伤）
+
+
+## 阵营查询（2026-08-13 阵营级友伤过滤接口）：玩家属 "friendly" 阵营。
+## 未来 M3 敌人 AI 以 "enemy" 阵营射击时可正常伤害玩家（friendly ≠ enemy）。
+func get_faction() -> String:
+	return "friendly"
 
 var _player: Node
 var _respawn_delay: float = RESPAWN_DELAY
@@ -37,12 +45,17 @@ func setup(player: Node, on_death: Callable = Callable(),
 
 
 func take_damage(dmg: float) -> void:
-	if dead:
-		return
+	if dead or protection_left > 0.0:
+		return  # 出生保护（2026-08-13 用户拍板）：2s 无敌
 	health = maxf(health - dmg, 0.0)
 	health_changed.emit(health)
 	if health <= 0.0:
 		_die()
+
+
+func _process(delta: float) -> void:
+	if protection_left > 0.0:
+		protection_left = maxf(protection_left - delta, 0.0)
 
 
 func _die() -> void:
@@ -74,6 +87,7 @@ func respawn_now() -> void:
 func _do_respawn() -> void:
 	health = MAX_HEALTH
 	dead = false
+	protection_left = SPAWN_PROTECTION  # 出生保护 2s
 	if _player:
 		if _on_respawn_point.is_valid():
 			_player.global_position = _on_respawn_point.call()

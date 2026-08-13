@@ -123,6 +123,33 @@ func _body_box(parent: Node3D, center: Vector3, size: Vector3, mat: Material) ->
 	mi.material_override = mat
 	mi.position = center
 	parent.add_child(mi)
+	_flash_mats.append({"mat": mat, "base": (mat as StandardMaterial3D).albedo_color})  # 出生保护白闪
+
+
+# ---- 出生保护白闪（2026-08-13 用户拍板：复活 2s 全身白色闪烁）----
+var _flash_mats: Array = []
+var _flash_remain := 0.0
+
+
+func set_spawn_flash(duration: float) -> void:
+	_flash_remain = duration
+	_apply_flash()
+
+
+func _process(delta: float) -> void:
+	if _flash_remain <= 0.0:
+		return
+	_flash_remain = maxf(_flash_remain - delta, 0.0)
+	_apply_flash()
+
+
+func _apply_flash() -> void:
+	var pulse: float = 0.5 + 0.5 * sin(_flash_remain * 24.0) if _flash_remain > 0.0 else 0.0
+	for entry in _flash_mats:
+		var m: StandardMaterial3D = entry["mat"]
+		var base: Color = entry["base"]
+		# 白闪保持原 alpha（虚化身体 0.35 半透明不破坏）
+		m.albedo_color = base.lerp(Color(1.0, 1.0, 1.0, base.a), pulse)
 
 
 func _body_mat(c: Color) -> StandardMaterial3D:
