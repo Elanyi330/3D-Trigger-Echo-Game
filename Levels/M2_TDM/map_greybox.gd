@@ -6,7 +6,6 @@ class_name MapGreybox
 extends Node3D
 
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
-const TEX := preload("res://Levels/M2_TDM/map_textures.gd")
 
 # 灰盒材质：墙/地面/掩体/屋顶 分色便于识别（kind 兜底色；模块名称主题优先，见 NAME_THEME）
 const MAT_WALL := Color(0.55, 0.55, 0.6)
@@ -98,11 +97,15 @@ func _spawn_solid(e: Dictionary) -> void:
 	body.add_child(col)
 
 	var mesh := MeshInstance3D.new()
-	# 2026-08-13 纹理级视觉升级：定制 UV BoxMesh + 主题纹理材质。
-	# 微放大 0.02（每侧 0.01）：仅视觉层消除贴面实体共面 z-fighting（纹理花纹会闪，
-	# 纯色同色看不出）；碰撞仍用上方 BoxShape3D 原尺寸，零改动。
-	mesh.mesh = TEX.box_mesh(s + Vector3(0.02, 0.02, 0.02))
-	mesh.material_override = TEX.material_for(_color_for(kind, e["name"]), s)
+	# 2026-08-13 纹理级视觉升级已取消回退（用户实测"面缺失+闪烁"复验仍失败）——
+	# 恢复纯色主题配色版本（NAME_THEME 名称规则色），BoxMesh 原尺寸。
+	var bm := BoxMesh.new()
+	bm.size = s
+	mesh.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = _color_for(kind, e["name"])
+	mat.roughness = 0.85
+	mesh.material_override = mat
 	body.add_child(mesh)
 
 
@@ -195,9 +198,12 @@ func _spawn_decor(e: Dictionary) -> void:
 
 
 # MC 钟形：钟体（上收下张）+ 口沿环 + 钟钮 + 顶球。无碰撞（decor 语义不变）；
-# 金纹理金属材质 + 微自发光。
+# 纯色金材质 + 微自发光（纹理级升级已取消，钟形几何+悬吊位置保留——用户批准豁免）。
 func _build_bell(root_node: Node3D, _s: Vector3) -> void:
-	var mat := TEX.material_for(Color(0.95, 0.75, 0.25), Vector3.ONE)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.95, 0.75, 0.25)
+	mat.roughness = 0.5
+	mat.metallic = 0.5
 	mat.emission_enabled = true
 	mat.emission = Color(0.35, 0.25, 0.06)
 	var body := MeshInstance3D.new()
