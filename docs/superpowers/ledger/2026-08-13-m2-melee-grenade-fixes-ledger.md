@@ -8,8 +8,8 @@
 
 | 任务 | 内容 | 实现者 | 审查 | 状态 |
 |------|------|--------|------|------|
-| T1 | .tres 资源字段（机械） | impl-t1（haiku，a1ee0c7e） | review-t1（后台运行中） | 实现 DONE（276/276 全绿；偏差声明：knife.tres 锚点实际值 0.5 为生产正确值） |
-| T2 | MeleeController 三项 | - | - | 未开始 |
+| T1 | .tres 资源字段（机械） | impl-t1（haiku，a1ee0c7e） | review-t1 ✅✅ | **完成**（276/276；偏差声明：knife.tres 锚点实际值 0.5 为生产正确值） |
+| T2 | MeleeController 三项 | impl-t2（后台运行中） | - | 进行中 |
 | T3 | Grenade LOS | - | - | 未开始 |
 | T4 | 投掷手感 | - | - | 未开始 |
 | T5 | 回归+文档同步 | 控制器 | - | 未开始 |
