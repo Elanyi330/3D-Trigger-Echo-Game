@@ -146,8 +146,9 @@ func _setup_tdm() -> void:
 	_begin_player_protection()
 
 
-## 导航装配（2026-08-13 navmesh 阶段 2/3）：烘焙网格区域 + 28 处跳跃链接。
-## M3 AI 寻路（NavigationAgent3D）直接消费；--nav-debug 启动参数显示网格与链接（阶段 5 验收用）。
+## 导航装配（2026-08-13 navmesh 阶段 2/3）：烘焙网格区域 + 跳跃链接。
+## M3 AI 寻路（NavigationAgent3D）直接消费；--nav-debug 启动参数自绘网格与链接（阶段 5 验收）。
+## link 端点注册前 snap 到导航面：导航面 y 偏移不统一（实测 +0.3~0.4），端点悬空整条 link 被丢弃。
 func _setup_navigation() -> void:
 	var nav_mesh: NavigationMesh = load("res://Levels/M2_TDM/navmesh.res")
 	if nav_mesh == null:
@@ -165,9 +166,85 @@ func _setup_navigation() -> void:
 		link.end_position = l["to"]
 		link.bidirectional = true
 		add_child(link)
+	_snap_nav_links.call_deferred()
 	if "--nav-debug" in OS.get_cmdline_user_args():
-		# 服务器级调试渲染：导航多边形（蓝）+ 边 + 跳跃链接（阶段 5 验收可视化）
-		NavigationServer3D.set_debug_enabled(true)
+		_build_nav_debug(nav_mesh)  # 自绘导航面+链接（Forward Mobile 不渲染 NavigationServer 调试层）
+
+
+## 等导航同步后把 link 端点 snap 到导航面（端点悬空 → 整条 link 被丢弃，links:0 根因）
+func _snap_nav_links() -> void:
+	# 2026-08-13 实测：首次物理帧时 map 尚未完成首次同步，查询会报错——多等几帧
+	for i in 5:
+		await get_tree().physics_frame
+	var map_rid := get_world_3d().navigation_map
+	for c in get_children():
+		if c is NavigationLink3D:
+			var link := c as NavigationLink3D
+			link.start_position = NavigationServer3D.map_get_closest_point(map_rid, link.start_position)
+			link.end_position = NavigationServer3D.map_get_closest_point(map_rid, link.end_position)
+
+
+## 导航可视化（--nav-debug，2026-08-13）：半透明蓝导航面片 + 青色边线 + 绿色跳跃链接线。
+## 数据直读 NavigationMesh 顶点/多边形索引环——不依赖引擎 debug 渲染。
+func _build_nav_debug(nav_mesh: NavigationMesh) -> void:
+	var holder := Node3D.new()
+	holder.name = "NavDebug"
+	add_child(holder)
+	# 面片（三角扇切分凸多边形）
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var verts := nav_mesh.get_vertices()
+	for i in nav_mesh.get_polygon_count():
+		var poly := nav_mesh.get_polygon(i)
+		for j in range(2, poly.size()):
+			for k in [0, j - 1, j]:
+				st.set_normal(Vector3.UP)
+				st.add_vertex(verts[poly[k]])
+	var face_mesh := MeshInstance3D.new()
+	face_mesh.mesh = st.commit()
+	var face_mat := StandardMaterial3D.new()
+	face_mat.albedo_color = Color(0.2, 0.5, 1.0, 0.22)
+	face_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	face_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	face_mesh.material_override = face_mat
+	holder.add_child(face_mesh)
+	# 边线 + 链接线
+	var im := ImmediateMesh.new()
+	var line_mesh := MeshInstance3D.new()
+	line_mesh.mesh = im
+	var line_mat := StandardMaterial3D.new()
+	line_mat.albedo_color = Color(0.3, 0.9, 1.0)
+	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_mesh.material_override = line_mat
+	holder.add_child(line_mesh)
+	im.surface_begin(Mesh.PRIMITIVE_LINES, line_mat)
+	for i in nav_mesh.get_polygon_count():
+		var poly := nav_mesh.get_polygon(i)
+		for j in poly.size():
+			im.surface_add_vertex(verts[poly[j]])
+			im.surface_add_vertex(verts[poly[(j + 1) % poly.size()]])
+	# 链接线（绿）+ 端点标记
+	for l0 in LAYOUT.jump_links():
+		var l: Dictionary = l0
+		im.surface_set_color(Color(0.3, 1.0, 0.4))
+		im.surface_add_vertex(l["from"])
+		im.surface_add_vertex(l["to"])
+	im.surface_end()
+	# 链接端点小球
+	for l0 in LAYOUT.jump_links():
+		var l: Dictionary = l0
+		for p in [l["from"], l["to"]]:
+			var ball := MeshInstance3D.new()
+			var sph := SphereMesh.new()
+			sph.radius = 0.25
+			sph.height = 0.5
+			ball.mesh = sph
+			var bmat := StandardMaterial3D.new()
+			bmat.albedo_color = Color(0.3, 1.0, 0.4)
+			bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			ball.material_override = bmat
+			ball.position = p
+			holder.add_child(ball)
 
 
 ## 弹药箱 ×10（2026-08-13 用户需求）：固定刷新点，玩家靠近自动拾取

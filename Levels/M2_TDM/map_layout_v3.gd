@@ -408,56 +408,90 @@ static func camp_spawn_points(side: int) -> Array:
 
 
 ## TDM 跳跃链接（2026-08-13 navmesh 阶段 3）：人类验证跳跃边收敛 + 180° 旋转对称补齐，共 28 处。
-## 每条 = 双向 NavigationLink：{"name", "from": 起跳面点, "to": 落点面点}（y=面高度即脚底）。
+## 每条 = 双向 NavigationLink：{"name", "from": 起跳面点, "to": 落点面点}（y=表面高度；注册方必须 snap 到导航面——2026-08-13 实测导航面偏移不统一 +0.3~0.4，端点悬空整条 link 被丢弃）。
 ## 依据：tools/jump_study.py 520 episode 边表（人类实证 n≥2）+ tools/probe_reachability.gd 几何分析；
 ## 自动覆盖不建 link：0.6m 台阶/坡道/同高相邻（max_climb 0.62 自动连通）、下跳（AI 自由跳下）。
 ## 暂缓边（YAGNI，人类 n=2 但链路过长）：rim↔钟门柱↔翼墙两级链。
 static func jump_links() -> Array:
 	var links := []
 	# 1. 摊阁(1.2) ↔ 摊位簇板(2.2)（人类：WestPavilion→WestClusterS_Panel n=2；E 侧对称）
-	links.append({"name": "PavToCluster_W", "from": Vector3(-18.7, 1.2, -8.6), "to": Vector3(-18.4, 2.2, -4.8)})
-	links.append({"name": "PavToCluster_E", "from": Vector3(18.7, 1.2, 8.6), "to": Vector3(18.4, 2.2, 4.8)})
+	links.append({"name": "PavToCluster_W", "from": Vector3(-18.7, 1.20, -8.6), "to": Vector3(-18.4, 2.20, -4.8)})
+	links.append({"name": "PavToCluster_E", "from": Vector3(18.7, 1.20, 8.6), "to": Vector3(18.4, 2.20, 4.8)})
 	# 2. 簇板(2.2) ↔ rim 围墙(3.0)（人类：WestClusterS_Panel→RimW_B n=2、EastTower→RimE_T n=2；对称 4 处）
-	links.append({"name": "ClusterToRim_WN", "from": Vector3(-17.5, 2.2, -4.9), "to": Vector3(-13.6, 3.0, -4.7)})
-	links.append({"name": "ClusterToRim_EN", "from": Vector3(17.5, 2.2, 4.9), "to": Vector3(13.6, 3.0, 4.7)})
-	links.append({"name": "ClusterToRim_WS", "from": Vector3(-17.5, 2.2, 4.9), "to": Vector3(-13.6, 3.0, 4.7)})
-	links.append({"name": "ClusterToRim_ES", "from": Vector3(17.5, 2.2, -4.9), "to": Vector3(13.6, 3.0, -4.7)})
+	links.append({"name": "ClusterToRim_WN", "from": Vector3(-17.5, 2.20, -4.9), "to": Vector3(-13.6, 3.00, -4.7)})
+	links.append({"name": "ClusterToRim_EN", "from": Vector3(17.5, 2.20, 4.9), "to": Vector3(13.6, 3.00, 4.7)})
+	links.append({"name": "ClusterToRim_WS", "from": Vector3(-17.5, 2.20, 4.9), "to": Vector3(-13.6, 3.00, 4.7)})
+	links.append({"name": "ClusterToRim_ES", "from": Vector3(17.5, 2.20, -4.9), "to": Vector3(13.6, 3.00, -4.7)})
 	# 3. 摊阁(1.2) ↔ 横脊墙(3.0)（人类：WestPavilion→WestSpurS n=3；旋转对称 4 处）
-	links.append({"name": "PavToSpur_W", "from": Vector3(-17.9, 1.2, -9.4), "to": Vector3(-16.2, 3.0, -7.4)})
-	links.append({"name": "PavToSpur_E", "from": Vector3(17.9, 1.2, 9.4), "to": Vector3(16.2, 3.0, 7.4)})
-	links.append({"name": "PavToSpur_WS", "from": Vector3(-16.2, 1.2, -9.4), "to": Vector3(-15.8, 3.0, 7.4)})
-	links.append({"name": "PavToSpur_ES", "from": Vector3(16.2, 1.2, 9.4), "to": Vector3(15.8, 3.0, -7.4)})
+	links.append({"name": "PavToSpur_W", "from": Vector3(-17.9, 1.20, -9.4), "to": Vector3(-16.2, 3.00, -7.4)})
+	links.append({"name": "PavToSpur_E", "from": Vector3(17.9, 1.20, 9.4), "to": Vector3(16.2, 3.00, 7.4)})
+	links.append({"name": "PavToSpur_WS", "from": Vector3(-16.2, 1.20, -9.4), "to": Vector3(-15.8, 3.00, 7.4)})
+	links.append({"name": "PavToSpur_ES", "from": Vector3(16.2, 1.20, 9.4), "to": Vector3(15.8, 3.00, -7.4)})
 	# 4. rim 围墙侧豁口(2.5m) 同高跳（人类：RimS1→RimS2 n=3、RimN1→RimN2 n=2；4 侧豁口）
-	links.append({"name": "RimGap_NW", "from": Vector3(-9.7, 3.0, 9.5), "to": Vector3(-5.5, 3.0, 9.5)})
-	links.append({"name": "RimGap_NE", "from": Vector3(5.5, 3.0, 9.5), "to": Vector3(9.7, 3.0, 9.5)})
-	links.append({"name": "RimGap_SW", "from": Vector3(-9.7, 3.0, -9.5), "to": Vector3(-5.5, 3.0, -9.5)})
-	links.append({"name": "RimGap_SE", "from": Vector3(5.5, 3.0, -9.5), "to": Vector3(9.7, 3.0, -9.5)})
+	links.append({"name": "RimGap_NW", "from": Vector3(-9.7, 3.00, 9.5), "to": Vector3(-5.5, 3.00, 9.5)})
+	links.append({"name": "RimGap_NE", "from": Vector3(5.5, 3.00, 9.5), "to": Vector3(9.7, 3.00, 9.5)})
+	links.append({"name": "RimGap_SW", "from": Vector3(-9.7, 3.00, -9.5), "to": Vector3(-5.5, 3.00, -9.5)})
+	links.append({"name": "RimGap_SE", "from": Vector3(5.5, 3.00, -9.5), "to": Vector3(9.7, 3.00, -9.5)})
 	# 5. 市街长墙顶段间豁口(2.5m) 同高跳（人类：WestWall_M→WestWall_N n=2；东西各 2 豁口）
-	links.append({"name": "LongWallGap_WN", "from": Vector3(-23.0, 3.0, 5.2), "to": Vector3(-23.0, 3.0, 8.3)})
-	links.append({"name": "LongWallGap_WS", "from": Vector3(-23.0, 3.0, -8.3), "to": Vector3(-23.0, 3.0, -5.2)})
-	links.append({"name": "LongWallGap_EN", "from": Vector3(23.0, 3.0, 5.2), "to": Vector3(23.0, 3.0, 8.3)})
-	links.append({"name": "LongWallGap_ES", "from": Vector3(23.0, 3.0, -8.3), "to": Vector3(23.0, 3.0, -5.2)})
+	links.append({"name": "LongWallGap_WN", "from": Vector3(-23.0, 3.00, 5.2), "to": Vector3(-23.0, 3.00, 8.3)})
+	links.append({"name": "LongWallGap_WS", "from": Vector3(-23.0, 3.00, -8.3), "to": Vector3(-23.0, 3.00, -5.2)})
+	links.append({"name": "LongWallGap_EN", "from": Vector3(23.0, 3.00, 5.2), "to": Vector3(23.0, 3.00, 8.3)})
+	links.append({"name": "LongWallGap_ES", "from": Vector3(23.0, 3.00, -8.3), "to": Vector3(23.0, 3.00, -5.2)})
 	# 6. 望楼/水塔顶(2.5) ↔ 塔顶箱(3.4)（人类：WestTowerBox 落点 n=1；几何 Δh=0.9）
-	links.append({"name": "TowerBox_W", "from": Vector3(-18.5, 2.5, 0.0), "to": Vector3(-18.5, 3.4, 0.0)})
-	links.append({"name": "TowerBox_E", "from": Vector3(18.5, 2.5, 0.0), "to": Vector3(18.5, 3.4, 0.0)})
+	links.append({"name": "TowerBox_W", "from": Vector3(-18.5, 2.50, 0.0), "to": Vector3(-18.5, 3.40, 0.0)})
+	links.append({"name": "TowerBox_E", "from": Vector3(18.5, 2.50, 0.0), "to": Vector3(18.5, 3.40, 0.0)})
 	# 7. 簇箱 Ground ↔ 箱顶(0.9)（人类：EastClusterN_Box 落点 n=3；4 簇箱）
-	links.append({"name": "Crate_WN", "from": Vector3(-15.0, 0.0, 11.0), "to": Vector3(-15.0, 0.9, 11.0)})
-	links.append({"name": "Crate_WS", "from": Vector3(-15.0, 0.0, -5.0), "to": Vector3(-15.0, 0.9, -5.0)})
-	links.append({"name": "Crate_EN", "from": Vector3(15.0, 0.0, 5.0), "to": Vector3(15.0, 0.9, 5.0)})
-	links.append({"name": "Crate_ES", "from": Vector3(15.0, 0.0, -11.0), "to": Vector3(15.0, 0.9, -11.0)})
+	links.append({"name": "Crate_WN", "from": Vector3(-15.0, 0.00, 11.0), "to": Vector3(-15.0, 0.90, 11.0)})
+	links.append({"name": "Crate_WS", "from": Vector3(-15.0, 0.00, -5.0), "to": Vector3(-15.0, 0.90, -5.0)})
+	links.append({"name": "Crate_EN", "from": Vector3(15.0, 0.00, 5.0), "to": Vector3(15.0, 0.90, 5.0)})
+	links.append({"name": "Crate_ES", "from": Vector3(15.0, 0.00, -11.0), "to": Vector3(15.0, 0.90, -11.0)})
 	# 8. 簇箱顶(0.9) ↔ 簇板(2.2)（人类：EastClusterN_Box↔EastClusterN_Panel 双向 n=2；4 簇）
-	links.append({"name": "CrateToCluster_WN", "from": Vector3(-15.0, 0.9, 11.0), "to": Vector3(-18.5, 2.2, 11.0)})
-	links.append({"name": "CrateToCluster_WS", "from": Vector3(-15.0, 0.9, -5.0), "to": Vector3(-18.5, 2.2, -5.0)})
-	links.append({"name": "CrateToCluster_EN", "from": Vector3(15.0, 0.9, 5.0), "to": Vector3(18.5, 2.2, 5.0)})
-	links.append({"name": "CrateToCluster_ES", "from": Vector3(15.0, 0.9, -11.0), "to": Vector3(18.5, 2.2, -11.0)})
+	links.append({"name": "CrateToCluster_WN", "from": Vector3(-15.0, 0.90, 11.0), "to": Vector3(-18.5, 2.20, 11.0)})
+	links.append({"name": "CrateToCluster_WS", "from": Vector3(-15.0, 0.90, -5.0), "to": Vector3(-18.5, 2.20, -5.0)})
+	links.append({"name": "CrateToCluster_EN", "from": Vector3(15.0, 0.90, 5.0), "to": Vector3(18.5, 2.20, 5.0)})
+	links.append({"name": "CrateToCluster_ES", "from": Vector3(15.0, 0.90, -11.0), "to": Vector3(18.5, 2.20, -11.0)})
 	# 9. 主坡道顶(3.0) ↔ 回廊(3.0) 跨 0.9m 高栏板（人类：Ground→CorridorSlab n=4 起跳在栏板旁；
 	#    navmesh 栏板 0.2 厚实体挡住坡道-回廊同高连接，实测探针确认断开）
-	links.append({"name": "RampTopToCorridor_E", "from": Vector3(4.5, 3.0, 2.0), "to": Vector3(2.5, 3.0, 2.0)})
-	links.append({"name": "RampTopToCorridor_W", "from": Vector3(-4.5, 3.0, -2.0), "to": Vector3(-2.5, 3.0, -2.0)})
+	links.append({"name": "RampTopToCorridor_E", "from": Vector3(4.5, 3.00, 2.0), "to": Vector3(2.5, 3.00, 2.0)})
+	links.append({"name": "RampTopToCorridor_W", "from": Vector3(-4.5, 3.00, -2.0), "to": Vector3(-2.5, 3.00, -2.0)})
 	# 10. 塔坡道顶(2.5) ↔ 塔顶(2.5)（人类：WestTowerRampStep10 落点 n=4；塔栏板豁口通道
 	#    0.2m 深被 agent 半径侵蚀吞掉——navmesh 实测断开，link 补齐）
-	links.append({"name": "TowerRampToTower_E", "from": Vector3(19.7, 2.5, -2.0), "to": Vector3(18.5, 2.5, -1.5)})
-	links.append({"name": "TowerRampToTower_W", "from": Vector3(-19.7, 2.5, 2.0), "to": Vector3(-18.5, 2.5, 1.5)})
+	links.append({"name": "TowerRampToTower_E", "from": Vector3(19.7, 2.50, -2.0), "to": Vector3(18.5, 2.50, -1.5)})
+	links.append({"name": "TowerRampToTower_W", "from": Vector3(-19.7, 2.50, 2.0), "to": Vector3(-18.5, 2.50, 1.5)})
+	# 11. 钟门翼墙顶(3.0) ↔ 门梁顶(4.9)（2026-08-13 用户新开发跳跃点：GateS_WingE→GateS_Lintel n=1）
+	links.append({"name": "WingToLintel_NW", "from": Vector3(-10.5, 3.00, 14.0), "to": Vector3(-4.0, 4.90, 14.0)})
+	links.append({"name": "WingToLintel_NE", "from": Vector3(10.5, 3.00, 14.0), "to": Vector3(4.0, 4.90, 14.0)})
+	links.append({"name": "WingToLintel_SW", "from": Vector3(-10.5, 3.00, -14.0), "to": Vector3(-4.0, 4.90, -14.0)})
+	links.append({"name": "WingToLintel_SE", "from": Vector3(10.5, 3.00, -14.0), "to": Vector3(4.0, 4.90, -14.0)})
+	# 12. 门梁顶(4.9) ↔ 市集高棚顶(4.9)（人类：GateS_Lintel→BeltS_CanopyW n=1 同高跳）
+	links.append({"name": "LintelToCanopy_N", "from": Vector3(0.0, 4.90, 13.5), "to": Vector3(-2.0, 4.90, 11.2)})
+	links.append({"name": "LintelToCanopy_S", "from": Vector3(0.0, 4.90, -13.5), "to": Vector3(2.0, 4.90, -11.2)})
+	# 12b. 高棚天井(2m) 同高跳（人类：BeltS_CanopyW→BeltS_CanopyE n=1——两棚间 x∈[-1,1] 天井）
+	links.append({"name": "CanopyGap_N", "from": Vector3(-2.0, 4.90, 10.75), "to": Vector3(2.0, 4.90, 10.75)})
+	links.append({"name": "CanopyGap_S", "from": Vector3(-2.0, 4.90, -10.75), "to": Vector3(2.0, 4.90, -10.75)})
+	# 13. 塔坡道顶(2.5) ↔ 长墙顶(3.0)（人类：EastTowerRampStep10→EastWall_M n=1）
+	links.append({"name": "RampToLongWall_E", "from": Vector3(19.8, 2.50, -2.4), "to": Vector3(23.0, 3.00, -1.5)})
+	links.append({"name": "RampToLongWall_W", "from": Vector3(-19.8, 2.50, 2.4), "to": Vector3(-23.0, 3.00, 1.5)})
+	# 14. 塔顶(2.5) ↔ 长墙顶(3.0)（人类：WestTower→WestWall_M n=1）
+	links.append({"name": "TowerToLongWall_W", "from": Vector3(-18.5, 2.50, 0.0), "to": Vector3(-23.0, 3.00, 1.4)})
+	links.append({"name": "TowerToLongWall_E", "from": Vector3(18.5, 2.50, 0.0), "to": Vector3(23.0, 3.00, -1.4)})
+	# 15. 簇板顶(2.2) ↔ 长墙顶(3.0)（人类：WestClusterS_Panel→WestWall_M、WestWall_N→WestClusterN_Panel n=1）
+	links.append({"name": "ClusterToLongWall_WS", "from": Vector3(-18.5, 2.20, -4.8), "to": Vector3(-23.0, 3.00, -4.3)})
+	links.append({"name": "ClusterToLongWall_ES", "from": Vector3(18.5, 2.20, 4.8), "to": Vector3(23.0, 3.00, 4.3)})
+	links.append({"name": "ClusterToLongWall_WN", "from": Vector3(-23.0, 3.00, 10.8), "to": Vector3(-18.5, 2.20, 10.8)})
+	links.append({"name": "ClusterToLongWall_EN", "from": Vector3(23.0, 3.00, -10.8), "to": Vector3(18.5, 2.20, -10.8)})
+	# 16. 塔顶(2.5) ↔ rim 围墙顶(3.0)（人类：WestTower→RimW_B n=1）
+	links.append({"name": "TowerToRim_W", "from": Vector3(-18.5, 2.50, 0.0), "to": Vector3(-14.0, 3.00, -3.2)})
+	links.append({"name": "TowerToRim_E", "from": Vector3(18.5, 2.50, 0.0), "to": Vector3(14.0, 3.00, 3.2)})
+	# 17. rim E/W 街口豁口(4m) 助跑跳（人类：RimE_T→RimE_B、RimW_B→RimW_T n=1；实测跳远 4.87 覆盖）
+	links.append({"name": "RimGap_E", "from": Vector3(14.0, 3.00, 2.5), "to": Vector3(14.0, 3.00, -2.5)})
+	links.append({"name": "RimGap_W", "from": Vector3(-14.0, 3.00, 2.5), "to": Vector3(-14.0, 3.00, -2.5)})
+	# 18. rim 围墙顶(3.0) ↔ 钟门翼墙顶(3.0)（人类：RimW_B→GateS_WingE n=3——
+	# 门梁/高棚链的唯一主网入口；2026-08-13 探针实证翼墙顶孤立，补链）
+	links.append({"name": "RimToWing_NW", "from": Vector3(-13.6, 3.00, 9.2), "to": Vector3(-10.7, 3.00, 14.0)})
+	links.append({"name": "RimToWing_NE", "from": Vector3(13.6, 3.00, 9.2), "to": Vector3(10.7, 3.00, 14.0)})
+	links.append({"name": "RimToWing_SW", "from": Vector3(-13.6, 3.00, -9.2), "to": Vector3(-10.7, 3.00, -14.0)})
+	links.append({"name": "RimToWing_SE", "from": Vector3(13.6, 3.00, -9.2), "to": Vector3(10.7, 3.00, -14.0)})
 	return links
 
 
