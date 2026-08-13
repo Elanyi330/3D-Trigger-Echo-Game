@@ -76,6 +76,41 @@ func build() -> void:
 			_spawn_big_tree(e)
 			continue
 		_spawn_solid(e)
+	_build_boundary_walls()
+
+
+# ---- 边界隐形高墙（2026-08-13，T1）----
+# 4 面 12m 高隐形墙（仅碰撞、无视觉），立在可见边界墙外缘，防止玩家从高处
+# （营顶 4.9m 等）跳越 4m 可见边界墙坠出地图（图外无地面 = 虚空）。
+# 几何依据：
+#   ① 可见边界墙外缘实测：西/东墙 center x=±30.5 尺寸 1 → 外缘 x=±31；
+#      北/南墙 z∈[29,30] → 外缘 z=±30。
+#   ② 用户口径「x=±31 / z=±30.5」：北/南 1m 厚墙中心 z=±30.5，内缘恰贴可见墙外缘 z=±30；
+#      西/东内缘贴 x=±31、向外延 1m（中心 ±31.5）——内缘与可见墙外缘平齐零缝隙
+#      （图外无地面，留缝 = 虚空坠落陷阱）。
+#   ③ 角部覆盖：东西墙 z 跨 [−31,31] 与南北墙 x 跨 [−31,31] 角部互叠，无缝隙。
+#   ④ 高度 12m：玩家最高可达面 4.9m + 身高 1.83 + 跳高 ≈1.51 ≈ 8.2m，留 ~3.8m 余量。
+#   ⑤ 不写进 LAYOUT.all_solids()：保 193 实体 / 布局哈希 / 跳跃记录不重置（用户铁律）。
+func _build_boundary_walls() -> void:
+	var specs := [
+		["BoundaryWallN", Vector3(0, 6, 30.5), Vector3(62, 12, 1)],
+		["BoundaryWallS", Vector3(0, 6, -30.5), Vector3(62, 12, 1)],
+		["BoundaryWallW", Vector3(-31.5, 6, 0), Vector3(1, 12, 62)],
+		["BoundaryWallE", Vector3(31.5, 6, 0), Vector3(1, 12, 62)],
+	]
+	for spec in specs:
+		var body := StaticBody3D.new()
+		body.name = spec[0]
+		body.collision_layer = 1
+		body.collision_mask = 0
+		body.position = spec[1]
+		add_child(body)
+		var col := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = spec[2]
+		col.shape = box
+		body.add_child(col)
+		# 绝不创建 MeshInstance3D 子节点——隐形墙无视觉（brief 红线）
 
 
 func _spawn_solid(e: Dictionary) -> void:
