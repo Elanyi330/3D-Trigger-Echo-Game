@@ -323,3 +323,77 @@ func test_heavy_swing_dips_viewmodel_and_returns() -> void:
 	var after := (wm.position - base_pos).length() + (wm.rotation - base_rot).length()
 	assert_lt(after, 0.01, "重刺结束回位")
 
+
+# ================= 7. M2 手感修复：连击窗口 / stab 射程 / 垂直差 =================
+func test_combo_resets_after_window_expiry() -> void:
+	await _ready_melee()
+	var t := _front_target()
+	manager.try_fire()  # 首挥 40
+	await _await_hit(false)
+	assert_almost_eq(t.health, 100.0 - knife.melee_primary_damage, 0.001, "首挥 40")
+	await _await_cooldown(knife.melee_light_time)
+	manager.try_fire()  # 窗口内（自首挥 0.4s < 0.8s）→ 连击 25
+	await _await_hit(false)
+	assert_almost_eq(t.health, 100.0 - knife.melee_primary_damage - knife.melee_secondary_damage,
+			0.001, "窗口内连击 25")
+	# 自第二次挥击起等窗口过期（0.8s + 0.1s 余量）→ 第三击回首挥 40（用信号断言防血量到 0）
+	await _await_cooldown(knife.melee_combo_window + 0.1)
+	manager.try_fire()
+	await _await_hit(false)
+	assert_almost_eq(last_hit_damage, knife.melee_primary_damage, 0.001,
+			"窗口过期后回首挥 40（非连击 25）")
+
+
+func test_stab_range_shorter_than_slash() -> void:
+	await _ready_melee()
+	var t := Target.new()
+	add_child_autofree(t)
+	t.position = Vector3(0, 0, -(knife.melee_stab_range + 0.2))  # 1.8m：> stab 1.6、< 轻击 2.0
+	t.rotation = Vector3(0, PI, 0)
+	_set_targets(t)
+	manager.set_aim(true)  # 重刺
+	await _await_hit(true)
+	assert_almost_eq(t.health, 100.0, 0.001, "1.8m > stab 射程 1.6 → 重刺不命中")
+	await _await_cooldown(knife.melee_heavy_time)
+	manager.try_fire()  # 同 1.8m 轻击（射程 2.0）→ 命中首挥 40
+	await _await_hit(false)
+	assert_almost_eq(t.health, 100.0 - knife.melee_primary_damage, 0.001, "同距轻击命中 40")
+
+
+func test_stab_hits_within_stab_range() -> void:
+	await _ready_melee()
+	var t := Target.new()
+	add_child_autofree(t)
+	t.position = Vector3(0, 0, -(knife.melee_stab_range - 0.2))  # 1.4m < 1.6
+	t.rotation = Vector3(0, PI, 0)
+	_set_targets(t)
+	manager.set_aim(true)
+	await _await_hit(true)
+	assert_almost_eq(t.health, 100.0 - knife.melee_stab_damage, 0.001, "1.4m ≤ stab 射程 → 重刺命中 65")
+
+
+func test_vertical_cap_blocks_cross_level_knifing() -> void:
+	await _ready_melee()
+	origin.position = Vector3(0, 1.63, 0)  # 眼位（脚部 0）
+	var t := Target.new()
+	add_child_autofree(t)
+	t.position = Vector3(0, 2.5, -1.5)  # 目标站 2.5m 望楼（水平 1.5m 在射程内）
+	t.rotation = Vector3(0, PI, 0)
+	_set_targets(t)
+	manager.try_fire()
+	await _await_hit(false)
+	assert_almost_eq(t.health, 100.0, 0.001, "2.5m 高差 > 1.5 → 隔层不命中")
+
+
+func test_vertical_cap_allows_one_step_difference() -> void:
+	await _ready_melee()
+	origin.position = Vector3(0, 1.63, 0)
+	var t := Target.new()
+	add_child_autofree(t)
+	t.position = Vector3(0, 1.2, -1.5)  # 1.2m 摊阁级（脚部 y=1.2，水平 1.5m）
+	t.rotation = Vector3(0, PI, 0)
+	_set_targets(t)
+	manager.try_fire()
+	await _await_hit(false)
+	assert_almost_eq(t.health, 100.0 - knife.melee_primary_damage, 0.001, "1.2m 位差 ≤ 1.5 → 命中 40")
+
