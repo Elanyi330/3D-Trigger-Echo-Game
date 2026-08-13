@@ -1,0 +1,3113 @@
+{
+ "meta": {
+  "map_hash": "f935ccd7c32c7cd4bdd47e8b9f6ef858b8f4220bd3f85606e810743eeb6bcef0",
+  "movement_rev": "unknown(嵌入 map_hash 计算)",
+  "map_name": "回声祭坛v3",
+  "corpus_episodes": 262,
+  "calibrated": {
+   "peak_rise_p99": 1.668,
+   "catch_depth_p90": 0.106,
+   "episodes": 260,
+   "groups": 121,
+   "edges_matched": 28
+  },
+  "generated_by": "tools/build_jump_dataset.py",
+  "source": "user://jump_training"
+ },
+ "edges": [
+  {
+   "from_face": "BeltN_CanopyW",
+   "to_face": "BeltN_CanopyE",
+   "delta_h": 0.0,
+   "dist_zone": 3.0,
+   "link_names": [
+    "CanopyGap_N"
+   ],
+   "zone": {
+    "center": {
+     "x": -2.0,
+     "z": 10.75
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 3.6,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "BeltS_CanopyE",
+   "to_face": "BeltS_CanopyW",
+   "delta_h": 0.0,
+   "dist_zone": 3.0,
+   "link_names": [
+    "CanopyGap_S"
+   ],
+   "zone": {
+    "center": {
+     "x": -2.0,
+     "z": -10.75
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 3.6,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastClusterN_Box",
+   "to_face": "EastClusterN_Panel",
+   "delta_h": 1.3,
+   "dist_zone": 2.5,
+   "link_names": [
+    "CrateToCluster_EN"
+   ],
+   "zone": {
+    "center": {
+     "x": 15.0,
+     "z": 5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "EastClusterN_Box",
+    "to": "EastClusterN_Panel",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.514,
+     "p10": 4.01,
+     "p90": 4.514
+    },
+    "takeoff_feet_y": 1.027,
+    "contact_feet_y": 2.201,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 533,
+    "takeoff_rect": {
+     "x": 15.463,
+     "z": 4.615,
+     "w": 0.218,
+     "h": 0.091
+    },
+    "landing_rect": {
+     "x": 17.559,
+     "z": 5.043,
+     "w": 0.483,
+     "h": 0.138
+    }
+   },
+   "physics": {
+    "v_req": 3.846,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastClusterN_Panel",
+   "to_face": "EastWall_M",
+   "delta_h": 0.8,
+   "dist_zone": 3.5,
+   "link_names": [
+    "ClusterToLongWall_ES"
+   ],
+   "zone": {
+    "center": {
+     "x": 18.5,
+     "z": 5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.4
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 4.773,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastClusterN_Panel",
+   "to_face": "RimE_T",
+   "delta_h": 0.8,
+   "dist_zone": 2.9,
+   "link_names": [
+    "ClusterToRim_EN"
+   ],
+   "zone": {
+    "center": {
+     "x": 17.5,
+     "z": 5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.4
+    }
+   },
+   "human": {
+    "from": "EastClusterN_Panel",
+    "to": "RimE_T",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.847,
+     "p10": 4.847,
+     "p90": 4.847
+    },
+    "takeoff_feet_y": 2.326,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 650,
+    "takeoff_rect": {
+     "x": 17.467,
+     "z": 5.211,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 14.32,
+     "z": 5.066,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 3.955,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastClusterS_Box",
+   "to_face": "EastClusterS_Panel",
+   "delta_h": 1.3,
+   "dist_zone": 2.5,
+   "link_names": [
+    "CrateToCluster_ES"
+   ],
+   "zone": {
+    "center": {
+     "x": 15.0,
+     "z": -11.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "EastClusterS_Box",
+    "to": "EastClusterS_Panel",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 2.888,
+     "p10": 2.888,
+     "p90": 2.888
+    },
+    "takeoff_feet_y": 1.027,
+    "contact_feet_y": 2.12,
+    "catch_depth": {
+     "p50": 0.08,
+     "p90": 0.08
+    },
+    "flight_ms": 550,
+    "takeoff_rect": {
+     "x": 15.141,
+     "z": -11.013,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 16.728,
+     "z": -10.979,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 3.846,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastPavilion",
+   "to_face": "EastClusterN_Panel",
+   "delta_h": 1.0,
+   "dist_zone": 3.55,
+   "link_names": [
+    "PavToCluster_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 18.7,
+     "z": 8.925
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.35
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 5.071,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastPavilion",
+   "to_face": "EastSpurN",
+   "delta_h": 1.8,
+   "dist_zone": 1.565,
+   "link_names": [
+    "PavToSpur_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 17.9,
+     "z": 9.4
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "EastPavilion",
+    "to": "EastSpurN",
+    "n": 3,
+    "chain_n": 2,
+    "takeoff_speed": {
+     "p50": 5.218,
+     "p10": 5.114,
+     "p90": 5.407
+    },
+    "takeoff_feet_y": 1.327,
+    "contact_feet_y": 2.901,
+    "catch_depth": {
+     "p50": 0.099,
+     "p90": 0.102
+    },
+    "flight_ms": 383,
+    "takeoff_rect": {
+     "x": 17.702,
+     "z": 8.983,
+     "w": 0.145,
+     "h": 0.22
+    },
+    "landing_rect": {
+     "x": 15.986,
+     "z": 7.763,
+     "w": 1.04,
+     "h": 0.046
+    }
+   },
+   "physics": {
+    "v_req": 2.935,
+    "verdict": "easy"
+   },
+   "skill": true,
+   "skill_reasons": [
+    "链式跳跃（多跳合成）"
+   ]
+  },
+  {
+   "from_face": "EastTower",
+   "to_face": "EastTower",
+   "delta_h": 0.0,
+   "dist_zone": 0.2,
+   "link_names": [
+    "TowerRampToTower_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 19.7,
+     "z": -1.75
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.5
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 0.24,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastTower",
+   "to_face": "EastTowerBox",
+   "delta_h": 0.9,
+   "dist_zone": 0.0,
+   "link_names": [
+    "TowerBox_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 18.5,
+     "z": 0.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 0.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastTower",
+   "to_face": "EastWall_M",
+   "delta_h": 0.5,
+   "dist_zone": 3.523,
+   "link_names": [
+    "TowerToLongWall_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 18.5,
+     "z": 0.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 4.497,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastTower",
+   "to_face": "RimE_T",
+   "delta_h": 0.5,
+   "dist_zone": 4.134,
+   "link_names": [
+    "TowerToRim_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 18.5,
+     "z": 0.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "EastTower",
+    "to": "RimE_T",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.421,
+     "p10": 4.764,
+     "p90": 5.421
+    },
+    "takeoff_feet_y": 2.627,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": 0.035,
+     "p90": 0.035
+    },
+    "flight_ms": 717,
+    "takeoff_rect": {
+     "x": 17.201,
+     "z": -0.362,
+     "w": 0.0,
+     "h": 1.661
+    },
+    "landing_rect": {
+     "x": 14.28,
+     "z": 1.813,
+     "w": 0.003,
+     "h": 0.569
+    }
+   },
+   "physics": {
+    "v_req": 5.277,
+    "verdict": "tight"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastTowerRampStep10",
+   "to_face": "EastWall_M",
+   "delta_h": 0.5,
+   "dist_zone": 2.2,
+   "link_names": [
+    "RampToLongWall_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 19.8,
+     "z": -2.31
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.62
+    }
+   },
+   "human": {
+    "from": "EastTowerRampStep10",
+    "to": "EastWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.329,
+     "p10": 4.329,
+     "p90": 4.329
+    },
+    "takeoff_feet_y": 2.627,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 700,
+    "takeoff_rect": {
+     "x": 20.403,
+     "z": -2.501,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 23.334,
+     "z": -1.77,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 2.809,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastWall_M",
+   "to_face": "EastWall_N",
+   "delta_h": 0.0,
+   "dist_zone": 2.5,
+   "link_names": [
+    "LongWallGap_EN"
+   ],
+   "zone": {
+    "center": {
+     "x": 23.0,
+     "z": 5.1
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.8
+    }
+   },
+   "human": {
+    "from": "EastWall_M",
+    "to": "EastWall_N",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.461,
+     "p10": 5.459,
+     "p90": 5.461
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": 22.744,
+     "z": 4.122,
+     "w": 0.334,
+     "h": 0.266
+    },
+    "landing_rect": {
+     "x": 22.983,
+     "z": 8.392,
+     "w": 0.016,
+     "h": 0.273
+    }
+   },
+   "physics": {
+    "v_req": 3.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastWall_S",
+   "to_face": "EastClusterS_Panel",
+   "delta_h": -0.8,
+   "dist_zone": 3.5,
+   "link_names": [
+    "ClusterToLongWall_EN"
+   ],
+   "zone": {
+    "center": {
+     "x": 23.0,
+     "z": -10.8
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 3.818,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "EastWall_S",
+   "to_face": "EastWall_M",
+   "delta_h": 0.0,
+   "dist_zone": 2.5,
+   "link_names": [
+    "LongWallGap_ES"
+   ],
+   "zone": {
+    "center": {
+     "x": 23.0,
+     "z": -8.4
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.8
+    }
+   },
+   "human": {
+    "from": "EastWall_S",
+    "to": "EastWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.388,
+     "p10": 5.388,
+     "p90": 5.388
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": 23.099,
+     "z": -8.623,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 22.587,
+     "z": -4.434,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 3.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "GateN_Lintel",
+   "to_face": "BeltN_CanopyW",
+   "delta_h": 0.0,
+   "dist_zone": 1.64,
+   "link_names": [
+    "LintelToCanopy_N"
+   ],
+   "zone": {
+    "center": {
+     "x": 0.0,
+     "z": 13.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 1.968,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "GateN_WingE",
+   "to_face": "GateN_Lintel",
+   "delta_h": 1.9,
+   "dist_zone": 5.5,
+   "link_names": [
+    "WingToLintel_NE"
+   ],
+   "zone": {
+    "center": {
+     "x": 10.5,
+     "z": 14.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "GateN_WingE",
+    "to": "GateN_Lintel",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.454,
+     "p10": 4.503,
+     "p90": 5.454
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 4.794,
+    "catch_depth": {
+     "p50": 0.145,
+     "p90": 0.145
+    },
+    "flight_ms": 567,
+    "takeoff_rect": {
+     "x": 6.012,
+     "z": 13.979,
+     "w": 1.632,
+     "h": 0.117
+    },
+    "landing_rect": {
+     "x": 5.813,
+     "z": 13.976,
+     "w": 0.04,
+     "h": 0.183
+    }
+   },
+   "physics": {
+    "v_req": 11.0,
+    "verdict": "infeasible"
+   },
+   "skill": true,
+   "skill_reasons": [
+    "物理边缘但人类实证"
+   ]
+  },
+  {
+   "from_face": "GateN_WingW",
+   "to_face": "GateN_Lintel",
+   "delta_h": 1.9,
+   "dist_zone": 5.5,
+   "link_names": [
+    "WingToLintel_NW"
+   ],
+   "zone": {
+    "center": {
+     "x": -10.5,
+     "z": 14.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 11.0,
+    "verdict": "infeasible"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "GateS_Lintel",
+   "to_face": "BeltS_CanopyW",
+   "delta_h": 0.0,
+   "dist_zone": 1.64,
+   "link_names": [
+    "LintelToCanopy_S"
+   ],
+   "zone": {
+    "center": {
+     "x": 0.0,
+     "z": -13.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "GateS_Lintel",
+    "to": "BeltS_CanopyW",
+    "n": 1,
+    "chain_n": 1,
+    "takeoff_speed": {
+     "p50": 5.456,
+     "p10": 5.456,
+     "p90": 5.456
+    },
+    "takeoff_feet_y": 5.026,
+    "contact_feet_y": 4.901,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -1.155,
+     "z": -14.479,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 3.115,
+     "z": -14.663,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 1.968,
+    "verdict": "easy"
+   },
+   "skill": true,
+   "skill_reasons": [
+    "链式跳跃（多跳合成）"
+   ]
+  },
+  {
+   "from_face": "GateS_WingE",
+   "to_face": "GateS_Lintel",
+   "delta_h": 1.9,
+   "dist_zone": 5.5,
+   "link_names": [
+    "WingToLintel_SW"
+   ],
+   "zone": {
+    "center": {
+     "x": -10.5,
+     "z": -14.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "GateS_WingE",
+    "to": "GateS_Lintel",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.457,
+     "p10": 4.507,
+     "p90": 5.457
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 4.788,
+    "catch_depth": {
+     "p50": 0.133,
+     "p90": 0.133
+    },
+    "flight_ms": 550,
+    "takeoff_rect": {
+     "x": -7.809,
+     "z": -14.102,
+     "w": 0.733,
+     "h": 0.185
+    },
+    "landing_rect": {
+     "x": -5.841,
+     "z": -14.153,
+     "w": 0.023,
+     "h": 0.165
+    }
+   },
+   "physics": {
+    "v_req": 11.0,
+    "verdict": "infeasible"
+   },
+   "skill": true,
+   "skill_reasons": [
+    "物理边缘但人类实证"
+   ]
+  },
+  {
+   "from_face": "GateS_WingW",
+   "to_face": "GateS_Lintel",
+   "delta_h": 1.9,
+   "dist_zone": 5.5,
+   "link_names": [
+    "WingToLintel_SE"
+   ],
+   "zone": {
+    "center": {
+     "x": 10.5,
+     "z": -14.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 11.0,
+    "verdict": "infeasible"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "Ground",
+   "to_face": "EastClusterN_Box",
+   "delta_h": 0.9,
+   "dist_zone": 0.0,
+   "link_names": [
+    "Crate_EN"
+   ],
+   "zone": {
+    "center": {
+     "x": 15.0,
+     "z": 5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 0.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "Ground",
+   "to_face": "EastClusterS_Box",
+   "delta_h": 0.9,
+   "dist_zone": 0.0,
+   "link_names": [
+    "Crate_ES"
+   ],
+   "zone": {
+    "center": {
+     "x": 15.0,
+     "z": -11.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "Ground",
+    "to": "EastClusterS_Box",
+    "n": 1,
+    "chain_n": 1,
+    "takeoff_speed": {
+     "p50": 4.201,
+     "p10": 4.201,
+     "p90": 4.201
+    },
+    "takeoff_feet_y": 0.127,
+    "contact_feet_y": 0.001,
+    "catch_depth": {
+     "p50": 0.899,
+     "p90": 0.899
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": 13.758,
+     "z": -10.96,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 16.499,
+     "z": -10.984,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 0.0,
+    "verdict": "easy"
+   },
+   "skill": true,
+   "skill_reasons": [
+    "链式跳跃（多跳合成）",
+    "抓边深度超带"
+   ]
+  },
+  {
+   "from_face": "Ground",
+   "to_face": "WestClusterN_Box",
+   "delta_h": 0.9,
+   "dist_zone": 0.0,
+   "link_names": [
+    "Crate_WN"
+   ],
+   "zone": {
+    "center": {
+     "x": -15.0,
+     "z": 11.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 0.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "Ground",
+   "to_face": "WestClusterS_Box",
+   "delta_h": 0.9,
+   "dist_zone": 0.0,
+   "link_names": [
+    "Crate_WS"
+   ],
+   "zone": {
+    "center": {
+     "x": -15.0,
+     "z": -5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "Ground",
+    "to": "WestClusterS_Box",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.012,
+     "p10": 4.012,
+     "p90": 4.012
+    },
+    "takeoff_feet_y": 0.127,
+    "contact_feet_y": 0.901,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 633,
+    "takeoff_rect": {
+     "x": -16.028,
+     "z": -4.851,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -15.001,
+     "z": -4.629,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 0.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RampEStep8",
+   "to_face": "CorridorSlab",
+   "delta_h": 0.0,
+   "dist_zone": 1.0,
+   "link_names": [
+    "RampTopToCorridor_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 4.5,
+     "z": 2.125
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.75
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 1.2,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RampWStep8",
+   "to_face": "CorridorSlab",
+   "delta_h": 0.0,
+   "dist_zone": 1.0,
+   "link_names": [
+    "RampTopToCorridor_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -4.5,
+     "z": -2.125
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.75
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 1.2,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimE_B",
+   "to_face": "GateS_WingW",
+   "delta_h": 0.0,
+   "dist_zone": 4.442,
+   "link_names": [
+    "RimToWing_SE"
+   ],
+   "zone": {
+    "center": {
+     "x": 13.8,
+     "z": -9.2
+    },
+    "size": {
+     "x": 0.6,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 5.33,
+    "verdict": "tight"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimE_T",
+   "to_face": "GateN_WingE",
+   "delta_h": 0.0,
+   "dist_zone": 4.442,
+   "link_names": [
+    "RimToWing_NE"
+   ],
+   "zone": {
+    "center": {
+     "x": 13.8,
+     "z": 9.2
+    },
+    "size": {
+     "x": 0.6,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 5.33,
+    "verdict": "tight"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimE_T",
+   "to_face": "RimE_B",
+   "delta_h": 0.0,
+   "dist_zone": 4.0,
+   "link_names": [
+    "RimGap_E"
+   ],
+   "zone": {
+    "center": {
+     "x": 14.0,
+     "z": 2.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "RimE_T",
+    "to": "RimE_B",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.189,
+     "p10": 6.189,
+     "p90": 6.189
+    },
+    "takeoff_feet_y": 3.057,
+    "contact_feet_y": 2.97,
+    "catch_depth": {
+     "p50": 0.03,
+     "p90": 0.03
+    },
+    "flight_ms": 767,
+    "takeoff_rect": {
+     "x": 13.847,
+     "z": 1.643,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 13.328,
+     "z": -3.074,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 4.8,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimN1",
+   "to_face": "RimN2",
+   "delta_h": 0.0,
+   "dist_zone": 3.2,
+   "link_names": [
+    "RimGap_NW"
+   ],
+   "zone": {
+    "center": {
+     "x": -9.7,
+     "z": 9.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "RimN1",
+    "to": "RimN2",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.211,
+     "p10": 5.451,
+     "p90": 6.211
+    },
+    "takeoff_feet_y": 3.126,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -10.985,
+     "z": 9.398,
+     "w": 0.981,
+     "h": 0.129
+    },
+    "landing_rect": {
+     "x": -6.181,
+     "z": 9.296,
+     "w": 0.446,
+     "h": 0.182
+    }
+   },
+   "physics": {
+    "v_req": 3.84,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimN3",
+   "to_face": "RimN4",
+   "delta_h": 0.0,
+   "dist_zone": 3.2,
+   "link_names": [
+    "RimGap_NE"
+   ],
+   "zone": {
+    "center": {
+     "x": 5.5,
+     "z": 9.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 3.84,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimS1",
+   "to_face": "RimS2",
+   "delta_h": 0.0,
+   "dist_zone": 3.2,
+   "link_names": [
+    "RimGap_SW"
+   ],
+   "zone": {
+    "center": {
+     "x": -9.7,
+     "z": -9.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "RimS1",
+    "to": "RimS2",
+    "n": 3,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.457,
+     "p10": 5.445,
+     "p90": 6.333
+    },
+    "takeoff_feet_y": 3.126,
+    "contact_feet_y": 3.0,
+    "catch_depth": {
+     "p50": 0.0,
+     "p90": 0.0
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -9.954,
+     "z": -9.514,
+     "w": 0.772,
+     "h": 0.211
+    },
+    "landing_rect": {
+     "x": -5.471,
+     "z": -9.782,
+     "w": 0.039,
+     "h": 0.498
+    }
+   },
+   "physics": {
+    "v_req": 3.84,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimS3",
+   "to_face": "RimS4",
+   "delta_h": 0.0,
+   "dist_zone": 3.2,
+   "link_names": [
+    "RimGap_SE"
+   ],
+   "zone": {
+    "center": {
+     "x": 5.5,
+     "z": -9.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "RimS3",
+    "to": "RimS4",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.461,
+     "p10": 5.461,
+     "p90": 5.461
+    },
+    "takeoff_feet_y": 3.126,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": 5.462,
+     "z": -9.048,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 9.736,
+     "z": -9.23,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 3.84,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimW_B",
+   "to_face": "GateS_WingE",
+   "delta_h": 0.0,
+   "dist_zone": 4.442,
+   "link_names": [
+    "RimToWing_SW"
+   ],
+   "zone": {
+    "center": {
+     "x": -13.8,
+     "z": -9.2
+    },
+    "size": {
+     "x": 0.6,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "RimW_B",
+    "to": "GateS_WingE",
+    "n": 3,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.828,
+     "p10": 5.434,
+     "p90": 6.113
+    },
+    "takeoff_feet_y": 3.126,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": 0.033
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -14.088,
+     "z": -9.433,
+     "w": 0.467,
+     "h": 0.269
+    },
+    "landing_rect": {
+     "x": -13.3,
+     "z": -13.981,
+     "w": 0.404,
+     "h": 0.663
+    }
+   },
+   "physics": {
+    "v_req": 5.33,
+    "verdict": "tight"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimW_T",
+   "to_face": "GateN_WingW",
+   "delta_h": 0.0,
+   "dist_zone": 4.442,
+   "link_names": [
+    "RimToWing_NW"
+   ],
+   "zone": {
+    "center": {
+     "x": -13.8,
+     "z": 9.2
+    },
+    "size": {
+     "x": 0.6,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 5.33,
+    "verdict": "tight"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "RimW_T",
+   "to_face": "RimW_B",
+   "delta_h": 0.0,
+   "dist_zone": 4.0,
+   "link_names": [
+    "RimGap_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -14.0,
+     "z": 2.5
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 4.8,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestClusterN_Box",
+   "to_face": "WestClusterN_Panel",
+   "delta_h": 1.3,
+   "dist_zone": 2.5,
+   "link_names": [
+    "CrateToCluster_WN"
+   ],
+   "zone": {
+    "center": {
+     "x": -15.0,
+     "z": 11.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 3.846,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestClusterS_Box",
+   "to_face": "WestClusterS_Panel",
+   "delta_h": 1.3,
+   "dist_zone": 2.5,
+   "link_names": [
+    "CrateToCluster_WS"
+   ],
+   "zone": {
+    "center": {
+     "x": -15.0,
+     "z": -5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "WestClusterS_Box",
+    "to": "WestClusterS_Panel",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 3.532,
+     "p10": 3.532,
+     "p90": 3.532
+    },
+    "takeoff_feet_y": 1.027,
+    "contact_feet_y": 2.201,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 533,
+    "takeoff_rect": {
+     "x": -15.335,
+     "z": -4.654,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -17.214,
+     "z": -4.797,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 3.846,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestClusterS_Panel",
+   "to_face": "RimW_B",
+   "delta_h": 0.8,
+   "dist_zone": 2.9,
+   "link_names": [
+    "ClusterToRim_WN"
+   ],
+   "zone": {
+    "center": {
+     "x": -17.5,
+     "z": -5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.4
+    }
+   },
+   "human": {
+    "from": "WestClusterS_Panel",
+    "to": "RimW_B",
+    "n": 4,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.084,
+     "p10": 4.847,
+     "p90": 5.333
+    },
+    "takeoff_feet_y": 2.327,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 650,
+    "takeoff_rect": {
+     "x": -17.497,
+     "z": -5.065,
+     "w": 0.396,
+     "h": 0.175
+    },
+    "landing_rect": {
+     "x": -14.17,
+     "z": -5.444,
+     "w": 0.265,
+     "h": 0.756
+    }
+   },
+   "physics": {
+    "v_req": 3.955,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestClusterS_Panel",
+   "to_face": "WestWall_M",
+   "delta_h": 0.8,
+   "dist_zone": 3.5,
+   "link_names": [
+    "ClusterToLongWall_WS"
+   ],
+   "zone": {
+    "center": {
+     "x": -18.5,
+     "z": -5.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.4
+    }
+   },
+   "human": {
+    "from": "WestClusterS_Panel",
+    "to": "WestWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.284,
+     "p10": 5.284,
+     "p90": 5.284
+    },
+    "takeoff_feet_y": 2.326,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 650,
+    "takeoff_rect": {
+     "x": -19.092,
+     "z": -4.975,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -22.495,
+     "z": -4.516,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 4.773,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestPavilion",
+   "to_face": "WestClusterS_Panel",
+   "delta_h": 1.0,
+   "dist_zone": 3.55,
+   "link_names": [
+    "PavToCluster_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -18.7,
+     "z": -8.925
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.35
+    }
+   },
+   "human": {
+    "from": "WestPavilion",
+    "to": "WestClusterS_Panel",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.46,
+     "p10": 5.427,
+     "p90": 5.46
+    },
+    "takeoff_feet_y": 1.326,
+    "contact_feet_y": 2.197,
+    "catch_depth": {
+     "p50": 0.012,
+     "p90": 0.012
+    },
+    "flight_ms": 617,
+    "takeoff_rect": {
+     "x": -19.157,
+     "z": -8.641,
+     "w": 0.438,
+     "h": 0.018
+    },
+    "landing_rect": {
+     "x": -19.354,
+     "z": -5.317,
+     "w": 0.898,
+     "h": 0.045
+    }
+   },
+   "physics": {
+    "v_req": 5.071,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestPavilion",
+   "to_face": "WestSpurS",
+   "delta_h": 1.8,
+   "dist_zone": 1.565,
+   "link_names": [
+    "PavToSpur_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -17.9,
+     "z": -9.4
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "WestPavilion",
+    "to": "WestSpurS",
+    "n": 3,
+    "chain_n": 1,
+    "takeoff_speed": {
+     "p50": 5.99,
+     "p10": 5.748,
+     "p90": 6.182
+    },
+    "takeoff_feet_y": 1.326,
+    "contact_feet_y": 2.919,
+    "catch_depth": {
+     "p50": 0.081,
+     "p90": 0.092
+    },
+    "flight_ms": 400,
+    "takeoff_rect": {
+     "x": -17.971,
+     "z": -9.61,
+     "w": 0.156,
+     "h": 0.447
+    },
+    "landing_rect": {
+     "x": -16.695,
+     "z": -7.797,
+     "w": 0.239,
+     "h": 0.036
+    }
+   },
+   "physics": {
+    "v_req": 2.935,
+    "verdict": "easy"
+   },
+   "skill": true,
+   "skill_reasons": [
+    "链式跳跃（多跳合成）"
+   ]
+  },
+  {
+   "from_face": "WestTower",
+   "to_face": "RimW_B",
+   "delta_h": 0.5,
+   "dist_zone": 4.134,
+   "link_names": [
+    "TowerToRim_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -18.5,
+     "z": 0.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "WestTower",
+    "to": "RimW_B",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.919,
+     "p10": 4.919,
+     "p90": 4.919
+    },
+    "takeoff_feet_y": 2.627,
+    "contact_feet_y": 3.003,
+    "catch_depth": {
+     "p50": -0.003,
+     "p90": -0.003
+    },
+    "flight_ms": 717,
+    "takeoff_rect": {
+     "x": -17.201,
+     "z": -1.299,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -14.457,
+     "z": -2.988,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 5.277,
+    "verdict": "tight"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestTower",
+   "to_face": "WestTower",
+   "delta_h": 0.0,
+   "dist_zone": 0.2,
+   "link_names": [
+    "TowerRampToTower_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -19.7,
+     "z": 1.75
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.5
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 0.24,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestTower",
+   "to_face": "WestTowerBox",
+   "delta_h": 0.9,
+   "dist_zone": 0.0,
+   "link_names": [
+    "TowerBox_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -18.5,
+     "z": 0.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "WestTower",
+    "to": "WestTowerBox",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 0.0,
+     "p10": 0.0,
+     "p90": 0.0
+    },
+    "takeoff_feet_y": 2.637,
+    "contact_feet_y": 3.401,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 633,
+    "takeoff_rect": {
+     "x": -18.52,
+     "z": -1.3,
+     "w": 0.147,
+     "h": 2.201
+    },
+    "landing_rect": {
+     "x": -18.47,
+     "z": 0.249,
+     "w": 0.038,
+     "h": 0.124
+    }
+   },
+   "physics": {
+    "v_req": 0.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestTower",
+   "to_face": "WestWall_M",
+   "delta_h": 0.5,
+   "dist_zone": 3.523,
+   "link_names": [
+    "TowerToLongWall_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -18.5,
+     "z": 0.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "WestTower",
+    "to": "WestWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.293,
+     "p10": 4.293,
+     "p90": 4.293
+    },
+    "takeoff_feet_y": 2.627,
+    "contact_feet_y": 3.002,
+    "catch_depth": {
+     "p50": -0.002,
+     "p90": -0.002
+    },
+    "flight_ms": 717,
+    "takeoff_rect": {
+     "x": -19.799,
+     "z": 0.383,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -22.466,
+     "z": 1.282,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 4.497,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestTowerRampStep10",
+   "to_face": "WestWall_M",
+   "delta_h": 0.5,
+   "dist_zone": 2.2,
+   "link_names": [
+    "RampToLongWall_W"
+   ],
+   "zone": {
+    "center": {
+     "x": -19.8,
+     "z": 2.31
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.62
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 2.809,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestWall_M",
+   "to_face": "WestWall_N",
+   "delta_h": 0.0,
+   "dist_zone": 2.5,
+   "link_names": [
+    "LongWallGap_WN"
+   ],
+   "zone": {
+    "center": {
+     "x": -23.0,
+     "z": 5.1
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.8
+    }
+   },
+   "human": {
+    "from": "WestWall_M",
+    "to": "WestWall_N",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.216,
+     "p10": 5.443,
+     "p90": 6.216
+    },
+    "takeoff_feet_y": 3.126,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -23.146,
+     "z": 4.024,
+     "w": 0.297,
+     "h": 0.505
+    },
+    "landing_rect": {
+     "x": -23.082,
+     "z": 8.792,
+     "w": 0.188,
+     "h": 0.1
+    }
+   },
+   "physics": {
+    "v_req": 3.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestWall_N",
+   "to_face": "WestClusterN_Panel",
+   "delta_h": -0.8,
+   "dist_zone": 3.5,
+   "link_names": [
+    "ClusterToLongWall_WN"
+   ],
+   "zone": {
+    "center": {
+     "x": -23.0,
+     "z": 10.8
+    },
+    "size": {
+     "x": 1.0,
+     "z": 1.0
+    }
+   },
+   "human": {
+    "from": "WestWall_N",
+    "to": "WestClusterN_Panel",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.982,
+     "p10": 4.982,
+     "p90": 4.982
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 2.201,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 867,
+    "takeoff_rect": {
+     "x": -22.513,
+     "z": 12.743,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -18.588,
+     "z": 10.943,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
+   "physics": {
+    "v_req": 3.818,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
+   "from_face": "WestWall_S",
+   "to_face": "WestWall_M",
+   "delta_h": 0.0,
+   "dist_zone": 2.5,
+   "link_names": [
+    "LongWallGap_WS"
+   ],
+   "zone": {
+    "center": {
+     "x": -23.0,
+     "z": -8.4
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.8
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 3.0,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  }
+ ],
+ "link_audit": [
+  {
+   "link": "PavToCluster_W",
+   "from_face": "WestPavilion",
+   "to_face": "WestClusterS_Panel",
+   "delta_h": 1.0,
+   "dist_link": 3.812,
+   "verdict": "tight"
+  },
+  {
+   "link": "PavToCluster_E",
+   "from_face": "EastPavilion",
+   "to_face": "EastClusterN_Panel",
+   "delta_h": 1.0,
+   "dist_link": 3.812,
+   "verdict": "tight"
+  },
+  {
+   "link": "ClusterToRim_WN",
+   "from_face": "WestClusterS_Panel",
+   "to_face": "RimW_B",
+   "delta_h": 0.8,
+   "dist_link": 3.905,
+   "verdict": "tight"
+  },
+  {
+   "link": "ClusterToRim_EN",
+   "from_face": "EastClusterN_Panel",
+   "to_face": "RimE_T",
+   "delta_h": 0.8,
+   "dist_link": 3.905,
+   "verdict": "tight"
+  },
+  {
+   "link": "ClusterToRim_WS",
+   "from_face": "",
+   "to_face": "RimW_T",
+   "delta_h": 0.0,
+   "dist_link": 3.905,
+   "verdict": "suspicious_link"
+  },
+  {
+   "link": "ClusterToRim_ES",
+   "from_face": "",
+   "to_face": "RimE_B",
+   "delta_h": 0.0,
+   "dist_link": 3.905,
+   "verdict": "suspicious_link"
+  },
+  {
+   "link": "PavToSpur_W",
+   "from_face": "WestPavilion",
+   "to_face": "WestSpurS",
+   "delta_h": 1.8,
+   "dist_link": 2.625,
+   "verdict": "easy"
+  },
+  {
+   "link": "PavToSpur_E",
+   "from_face": "EastPavilion",
+   "to_face": "EastSpurN",
+   "delta_h": 1.8,
+   "dist_link": 2.625,
+   "verdict": "easy"
+  },
+  {
+   "link": "PavToSpur_WS",
+   "from_face": "",
+   "to_face": "WestSpurN",
+   "delta_h": 0.0,
+   "dist_link": 16.805,
+   "verdict": "suspicious_link"
+  },
+  {
+   "link": "PavToSpur_ES",
+   "from_face": "",
+   "to_face": "EastSpurS",
+   "delta_h": 0.0,
+   "dist_link": 16.805,
+   "verdict": "suspicious_link"
+  },
+  {
+   "link": "RimGap_NW",
+   "from_face": "RimN1",
+   "to_face": "RimN2",
+   "delta_h": 0.0,
+   "dist_link": 4.2,
+   "verdict": "easy"
+  },
+  {
+   "link": "RimGap_NE",
+   "from_face": "RimN3",
+   "to_face": "RimN4",
+   "delta_h": 0.0,
+   "dist_link": 4.2,
+   "verdict": "easy"
+  },
+  {
+   "link": "RimGap_SW",
+   "from_face": "RimS1",
+   "to_face": "RimS2",
+   "delta_h": 0.0,
+   "dist_link": 4.2,
+   "verdict": "easy"
+  },
+  {
+   "link": "RimGap_SE",
+   "from_face": "RimS3",
+   "to_face": "RimS4",
+   "delta_h": 0.0,
+   "dist_link": 4.2,
+   "verdict": "easy"
+  },
+  {
+   "link": "LongWallGap_WN",
+   "from_face": "WestWall_M",
+   "to_face": "WestWall_N",
+   "delta_h": 0.0,
+   "dist_link": 3.1,
+   "verdict": "easy"
+  },
+  {
+   "link": "LongWallGap_WS",
+   "from_face": "WestWall_S",
+   "to_face": "WestWall_M",
+   "delta_h": 0.0,
+   "dist_link": 3.1,
+   "verdict": "easy"
+  },
+  {
+   "link": "LongWallGap_EN",
+   "from_face": "EastWall_M",
+   "to_face": "EastWall_N",
+   "delta_h": 0.0,
+   "dist_link": 3.1,
+   "verdict": "easy"
+  },
+  {
+   "link": "LongWallGap_ES",
+   "from_face": "EastWall_S",
+   "to_face": "EastWall_M",
+   "delta_h": 0.0,
+   "dist_link": 3.1,
+   "verdict": "easy"
+  },
+  {
+   "link": "TowerBox_W",
+   "from_face": "WestTower",
+   "to_face": "WestTowerBox",
+   "delta_h": 0.9,
+   "dist_link": 0.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "TowerBox_E",
+   "from_face": "EastTower",
+   "to_face": "EastTowerBox",
+   "delta_h": 0.9,
+   "dist_link": 0.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "Crate_WN",
+   "from_face": "Ground",
+   "to_face": "WestClusterN_Box",
+   "delta_h": 0.9,
+   "dist_link": 0.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "Crate_WS",
+   "from_face": "Ground",
+   "to_face": "WestClusterS_Box",
+   "delta_h": 0.9,
+   "dist_link": 0.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "Crate_EN",
+   "from_face": "Ground",
+   "to_face": "EastClusterN_Box",
+   "delta_h": 0.9,
+   "dist_link": 0.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "Crate_ES",
+   "from_face": "Ground",
+   "to_face": "EastClusterS_Box",
+   "delta_h": 0.9,
+   "dist_link": 0.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "CrateToCluster_WN",
+   "from_face": "WestClusterN_Box",
+   "to_face": "WestClusterN_Panel",
+   "delta_h": 1.3,
+   "dist_link": 3.5,
+   "verdict": "tight"
+  },
+  {
+   "link": "CrateToCluster_WS",
+   "from_face": "WestClusterS_Box",
+   "to_face": "WestClusterS_Panel",
+   "delta_h": 1.3,
+   "dist_link": 3.5,
+   "verdict": "tight"
+  },
+  {
+   "link": "CrateToCluster_EN",
+   "from_face": "EastClusterN_Box",
+   "to_face": "EastClusterN_Panel",
+   "delta_h": 1.3,
+   "dist_link": 3.5,
+   "verdict": "tight"
+  },
+  {
+   "link": "CrateToCluster_ES",
+   "from_face": "EastClusterS_Box",
+   "to_face": "EastClusterS_Panel",
+   "delta_h": 1.3,
+   "dist_link": 3.5,
+   "verdict": "tight"
+  },
+  {
+   "link": "RampTopToCorridor_E",
+   "from_face": "RampEStep8",
+   "to_face": "CorridorSlab",
+   "delta_h": 0.0,
+   "dist_link": 2.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "RampTopToCorridor_W",
+   "from_face": "RampWStep8",
+   "to_face": "CorridorSlab",
+   "delta_h": 0.0,
+   "dist_link": 2.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "TowerRampToTower_E",
+   "from_face": "EastTower",
+   "to_face": "EastTower",
+   "delta_h": 0.0,
+   "dist_link": 1.3,
+   "verdict": "easy"
+  },
+  {
+   "link": "TowerRampToTower_W",
+   "from_face": "WestTower",
+   "to_face": "WestTower",
+   "delta_h": 0.0,
+   "dist_link": 1.3,
+   "verdict": "easy"
+  },
+  {
+   "link": "WingToLintel_NW",
+   "from_face": "GateN_WingW",
+   "to_face": "GateN_Lintel",
+   "delta_h": 1.9,
+   "dist_link": 6.5,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "WingToLintel_NE",
+   "from_face": "GateN_WingE",
+   "to_face": "GateN_Lintel",
+   "delta_h": 1.9,
+   "dist_link": 6.5,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "WingToLintel_SW",
+   "from_face": "GateS_WingE",
+   "to_face": "GateS_Lintel",
+   "delta_h": 1.9,
+   "dist_link": 6.5,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "WingToLintel_SE",
+   "from_face": "GateS_WingW",
+   "to_face": "GateS_Lintel",
+   "delta_h": 1.9,
+   "dist_link": 6.5,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "LintelToCanopy_N",
+   "from_face": "GateN_Lintel",
+   "to_face": "BeltN_CanopyW",
+   "delta_h": 0.0,
+   "dist_link": 3.048,
+   "verdict": "easy"
+  },
+  {
+   "link": "LintelToCanopy_S",
+   "from_face": "GateS_Lintel",
+   "to_face": "BeltS_CanopyW",
+   "delta_h": 0.0,
+   "dist_link": 3.048,
+   "verdict": "easy"
+  },
+  {
+   "link": "CanopyGap_N",
+   "from_face": "BeltN_CanopyW",
+   "to_face": "BeltN_CanopyE",
+   "delta_h": 0.0,
+   "dist_link": 4.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "CanopyGap_S",
+   "from_face": "BeltS_CanopyE",
+   "to_face": "BeltS_CanopyW",
+   "delta_h": 0.0,
+   "dist_link": 4.0,
+   "verdict": "easy"
+  },
+  {
+   "link": "RampToLongWall_E",
+   "from_face": "EastTowerRampStep10",
+   "to_face": "EastWall_M",
+   "delta_h": 0.5,
+   "dist_link": 3.324,
+   "verdict": "easy"
+  },
+  {
+   "link": "RampToLongWall_W",
+   "from_face": "WestTowerRampStep10",
+   "to_face": "WestWall_M",
+   "delta_h": 0.5,
+   "dist_link": 3.324,
+   "verdict": "easy"
+  },
+  {
+   "link": "TowerToLongWall_W",
+   "from_face": "WestTower",
+   "to_face": "WestWall_M",
+   "delta_h": 0.5,
+   "dist_link": 4.713,
+   "verdict": "tight"
+  },
+  {
+   "link": "TowerToLongWall_E",
+   "from_face": "EastTower",
+   "to_face": "EastWall_M",
+   "delta_h": 0.5,
+   "dist_link": 4.713,
+   "verdict": "tight"
+  },
+  {
+   "link": "ClusterToLongWall_WS",
+   "from_face": "WestClusterS_Panel",
+   "to_face": "WestWall_M",
+   "delta_h": 0.8,
+   "dist_link": 4.528,
+   "verdict": "knife"
+  },
+  {
+   "link": "ClusterToLongWall_ES",
+   "from_face": "EastClusterN_Panel",
+   "to_face": "EastWall_M",
+   "delta_h": 0.8,
+   "dist_link": 4.528,
+   "verdict": "knife"
+  },
+  {
+   "link": "ClusterToLongWall_WN",
+   "from_face": "WestWall_N",
+   "to_face": "WestClusterN_Panel",
+   "delta_h": -0.8,
+   "dist_link": 4.5,
+   "verdict": "easy"
+  },
+  {
+   "link": "ClusterToLongWall_EN",
+   "from_face": "EastWall_S",
+   "to_face": "EastClusterS_Panel",
+   "delta_h": -0.8,
+   "dist_link": 4.5,
+   "verdict": "easy"
+  },
+  {
+   "link": "TowerToRim_W",
+   "from_face": "WestTower",
+   "to_face": "RimW_B",
+   "delta_h": 0.5,
+   "dist_link": 5.522,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "TowerToRim_E",
+   "from_face": "EastTower",
+   "to_face": "RimE_T",
+   "delta_h": 0.5,
+   "dist_link": 5.522,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "RimGap_E",
+   "from_face": "RimE_T",
+   "to_face": "RimE_B",
+   "delta_h": 0.0,
+   "dist_link": 5.0,
+   "verdict": "tight"
+  },
+  {
+   "link": "RimGap_W",
+   "from_face": "RimW_T",
+   "to_face": "RimW_B",
+   "delta_h": 0.0,
+   "dist_link": 5.0,
+   "verdict": "tight"
+  },
+  {
+   "link": "RimToWing_NW",
+   "from_face": "RimW_T",
+   "to_face": "GateN_WingW",
+   "delta_h": 0.0,
+   "dist_link": 5.608,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "RimToWing_NE",
+   "from_face": "RimE_T",
+   "to_face": "GateN_WingE",
+   "delta_h": 0.0,
+   "dist_link": 5.608,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "RimToWing_SW",
+   "from_face": "RimW_B",
+   "to_face": "GateS_WingE",
+   "delta_h": 0.0,
+   "dist_link": 5.608,
+   "verdict": "infeasible"
+  },
+  {
+   "link": "RimToWing_SE",
+   "from_face": "RimE_B",
+   "to_face": "GateS_WingW",
+   "delta_h": 0.0,
+   "dist_link": 5.608,
+   "verdict": "infeasible"
+  }
+ ],
+ "unlinked_human_edges": [
+  {
+   "from": "Ground",
+   "to": "AltarPlatform",
+   "n": 19
+  },
+  {
+   "from": "EastTower",
+   "to": "Ground",
+   "n": 17
+  },
+  {
+   "from": "WestTower",
+   "to": "Ground",
+   "n": 15
+  },
+  {
+   "from": "CorridorSlab",
+   "to": "Ground",
+   "n": 11
+  },
+  {
+   "from": "AltarPlatform",
+   "to": "Ground",
+   "n": 9
+  },
+  {
+   "from": "Ground",
+   "to": "WestTower",
+   "n": 7
+  },
+  {
+   "from": "Ground",
+   "to": "WestPavilion",
+   "n": 6
+  },
+  {
+   "from": "Ground",
+   "to": "CornerNE_Pav",
+   "n": 5
+  },
+  {
+   "from": "Ground",
+   "to": "BeltN_PavW",
+   "n": 4
+  },
+  {
+   "from": "Ground",
+   "to": "BeltS_PavE",
+   "n": 4
+  },
+  {
+   "from": "Ground",
+   "to": "CorridorSlab",
+   "n": 4
+  },
+  {
+   "from": "Ground",
+   "to": "EastTower",
+   "n": 4
+  },
+  {
+   "from": "Ground",
+   "to": "RampWStep8",
+   "n": 4
+  },
+  {
+   "from": "Ground",
+   "to": "BeltS_PavW",
+   "n": 3
+  },
+  {
+   "from": "Ground",
+   "to": "RampWStep6",
+   "n": 3
+  },
+  {
+   "from": "Ground",
+   "to": "WestTowerRampStep10",
+   "n": 3
+  },
+  {
+   "from": "BeltN_PavW",
+   "to": "Ground",
+   "n": 2
+  },
+  {
+   "from": "CornerNE_Pav",
+   "to": "Ground",
+   "n": 2
+  },
+  {
+   "from": "EastClusterN_Panel",
+   "to": "EastClusterN_Box",
+   "n": 2
+  },
+  {
+   "from": "EastWall_N",
+   "to": "EastPavilion",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "BeltN_PavE",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "CornerNW_Pav",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "EastPavilion",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "EastTowerRampStep10",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "MicroN2",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "RampWStep5",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "RampWStep7",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "WestClusterS_Panel",
+   "n": 2
+  },
+  {
+   "from": "Ground",
+   "to": "WestTowerRampStep9",
+   "n": 2
+  },
+  {
+   "from": "RampEStep8",
+   "to": "Ground",
+   "n": 2
+  },
+  {
+   "from": "RimN4",
+   "to": "GateN_WingE",
+   "n": 2
+  },
+  {
+   "from": "WestTower",
+   "to": "WestClusterS_Panel",
+   "n": 2
+  },
+  {
+   "from": "WestTower",
+   "to": "WestPavilion",
+   "n": 2
+  },
+  {
+   "from": "BeltN_PavE",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "BeltN_PavStepW",
+   "to": "BeltN_PavE",
+   "n": 1
+  },
+  {
+   "from": "BeltS_CanopyE",
+   "to": "GateS_Lintel",
+   "n": 1
+  },
+  {
+   "from": "BeltS_CanopyW",
+   "to": "BeltS_CanopyE",
+   "n": 1
+  },
+  {
+   "from": "BeltS_PavE",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "BeltS_PavW",
+   "to": "AltarPlatform",
+   "n": 1
+  },
+  {
+   "from": "BeltS_PavW",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "CampN_Screen_S",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "CampS_Screen_N",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "CampS_Truck",
+   "to": "CampS_Screen_N",
+   "n": 1
+  },
+  {
+   "from": "CornerNW_Pav",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "CornerNW_PavStep",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "CorridorSlab",
+   "to": "RampEStep3",
+   "n": 1
+  },
+  {
+   "from": "EastClusterS_Panel",
+   "to": "EastWall_S",
+   "n": 1
+  },
+  {
+   "from": "EastPavilion",
+   "to": "EastClusterN_Box",
+   "n": 1
+  },
+  {
+   "from": "EastPavilion",
+   "to": "EastTowerRampStep3",
+   "n": 1
+  },
+  {
+   "from": "EastPavilion",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "EastPavilionStep",
+   "to": "EastPavilion",
+   "n": 1
+  },
+  {
+   "from": "EastTower",
+   "to": "EastPavilion",
+   "n": 1
+  },
+  {
+   "from": "EastTowerRampStep3",
+   "to": "EastTower",
+   "n": 1
+  },
+  {
+   "from": "GateN_Lintel",
+   "to": "CampN_Screen_S",
+   "n": 1
+  },
+  {
+   "from": "GateN_Lintel",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "GateS_Lintel",
+   "to": "CampS_Screen_N",
+   "n": 1
+  },
+  {
+   "from": "GateS_Lintel",
+   "to": "CampS_Truck",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "BeltN_PavStepW",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "CornerSW_Pav",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "EastClusterN_Panel",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "EastTowerRampStep3",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "EastTowerRampStep4",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "EastTowerRampStep5",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "RampEStep3",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "RampEStep6",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "RampEStep7",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "RampEStep8",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "RampWStep4",
+   "n": 1
+  },
+  {
+   "from": "RampEStep3",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "RampWStep8",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "RimN2",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "RimN2",
+   "to": "RimN4",
+   "n": 1
+  },
+  {
+   "from": "RimN4",
+   "to": "AltarPlatform",
+   "n": 1
+  },
+  {
+   "from": "RimS1",
+   "to": "GateS_WingE",
+   "n": 1
+  },
+  {
+   "from": "RimS2",
+   "to": "AltarPlatform",
+   "n": 1
+  },
+  {
+   "from": "RimS2",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "RimS2",
+   "to": "RimS3",
+   "n": 1
+  },
+  {
+   "from": "RimS3",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "RimS4",
+   "to": "RimS3",
+   "n": 1
+  },
+  {
+   "from": "RimW_B",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "RimW_B",
+   "to": "RimW_T",
+   "n": 1
+  },
+  {
+   "from": "RimW_T",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "WestClusterN_Panel",
+   "to": "RimN1",
+   "n": 1
+  },
+  {
+   "from": "WestClusterS_Panel",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "WestClusterS_Panel",
+   "to": "WestTower",
+   "n": 1
+  },
+  {
+   "from": "WestPavilion",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "WestPavilionStep",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "WestTower",
+   "to": "CornerSW_Pav",
+   "n": 1
+  },
+  {
+   "from": "WestTower",
+   "to": "RimW_T",
+   "n": 1
+  },
+  {
+   "from": "WestTower",
+   "to": "WestTowerRailW",
+   "n": 1
+  },
+  {
+   "from": "WestTower",
+   "to": "WestTowerRampStep10",
+   "n": 1
+  },
+  {
+   "from": "WestTowerBox",
+   "to": "RimW_B",
+   "n": 1
+  },
+  {
+   "from": "WestTowerRampStep4",
+   "to": "Ground",
+   "n": 1
+  }
+ ]
+}
