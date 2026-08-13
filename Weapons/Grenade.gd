@@ -110,8 +110,25 @@ func _apply_blast_damage() -> void:
 			continue  # 头部 hitbox 转发本体 → 爆炸无头部倍率，跳过防双结算
 		seen[hit["collider_id"]] = true
 		var dmg := damage_in_radius(global_position.distance_to(target.global_position))
-		if dmg > 0.0 and target.has_method("take_damage"):
+		if dmg > 0.0 and target.has_method("take_damage") and not _los_blocked(target):
 			target.take_damage(dmg)
+
+
+# M2 手感修复（2026-08-13）：爆炸 LOS 墙体遮挡（Source RadiusDamage 每受害者 trace 思路，自研实现）。
+# 从爆心向目标胸口参考点（脚部 + blast_los_probe_height）打射线——不打脚部：贴地射线会打中地板假遮挡；
+# exclude 目标自身全部碰撞 RID（本体 + 子 CollisionObject3D——头 hitbox 是独立 body，不排除会自挡）；
+# 任何剩余命中 = 墙体遮挡 → 该目标伤害 0（CS 全遮挡语义，无穿透衰减）。
+func _los_blocked(target: Node) -> bool:
+	if resource == null or not target is CollisionObject3D:
+		return false
+	var probe: Vector3 = target.global_position + Vector3(0, resource.blast_los_probe_height, 0)
+	var ray := PhysicsRayQueryParameters3D.create(global_position, probe, 1)
+	var exclude: Array[RID] = [(target as CollisionObject3D).get_rid()]
+	for child in target.get_children():
+		if child is CollisionObject3D:
+			exclude.append((child as CollisionObject3D).get_rid())
+	ray.exclude = exclude
+	return not get_world_3d().direct_space_state.intersect_ray(ray).is_empty()
 
 
 # M1 任务11：爆炸视觉（spec §9.8）——生成 ExplosionEffect（火花粒子/闪光/冲击波环）。

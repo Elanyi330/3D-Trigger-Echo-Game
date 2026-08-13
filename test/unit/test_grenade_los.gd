@@ -1,0 +1,106 @@
+# test/unit/test_grenade_los.gd
+# M2 手感修复（2026-08-13）：手雷爆炸 LOS 墙体遮挡（TDD RED 先行）
+# 行为（设计 2026-08-13-m2-melee-grenade-fixes-design §一）：
+#   - 墙在爆心与目标之间（射线路径相交）→ 伤害 0（CS 全遮挡语义，无穿透衰减）
+#   - 无遮挡 → 距离线性衰减满值
+#   - 贴地爆炸同层目标不假遮挡（胸口参考点防地板挡射线——回归重点）
+#   - 头 hitbox 自挡回归：爆心在头顶上方时射线穿过头 hitbox——exclude 本体+子 CollisionObject3D RID
+#   - 矮掩体 0.9 墙：贴地爆炸射线路径相交 → 遮挡（CS trace 语义）；爆心抬高 1.2m → 射线过顶不遮挡
+# 全局约束：期望值由 m67.tres 派生（damage/blast_radius），不硬编码散值。
+extends GutTest
+
+var m67: WeaponResource
+const ENEMY_SCENE := "res://Levels/Enemy/Enemy.tscn"
+
+
+func before_each() -> void:
+	m67 = load("res://Weapons/weapon_m67.tres")
+
+
+func _spawn_enemy(at: Vector3) -> Enemy:
+	var e: Enemy = load(ENEMY_SCENE).instantiate()
+	add_child_autofree(e)
+	e.global_position = at
+	e.rotation.y = PI
+	return e
+
+
+func _wall(center: Vector3, size: Vector3) -> StaticBody3D:
+	var b := StaticBody3D.new()
+	b.collision_layer = 1
+	b.collision_mask = 0
+	add_child_autofree(b)
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	cs.shape = box
+	b.add_child(cs)
+	b.global_position = center
+	return b
+
+
+func _explode_at(pos: Vector3) -> void:
+	var g := Grenade.new()
+	g.resource = m67
+	add_child_autofree(g)
+	g.init(pos, Vector3(0, 0, -1), 20.0)
+	g.explode()
+
+
+func _dist_damage(dist: float) -> float:
+	return m67.damage * (1.0 - dist / m67.blast_radius)
+
+
+func test_wall_blocks_blast_damage() -> void:
+	var e := _spawn_enemy(Vector3(0, 0, -4))
+	await wait_physics_frames(2)
+	_wall(Vector3(0, 1.5, -2), Vector3(4, 3, 1))  # 爆心(0)与目标(-4)之间：3m 高墙
+	await wait_physics_frames(1)  # 墙形状入空间需一物理帧（同帧 raycast 不可见——Godot 4.7.1 实测）
+	_explode_at(Vector3.ZERO)
+	assert_almost_eq(e.health, 100.0, 0.001, "墙后目标 0 伤（CS 全遮挡）")
+
+
+func test_no_wall_full_distance_damage() -> void:
+	var e := _spawn_enemy(Vector3(0, 0, -4))
+	await wait_physics_frames(2)
+	_explode_at(Vector3.ZERO)
+	assert_almost_eq(e.health, 100.0 - _dist_damage(4.0), 0.001, "无遮挡 → 距离线性衰减")
+
+
+func test_ground_blast_does_not_false_block() -> void:
+	# 回归：贴地爆炸 + 同层目标——射线打胸口参考点（不打脚部），地板不挡
+	var e := _spawn_enemy(Vector3(0, 0, -2))
+	await wait_physics_frames(2)
+	_wall(Vector3(0, -0.5, 0), Vector3(40, 1, 40))  # 大底板（爆心/目标脚下）
+	_explode_at(Vector3.ZERO)
+	assert_almost_eq(e.health, 100.0 - _dist_damage(2.0), 0.001, "贴地爆炸无地板假遮挡")
+
+
+func test_elevated_blast_does_not_self_block_via_head() -> void:
+	# 回归：爆心在头顶上方 → 射线穿过头 hitbox（y≈1.70）——exclude 头 RID 防自挡
+	var e := _spawn_enemy(Vector3.ZERO)
+	await wait_physics_frames(2)
+	_explode_at(Vector3(0, 2.5, 0))
+	assert_almost_eq(e.health, 100.0 - _dist_damage(2.5), 0.001,
+			"头顶爆炸：射线穿头 hitbox 不自挡（exclude 本体+头 RID）")
+
+
+func test_low_cover_blocks_ground_blast() -> void:
+	# 0.9m 矮墙在贴地爆心与目标之间：射线路径相交（射线从 y=0 升到 y=1，中点 ~0.5 < 0.9）→ 遮挡
+	var e := _spawn_enemy(Vector3(0, 0, -4))
+	await wait_physics_frames(2)
+	_wall(Vector3(0, 0.45, -2), Vector3(4, 0.9, 0.6))
+	await wait_physics_frames(1)  # 墙形状入空间需一物理帧
+	_explode_at(Vector3.ZERO)
+	assert_almost_eq(e.health, 100.0, 0.001, "0.9m 矮墙遮挡贴地爆炸（射线相交即挡）")
+
+
+func test_elevated_blast_clears_low_cover() -> void:
+	# 爆心抬高 1.2m（摊阁级）→ 射线在墙处高度 ≈1.1 > 0.9 → 过顶不遮挡
+	var e := _spawn_enemy(Vector3(0, 0, -4))
+	await wait_physics_frames(2)
+	_wall(Vector3(0, 0.45, -2), Vector3(4, 0.9, 0.6))
+	await wait_physics_frames(1)  # 墙形状入空间需一物理帧
+	_explode_at(Vector3(0, 1.2, 0))
+	assert_almost_eq(e.health, 100.0 - _dist_damage(sqrt(4.0 * 4.0 + 1.2 * 1.2)), 0.001,
+			"爆心抬高 → 射线过顶矮墙")
