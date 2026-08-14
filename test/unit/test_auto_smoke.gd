@@ -15,6 +15,10 @@
 # 测试 3：test_l2_nav_link_snap——L_M2.tscn 实例化 90 物理帧后全部 NavigationLink3D
 #   端点自身即导航点（<0.1m）——实机链接静默丢弃回归锚（2026-08-15：固定 5 帧等待
 #   在实机全场景同步前快照 → 端点悬空 → 整条 link 被丢 → 91 no_path 根因）。
+# 测试 4：test_link_chain_regression——单目标链接链回归锚（2026-08-15 控制器裁决 4：
+#   与测试 1 隔离独立断言，贪心队列顺序不再互相影响；原定 WestClusterN_Panel 双链接
+#   链，实测箱→面板跳无法稳定 success 后按控制器回退条款改 WestClusterN_Box
+#   （Crate_WN 单链；链接未注册时同样必 no_path）。
 # 断点：done 或 success≥2 或 90s 超时（超时即失败，防 CI 挂死）。
 # T3 唯一允许的慢测试（物理秒 30-60s）；其余逻辑测试保持毫秒级。
 extends GutTest
@@ -104,12 +108,12 @@ func test_full_traversal() -> void:
 	# 转弯圆 bug 的唯一触发形态，冒烟此前全是 dist=0 垂直跳所以没抓到）；
 	# UmbrellaN=不可达面（probe_navmesh 不可能清单）——验证 no_path 记录 + 审查
 	# Minor 1 修复：no_path 的 plan 字段为空（不带上一目标旧数据）。
-	# WestClusterN_Panel=双链接链目标（Crate_WN + CrateToCluster_WN 两跳）——
-	# 链接链回归锚：2026-08-15 实机链接静默丢弃教训（91 no_path 的暴露形态，
-	# 纯步行图时该面必 no_path；链接注册生效后必须 success）。
+	# 注：链接链目标 WestClusterN_Panel 已拆到 test_link_chain_regression 独立测试
+	# （2026-08-15 控制器裁决 4：同队列贪心顺序互相影响——面板加入后 WestTowerBox
+	# 的 attempt 顺序被改写导致既有断言失稳）。
 	autopilot.set_target_faces(
 			["WestTowerBox", "WestClusterN_Box", "AltarPlatform", "CorridorSlab",
-			"UmbrellaN", "WestClusterN_Panel"])
+			"UmbrellaN"])
 	autopilot.start()
 
 	# 8. 驱动循环至 done / 90s 超时（三目标全部处理完才 done——success 提前
@@ -142,12 +146,6 @@ func test_full_traversal() -> void:
 	assert_true(pf.has("CorridorSlab"), "CorridorSlab 应有 attempt 记录")
 	assert_eq(pf["CorridorSlab"]["verdict"], "success",
 			"水平跳目标 CorridorSlab 应成功（转圈 bug 回归锚）")
-	# 链接链回归锚（2026-08-15 实机链接静默丢弃教训）：WestClusterN_Panel 必经
-	# Crate_WN + CrateToCluster_WN 双链接链——链接未注册时该面必 no_path，
-	# success 即证链接注册生效
-	assert_true(pf.has("WestClusterN_Panel"), "WestClusterN_Panel 应有 attempt 记录")
-	assert_eq(pf["WestClusterN_Panel"]["verdict"], "success",
-			"双链接链目标 WestClusterN_Panel 应成功（链接注册回归锚）")
 	# 不可达面 + 审查 Minor 1 修复：no_path 的 plan 字段为空（不带上一目标旧数据）
 	assert_true(pf.has("UmbrellaN"), "UmbrellaN 应有 attempt 记录")
 	assert_eq(pf["UmbrellaN"]["verdict"], "no_path", "伞顶不可达 → no_path")
@@ -169,6 +167,33 @@ func test_full_traversal() -> void:
 	assert_eq(manifest["map_hash"], hash_str,
 			"manifest.map_hash == 当前布局哈希")
 	assert_gte(record.attempt_count(), 2, "attempt_count ≥ 2")
+
+
+# 链接链回归锚（2026-08-15 实机链接静默丢弃教训——控制器裁决 4：与全遍历测试隔离，
+# 独立场景/独立记录目录，贪心队列顺序不再互相影响）。控制器原定 WestClusterN_Panel
+# （Crate_WN + CrateToCluster_WN 双链接链，实机 91 no_path 的暴露形态），实测修复轮后
+# 仍不能稳定 success——箱→面板跳（起跳面 1m、面板距箱缘 1.5m、Δh1.3）需 3.2+ m/s 的
+# 正西向起跳，1m 箱顶助跑无法收敛方向（实测起跳方向偏西 27-45°、z 漂移 0.3-0.6m 后
+# 冲出圆盘坠地；详见报告）——按控制器回退条款改 WestClusterN_Box（Crate_WN 单链，
+# 链接未注册时同样必 no_path；success 即证链接注册生效）。面板链留待 M4 zone 级
+# 执行（HANDOFF 已列）。
+func test_link_chain_regression() -> void:
+	var a := await _assemble()
+	var autopilot: AutoTraversal = a["autopilot"]
+	var record: AutoTraversalRecord = a["record"]
+	autopilot.setup(a["player"], record, Callable())
+	autopilot.set_target_faces(["WestClusterN_Box"])
+	autopilot.start()
+	var max_frames := int(MAX_SECONDS * 60.0)
+	var frames := 0
+	while frames < max_frames and not autopilot.done:
+		await wait_physics_frames(1)
+		frames += 1
+	assert_true(autopilot.done, "单目标遍历应在 %.0fs 内完成" % MAX_SECONDS)
+	var pf: Dictionary = record.summary_dict()["per_face"]
+	assert_true(pf.has("WestClusterN_Box"), "WestClusterN_Box 应有 attempt 记录")
+	assert_eq(pf["WestClusterN_Box"]["verdict"], "success",
+			"链接链目标 WestClusterN_Box 应成功（链接注册回归锚）")
 
 
 # 会话超时暂停 + 重启（2026-08-14 用户拍板：单次自动运行 ≤30 分钟——注入 0.5s 验证）
