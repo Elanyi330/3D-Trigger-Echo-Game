@@ -622,10 +622,10 @@ func _steer_toward(target: Vector3, delta: float) -> bool:
 ## 途经点到达判定：水平距 ≤ WALK_ARRIVE_RADIUS 且目标面不高于脚底 0.3 以上
 ## （防高台途经点被水平距离提前跳过——0.8 半径会吞掉台面高度差，导致直线转向
 ## 切角撞墙卡死；历史坑：EastPavilion 步道途经点）
-func _arrived(target: Vector3, radius: float = WALK_ARRIVE_RADIUS) -> bool:
+func _arrived(target: Vector3) -> bool:
 	var d := target - _player.global_position
 	d.y = 0.0
-	if d.length() > radius:
+	if d.length() > WALK_ARRIVE_RADIUS:
 		return false
 	return _waypoint_surface_y(target) - _feet_y() <= 0.3
 
@@ -655,11 +655,6 @@ func _stuck_check(delta: float) -> bool:
 		_stuck_t = 0.0
 		return false
 	return _stuck_t >= STUCK_TIME
-
-
-## 途经点是否需要登台（目标面高于脚底 0.3 以上）
-func _needs_climb(target: Vector3) -> bool:
-	return _waypoint_surface_y(target) - _feet_y() > 0.3
 
 
 # ---- WALK ----
@@ -794,6 +789,10 @@ func _enter_jump(seg: Dictionary) -> void:
 	_travel_dir = h.normalized() if dist > 0.01 else Vector3.ZERO
 	var p := pick_jump_speed(_delta_h, dist, _human_p50(_from_face, _to_face))
 	_jump_v = float(p["v"])
+	# 物理包络钳制（2026-08-15 审查 B-3）：速度门 hspeed ≥ 0.9v 的物理可达上限
+	# = speed×mod/0.9——语料 3 条 Δh=0 边 p50 超 6.068 会系统性 miss；钳入
+	# 包络后落点短缩约 5%，优于永远 miss
+	_jump_v = minf(_jump_v, _player.speed * _player.speed_modifier * 0.95)
 	_jump_params = {"v": snappedf(_jump_v, 0.001), "source": p["source"], "clamped": p["clamped"]}
 	_jump_retry = 0
 	_runup_recover = 0
@@ -914,7 +913,7 @@ func _runup_tick(delta: float) -> void:
 			if _steer_toward(_from_point, delta) else Vector2.ZERO
 	var to_h := Vector3(_from_point.x - _player.global_position.x, 0.0,
 			_from_point.z - _player.global_position.z)
-	var along: float = to_h.dot(_travel_dir)  # 仅用于下方超跑恢复判定
+	var along: float = to_h.dot(_travel_dir)  # 停摆触发判定用
 	var height_ok: bool = _waypoint_surface_y(_from_point) - _feet_y() <= 0.3
 	var hspeed := Vector2(_player.velocity.x, _player.velocity.z).length()
 	# 前向墙体探测预跳：起跳点贴近障碍时（如 Crate_WN 起跳点距箱面仅 0.25m <
@@ -932,7 +931,7 @@ func _runup_tick(delta: float) -> void:
 	# ≤0.3m 的线窗口位于最小转弯圆之内不可达（TURN_RATE 4 rad/s 时 R_min =
 	# v/ω ≈ 0.52m > 窗口半径）→ 改为到起跳点水平距 ≤ 0.6m 的圆盘（0.6 > R_min
 	# 保证收敛可达；落点接收区 1-2m 宽，横向精度无必要）。保留 height_ok、
-	# 速度门与 along < -1.0 超跑恢复（along 仍按投影计算，仅用于恢复判定）。
+	# 速度门；超跑恢复职责由 8s 超时兜底承担。
 	# 近墙抑制：前方 1.0m 内有墙体时不抢跑——贴墙预跳/停摆两条先行触发
 	# 处理（起跳点贴障碍的链接如 Crate_WN：圆盘 0.6 环在墙探 0.6 射程之前
 	# 0.25m 抢先触发，起跳点漂移 → 落点漂移 → 下游相位破坏）
@@ -940,9 +939,6 @@ func _runup_tick(delta: float) -> void:
 		if _jump_v <= 0.4 or hspeed >= _jump_v * 0.9:
 			_trigger_jump()
 			return
-		# 速度不足：继续前跑（补跑窗口），过起跳点 1m 仍不足 → 回锚点重跑
-		if along < -1.0:
-			_recover_runup()
 	elif _stuck_check(delta):
 		_teleport_to(_spawn)
 		_teleported = true
