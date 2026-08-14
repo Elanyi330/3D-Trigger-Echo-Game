@@ -418,15 +418,20 @@ static func jump_links() -> Array:
 	links.append({"name": "PavToCluster_W", "from": Vector3(-18.7, 1.20, -8.6), "to": Vector3(-18.4, 2.20, -4.8)})
 	links.append({"name": "PavToCluster_E", "from": Vector3(18.7, 1.20, 8.6), "to": Vector3(18.4, 2.20, 4.8)})
 	# 2. 簇板(2.2) ↔ rim 围墙(3.0)（人类：WestClusterS_Panel→RimW_B n=2、EastTower→RimE_T n=2；对称 4 处）
+	# 簇板 2026-08-11 迁离坡道带后 WS/ES 端点未随迁（悬空 z=±4.9），2026-08-14 修复：
+	# from 归位簇板实际位置（WestClusterN_Panel z∈[10.8,11.2] / EastClusterS_Panel 镜像）、
+	# to 跟到 rim 近端（RimW_T z 端 / RimE_B 镜像，与 RimToWing 共享端点
+	# (-13.6,3,9.2)/(13.6,3,-9.2) 链条顺接）；仅改 from 不够——原 to z=±4.7 距新 from
+	# 7.24m（v_req 9.87 > 6.35 不可执行，求解器预验证）。修复后链接级 dist 4.23/v_req 5.77（tight）、zone 级 easy。
 	links.append({"name": "ClusterToRim_WN", "from": Vector3(-17.5, 2.20, -4.9), "to": Vector3(-13.6, 3.00, -4.7)})
 	links.append({"name": "ClusterToRim_EN", "from": Vector3(17.5, 2.20, 4.9), "to": Vector3(13.6, 3.00, 4.7)})
-	links.append({"name": "ClusterToRim_WS", "from": Vector3(-17.5, 2.20, 4.9), "to": Vector3(-13.6, 3.00, 4.7)})
-	links.append({"name": "ClusterToRim_ES", "from": Vector3(17.5, 2.20, -4.9), "to": Vector3(13.6, 3.00, -4.7)})
-	# 3. 摊阁(1.2) ↔ 横脊墙(3.0)（人类：WestPavilion→WestSpurS n=3；旋转对称 4 处）
+	links.append({"name": "ClusterToRim_WS", "from": Vector3(-17.5, 2.20, 10.85), "to": Vector3(-13.6, 3.00, 9.2)})
+	links.append({"name": "ClusterToRim_ES", "from": Vector3(17.5, 2.20, -10.85), "to": Vector3(13.6, 3.00, -9.2)})
+	# 3. 摊阁(1.2) ↔ 横脊墙(3.0)：4 处收敛为 2 处（W→SpurS 人类实证 n=3 + 180° 旋转对 E→SpurN）；
+	# x 镜像对无对应可跳几何，2026-08-14 用户拍板删除——远侧横脊墙（WestSpurN/EastSpurS）顶面
+	# 改由未来 RimToSpur 1m 同高链接覆盖（如需，另行拍板）
 	links.append({"name": "PavToSpur_W", "from": Vector3(-17.9, 1.20, -9.4), "to": Vector3(-16.2, 3.00, -7.4)})
 	links.append({"name": "PavToSpur_E", "from": Vector3(17.9, 1.20, 9.4), "to": Vector3(16.2, 3.00, 7.4)})
-	links.append({"name": "PavToSpur_WS", "from": Vector3(-16.2, 1.20, -9.4), "to": Vector3(-15.8, 3.00, 7.4)})
-	links.append({"name": "PavToSpur_ES", "from": Vector3(16.2, 1.20, 9.4), "to": Vector3(15.8, 3.00, -7.4)})
 	# 4. rim 围墙侧豁口(2.5m) 同高跳（人类：RimS1→RimS2 n=3、RimN1→RimN2 n=2；4 侧豁口）
 	links.append({"name": "RimGap_NW", "from": Vector3(-9.7, 3.00, 9.5), "to": Vector3(-5.5, 3.00, 9.5)})
 	links.append({"name": "RimGap_NE", "from": Vector3(5.5, 3.00, 9.5), "to": Vector3(9.7, 3.00, 9.5)})

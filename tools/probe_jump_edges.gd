@@ -12,8 +12,9 @@ const CORE := preload("res://Levels/M2_TDM/jump_record_core.gd")
 const MC := preload("res://Player/MovementController.gd")
 
 const DS_PATH := "res://Levels/M2_TDM/jump_edges_dataset.json"
-# 门禁 B 白名单：from_face=="" 的疑似数据错误链接（多一个少一个都 FAIL）
-const WHITELIST := ["ClusterToRim_ES", "ClusterToRim_WS", "PavToSpur_ES", "PavToSpur_WS"]
+# 门禁 B 白名单：已收敛为空（2026-08-14 删 2 改 2 后 54 条链接全数有归属）——
+# from_face=="" 的链接数必须 == 0，若再现即新数据错误
+const WHITELIST := []
 # 门禁 C 的 v_req 相对容差（数据集 dist_zone 存 3 位小数舍入值，允许 ±1% 波动）
 const VREQ_TOL := 0.01
 # 汇总校准对照的理论常量（JumpSolver 离散闭合式）
@@ -76,8 +77,8 @@ func _load_dataset() -> bool:
 
 
 ## 门禁 B：link_face_edges() 与 face_edge_groups() 的链接覆盖一致性。
-## 有效链接（from/to 均非空）== 52，且名集合 == 边组 link_names 合并集合（无遗漏无重复）；
-## from_face=="" 链接名集合 == 白名单 4 条。
+## 有效链接（from/to 均非空）== 54，且名集合 == 边组 link_names 合并集合（无遗漏无重复）；
+## from_face=="" 链接数 == 0（白名单已收敛为空——2026-08-14 删 2 改 2，若再现即新数据错误）。
 func _gate_b() -> bool:
 	var links := EDGES.link_face_edges()
 	var groups := EDGES.face_edge_groups()
@@ -90,10 +91,10 @@ func _gate_b() -> bool:
 		elif l["from_face"] == "":
 			empty_from.append(l["link"])
 	var problems: Array = []
-	if valid.size() != 52:
-		problems.append("有效链接数 %d ≠ 52（总链接 %d）" % [valid.size(), links.size()])
-	if groups.size() != 52:
-		problems.append("边组数 %d ≠ 52" % groups.size())
+	if valid.size() != 54:
+		problems.append("有效链接数 %d ≠ 54（总链接 %d）" % [valid.size(), links.size()])
+	if groups.size() != 54:
+		problems.append("边组数 %d ≠ 54" % groups.size())
 	# 名集合 == 边组 link_names 合并（无遗漏无重复）
 	var group_set := {}
 	var dupes: Array = []
@@ -118,7 +119,7 @@ func _gate_b() -> bool:
 	if dupes.size() > 0 or missing.size() > 0 or extra.size() > 0:
 		problems.append("链接名集合与边组 link_names 不一致（重复 %s / 遗漏 %s / 多出 %s）" % [
 			str(dupes), str(missing), str(extra)])
-	# 白名单 4 条（多一个少一个都 FAIL）
+	# from_face=="" 链接数 == 白名单数（== 0；白名单已收敛，若再现即新数据错误）
 	var wl := {}
 	for w in WHITELIST:
 		wl[w] = true
@@ -132,16 +133,16 @@ func _gate_b() -> bool:
 	for w in wl:
 		if not ef_set.has(w):
 			wl_diff.append(w)
-	if empty_from.size() != 4 or wl_diff.size() > 0:
-		problems.append("from_face==\"\" 白名单不符（实际 %d 条: %s；差异: %s）" % [
-			empty_from.size(), str(empty_from), str(wl_diff)])
+	if empty_from.size() != WHITELIST.size() or wl_diff.size() > 0:
+		problems.append("from_face==\"\" 链接数不符（实际 %d 条: %s；白名单已收敛为空，若再现即新数据错误）" % [
+			empty_from.size(), str(empty_from)])
 	if problems.size() > 0:
 		print("[FAIL] 门禁B 链接覆盖校验失败:")
 		for p in problems:
 			print("  - %s" % p)
 		quit(1)
 		return false
-	print("[通过] 门禁B 链接覆盖（有效链接 52 / 白名单 4 / 边组 52，无遗漏无重复）")
+	print("[通过] 门禁B 链接覆盖（有效链接 54 / 白名单 0 / 边组 54，无遗漏无重复）")
 	return true
 
 
@@ -277,7 +278,7 @@ func _link_row(l: Dictionary, flag: String) -> String:
 func _link_suggestion(l: Dictionary) -> String:
 	var nm: String = l["link"]
 	if l["verdict"] == "suspicious_link":
-		return "疑似数据错误待修复——修复前 M4 不得消费"
+		return "疑似数据错误待修复（白名单已收敛，若再现即新数据错误）——修复前 M4 不得消费"
 	if nm.begins_with("WingToLintel"):
 		return "端点 6.5m 不可执行，M4 应改走翼墙内端起跳区"
 	if nm.begins_with("TowerToRim"):
@@ -287,7 +288,8 @@ func _link_suggestion(l: Dictionary) -> String:
 	return ""
 
 
-## link_audit 表：56 条链接逐行；infeasible 与 suspicious_link 行首标 !! 并附一行建议
+## link_audit 表：每条链接逐行；infeasible 与 suspicious_link 行首标 !! 并附一行建议
+## （suspicious_link 分支保留但当前恒不触发——白名单已收敛，若再现即新数据错误）
 func _print_link_audit() -> void:
 	print("")
 	print("—— link_audit 表（%d 条链接；!! = infeasible / 疑似数据错误）——" % _link_audit.size())

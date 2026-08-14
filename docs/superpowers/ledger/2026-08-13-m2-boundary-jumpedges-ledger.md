@@ -45,6 +45,16 @@
 
 ## 遗留（待用户拍板）
 
-1. **4 条疑似错误链接修复方案**（建议下轮 F 任务）：PavToSpur_WS/ES 删除或改为真旋转对；ClusterToRim_WS/ES from 端点改至簇板实际位置（如 (±17.5, 2.2, ±10.8)）；修复后 T2 白名单收敛、probe_jump_edges 重跑。
+1. ~~4 条疑似错误链接修复~~ → **已由 F1 修复轮解决（2026-08-14 用户拍板，删 2 改 2，见下）**。
 2. **链接端点可执行性**：WingToLintel/TowerToRim/RimToWing 端点级 infeasible 但 zone/人类级可行——M4 消费面级 zone 而非链接端点（数据集双区已备）；是否调整链接端点坐标待用户定。
 3. ②(4) M3/M4 接口设计（寻路经过边→from_zone 边缘→求解器参数+语料采样执行跳跃）——下一轮。
+4. WestSpurN/EastSpurS 顶面无导航链（原假链删除后）——如需 AI 上远侧横脊墙，补 RimToSpur 1m 同高链接（另行拍板）。
+
+## F1 修复轮（2026-08-14 用户拍板：4 条数据错误链接修复）
+
+- **用户拍板**：PavToSpur_WS/ES 删除；ClusterToRim_WS/ES 改端点。
+- **端点方案**（求解器预验证，仅改 from 不够——7.24m v_req 9.87 不可执行）：WS from (-17.5,2.2,10.85)→to (-13.6,3.0,9.2)（与 RimToWing_NW from 共享端点顺接）；ES 为 180° 旋转。链接级 dist 4.235/v_req 5.77（tight）、zone 级 3.10/v_req 4.23（easy）。
+- **收敛动作**：T2 测试白名单机制整体删除（54 条全归属断言 + 新锚点 ClusterToRim_WS→WestClusterN_Panel/RimW_T）；probe 门禁 B 改 54/0（WHITELIST 空，空归属再现即新数据错误）；数据集重建（edges 52→54 新增 (WestClusterN_Panel,RimW_T)/(EastClusterS_Panel,RimE_B) 两组、audit 56→54、suspicious 4→0）；jump_edges.gd/build_jump_dataset.py 注释同步（审查 Minor 收尾）。
+- **不变量实证**：布局哈希 f935ccd7… 不变（jump_links 不属于 all_solids）→ manifest 实测 episode_count 577 保留（**跳跃记录不重置**）；navmesh.res 不需重烘焙。
+- **实现者 sonnet DONE → 审查 opus APPROVE_WITH_NOTES（2 Minor 注释遗留，控制器同步）**。验证全绿：GUT 364/364、probe_jump_edges 退出 0（54/0/54）、probe_navmesh 全过、walk 79/79、数据集重建确定性（审查者独立重建字节级同 diff）。
+- **遗留**：WestSpurN/EastSpurS 顶面无导航链（如需 AI 上远侧横脊墙，补 RimToSpur 1m 同高链接，另行拍板）。

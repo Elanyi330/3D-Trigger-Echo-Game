@@ -320,6 +320,42 @@
    "skill_reasons": []
   },
   {
+   "from_face": "EastClusterS_Panel",
+   "to_face": "RimE_B",
+   "delta_h": 0.8,
+   "dist_zone": 3.102,
+   "link_names": [
+    "ClusterToRim_ES"
+   ],
+   "takeoff_zone": {
+    "center": {
+     "x": 17.5,
+     "z": -11.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.4
+    }
+   },
+   "landing_zone": {
+    "center": {
+     "x": 13.8,
+     "z": -9.2
+    },
+    "size": {
+     "x": 0.6,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 4.229,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
    "from_face": "EastPavilion",
    "to_face": "EastClusterN_Panel",
    "delta_h": 1.0,
@@ -1954,6 +1990,42 @@
    "skill_reasons": []
   },
   {
+   "from_face": "WestClusterN_Panel",
+   "to_face": "RimW_T",
+   "delta_h": 0.8,
+   "dist_zone": 3.102,
+   "link_names": [
+    "ClusterToRim_WS"
+   ],
+   "takeoff_zone": {
+    "center": {
+     "x": -17.5,
+     "z": 11.0
+    },
+    "size": {
+     "x": 1.0,
+     "z": 0.4
+    }
+   },
+   "landing_zone": {
+    "center": {
+     "x": -13.8,
+     "z": 9.2
+    },
+    "size": {
+     "x": 0.6,
+     "z": 1.0
+    }
+   },
+   "human": null,
+   "physics": {
+    "v_req": 4.229,
+    "verdict": "easy"
+   },
+   "skill": false,
+   "skill_reasons": []
+  },
+  {
    "from_face": "WestClusterS_Box",
    "to_face": "WestClusterS_Panel",
    "delta_h": 1.3,
@@ -2747,19 +2819,19 @@
   },
   {
    "link": "ClusterToRim_WS",
-   "from_face": "",
+   "from_face": "WestClusterN_Panel",
    "to_face": "RimW_T",
-   "delta_h": 0.0,
-   "dist_link": 3.905,
-   "verdict": "suspicious_link"
+   "delta_h": 0.8,
+   "dist_link": 4.235,
+   "verdict": "tight"
   },
   {
    "link": "ClusterToRim_ES",
-   "from_face": "",
+   "from_face": "EastClusterS_Panel",
    "to_face": "RimE_B",
-   "delta_h": 0.0,
-   "dist_link": 3.905,
-   "verdict": "suspicious_link"
+   "delta_h": 0.8,
+   "dist_link": 4.235,
+   "verdict": "tight"
   },
   {
    "link": "PavToSpur_W",
@@ -2776,22 +2848,6 @@
    "delta_h": 1.8,
    "dist_link": 2.625,
    "verdict": "easy"
-  },
-  {
-   "link": "PavToSpur_WS",
-   "from_face": "",
-   "to_face": "WestSpurN",
-   "delta_h": 0.0,
-   "dist_link": 16.805,
-   "verdict": "suspicious_link"
-  },
-  {
-   "link": "PavToSpur_ES",
-   "from_face": "",
-   "to_face": "EastSpurS",
-   "delta_h": 0.0,
-   "dist_link": 16.805,
-   "verdict": "suspicious_link"
   },
   {
    "link": "RimGap_NW",

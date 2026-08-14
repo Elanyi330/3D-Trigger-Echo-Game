@@ -267,7 +267,8 @@ def main():
             "skill_reasons": reasons,
         })
 
-    # ── link_audit：56 条链接逐条，端点级 feasibility（白名单 from_face=="" → suspicious）──
+    # ── link_audit：54 条链接逐条，端点级 feasibility（2026-08-14 白名单收敛后 from_face 恒非空；
+    #   suspicious_link 分支保留为"新数据错误即现形"的防御路径）──
     link_audit = []
     for l in geo["links"]:
         item = {

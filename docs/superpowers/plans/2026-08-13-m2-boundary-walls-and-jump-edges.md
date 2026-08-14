@@ -245,3 +245,16 @@ static func landable_zone(takeoff_rect: Rect2, delta_h: float,
 | 窄缝 | `python3 tools/scan_gaps_v3.py` | 0 处 |
 | 跳跃边报告 | `godot --headless --path . -s tools/probe_jump_edges.gd` | 退出 0、覆盖 54/54 |
 | 布局不变量 | T1 测试 5/6 | 193 实体、哈希不变（跳跃记录不重置） |
+
+## 附：F 修复轮——4 条链接数据错误修复（2026-08-14 用户拍板）
+
+**用户拍板**：PavToSpur_WS/ES **删除**；ClusterToRim_WS/ES 改端点。
+
+**端点方案（求解器预验证）**：
+- 仅改 from 不够（用户口径 from=±10.8 + 原 to=±4.7 → 7.24m、v_req 9.87 INFEASIBLE）——**to 必须跟到 rim 近端**。
+- 定稿：WS from (-17.5, 2.20, 10.85) → to (-13.6, 3.00, 9.2)（与 RimToWing_NW from 共享端点，链条顺接）；ES 为 180° 旋转 (17.5, 2.20, -10.85) → (13.6, 3.00, -9.2)。
+- 预验证：链接级 dist 4.23、v_req 5.77、margin 0.091（tight ✓）；zone 级 3.10、v_req 4.23（easy ✓）。
+- 删除影响：WestSpurN/EastSpurS 顶面失去导航链（原链物理不可执行=假链，M4 无实损）；未来若要 AI 上远侧横脊墙，可补 RimW_T↔WestSpurN 1m 同高链接（另行拍板）。
+
+**收敛动作**：T2 测试白名单 → 空（全部 54 链接必有面归属）；probe_jump_edges 门禁 B → 0 条空面；数据集重建（export→build，52→54 边组、link_audit 56→54、0 suspicious）；jump_edges.gd 注释同步。
+**不变量**：jump_links 不属于 all_solids → 布局哈希不变 → **跳跃记录不重置**（577 条保留）；navmesh.res 不需重烘焙（几何未变）。

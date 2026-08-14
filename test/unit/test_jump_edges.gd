@@ -1,6 +1,6 @@
 # test/unit/test_jump_edges.gd
 # T2：jump_edges 面级数据结构测试（GUT，先 RED 后 GREEN）。
-# 将 LAYOUT.jump_links() 的 56 处点链接升级为面级边：面表 / 链接归属 / 面到面边组。
+# 将 LAYOUT.jump_links() 的 54 处点链接升级为面级边：面表 / 链接归属 / 面到面边组。
 # 只测数据结构本身，不做物理（T3 职责）。规格见任务 brief。
 
 extends GutTest
@@ -8,18 +8,11 @@ extends GutTest
 const JE := preload("res://Levels/M2_TDM/jump_edges.gd")
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 
-# 已知疑似数据错误链接白名单（控制器裁决 2026-08-13，共 4 条，各自证据见下）：
-#   PavToSpur_WS / PavToSpur_ES：
-#     from 端点 (±16.2, 1.2, ∓9.4) 在开阔地（摊阁 x∈[±17.25,±19.75] 之外无任何 top≈1.2 面），
-#     to 端点在远侧横脊墙（水平距 16.8m，为物理跳跃上限 ~3.4m 的约 5 倍）——疑似镜像笔误。
-#   ClusterToRim_WS / ClusterToRim_ES：
-#     from 端点 (±17.5, 2.2, ±4.9) 悬空（控制器独立复核：z=±4.9 距任何 top≈2.2 面 5m 以上；
-#     其旋转对应体 EN/WN 的簇板位置与 2026-08-11 簇板迁离坡道带后的实际位置不符）——
-#     疑似簇板迁移后端点未更新。
-# 以上均为疑似数据错误链接，修复待用户拍板；修复后此白名单应收敛。
-# 实测 jump_links() 共 56 处；白名单 4 条不进入 face_edge_groups()（无归属面），
-# 有效链接 = 56 − 4 = 52。
-const KNOWN_BAD := ["PavToSpur_WS", "PavToSpur_ES", "ClusterToRim_WS", "ClusterToRim_ES"]
+# 已修复记录（2026-08-14 用户拍板：删 2 改 2，白名单收敛为空；修复详情见 layout 注释与账本）：
+#   此前 4 条疑似数据错误链接已全部修复——PavToSpur_WS/ES 删除（x 镜像对无对应可跳几何，
+#   远侧横脊墙 WestSpurN/EastSpurS 顶面留待未来 RimToSpur 链接覆盖），ClusterToRim_WS/ES
+#   端点改至簇板实际位置（from z=±10.85）+ rim 近端（to z=±9.2，与 RimToWing 链条顺接）。
+#   白名单机制随 KNOWN_BAD 退役：54 条链接全部应有 from_face/to_face 归属。
 
 
 # ---- 1. 面表：首项 Ground（top 0 / 60×58）+ name 全图唯一 + 面数钉常量
@@ -42,16 +35,16 @@ func test_faces_include_ground_and_unique() -> void:
 	assert_true(dups.is_empty(), "face name 重复: %s" % ", ".join(dups))
 
 
-# ---- 2. 链接归属：除白名单（4 条已知坏，见文件头注释）外 from_face/to_face 均非空 ----
-func test_links_assign_to_faces_except_known_bad() -> void:
+# ---- 2. 链接归属：全部 54 条链接（56−2 删除）from_face/to_face 均非空，
+#         发现任何未指派即失败并打印链接名（白名单已收敛为空——2026-08-14）。----
+func test_links_assign_to_faces() -> void:
 	var links := LAYOUT.jump_links()
 	var edges := JE.link_face_edges()
 	assert_eq(edges.size(), links.size(), "link_face_edges() 与 jump_links() 条目数一致")
+	assert_eq(edges.size(), 54, "jump_links() 共 54 条（2026-08-14 删 2 改 2 后）")
 	for e0 in edges:
 		var e: Dictionary = e0
 		var nm: String = e["link"]
-		if KNOWN_BAD.has(nm):
-			continue
 		assert_true(e["from_face"] != "" and e["to_face"] != "",
 			"%s 端点未指派到任何面（from_face=%s to_face=%s）" % [nm, e["from_face"], e["to_face"]])
 
@@ -61,7 +54,8 @@ func test_links_assign_to_faces_except_known_bad() -> void:
 #         偏差 >1e-3 以代码输出为准并保留本注释说明；面名/Δh 必须如下）。
 #         实测 dist：PavToCluster_W=3.81182408332825、WingToLintel_NW=6.5、
 #         TowerBox_W=0.0、RimGap_NW=4.19999980926514、Crate_WN=0.0、
-#         PavToSpur_W=2.62487983703613。----
+#         PavToSpur_W=2.62487983703613、ClusterToRim_WS=4.234678264047932
+#         （2026-08-14 修复后端点，sqrt((3.9)²+(1.65)²) 计算值）。----
 func test_link_anchors() -> void:
 	var edges := JE.link_face_edges()
 	var by_name := {}
@@ -75,6 +69,7 @@ func test_link_anchors() -> void:
 		["RimGap_NW", "RimN1", "RimN2", 0.0, 4.19999980926514],
 		["Crate_WN", "Ground", "WestClusterN_Box", 0.9, 0.0],
 		["PavToSpur_W", "WestPavilion", "WestSpurS", 1.8, 2.62487983703613],
+		["ClusterToRim_WS", "WestClusterN_Panel", "RimW_T", 0.8, 4.234678264047932],
 	]
 	for a0 in anchors:
 		var a: Array = a0
@@ -85,9 +80,8 @@ func test_link_anchors() -> void:
 		assert_almost_eq(float(e["dist"]), float(a[4]), 1e-3, "%s dist" % a[0])
 
 
-# ---- 4. 组覆盖：各组 link_names 展开合并后 == jump_links() 全部 name − 白名单（52 条），
-#         无遗漏无重复。断言语义经控制器确认（2026-08-13）：jump_links() 名集合（56）−
-#         白名单（4，无归属面不进入 face_edge_groups()）= 组 link_names 集合（52）。----
+# ---- 4. 组覆盖：各组 link_names 展开合并后 == jump_links() 全部 name（54 条），
+#         无遗漏无重复（白名单已收敛为空——2026-08-14 删 2 改 2，公式自动成立）。----
 func test_groups_cover_all_links() -> void:
 	var groups := JE.face_edge_groups()
 	var union := {}
@@ -100,8 +94,7 @@ func test_groups_cover_all_links() -> void:
 	var expected := {}
 	for l0 in LAYOUT.jump_links():
 		var l: Dictionary = l0
-		if not KNOWN_BAD.has(l["name"]):
-			expected[l["name"]] = true
+		expected[l["name"]] = true
 	var missing := []
 	for nm in expected:
 		if not union.has(nm):
