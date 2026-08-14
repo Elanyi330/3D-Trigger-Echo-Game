@@ -622,10 +622,10 @@ func _steer_toward(target: Vector3, delta: float) -> bool:
 ## 途经点到达判定：水平距 ≤ WALK_ARRIVE_RADIUS 且目标面不高于脚底 0.3 以上
 ## （防高台途经点被水平距离提前跳过——0.8 半径会吞掉台面高度差，导致直线转向
 ## 切角撞墙卡死；历史坑：EastPavilion 步道途经点）
-func _arrived(target: Vector3) -> bool:
+func _arrived(target: Vector3, radius: float = WALK_ARRIVE_RADIUS) -> bool:
 	var d := target - _player.global_position
 	d.y = 0.0
-	if d.length() > WALK_ARRIVE_RADIUS:
+	if d.length() > radius:
 		return false
 	return _waypoint_surface_y(target) - _feet_y() <= 0.3
 
@@ -657,74 +657,9 @@ func _stuck_check(delta: float) -> bool:
 	return _stuck_t >= STUCK_TIME
 
 
-## 攀爬辅助激活：距途经点较近且当前或下一途经点需登台。不要求贴墙——斜滑
-## 在无接触段就把玩家带进台阶角缺口（实测西塔坡道：滑到 0.75m 级面贴死，
-## 该级 > step-up 0.62 不可登且胶囊嵌入台阶角缺口冻结）；攀爬临近即接管，
-## 按台面探测引导到可登级贴面（斜滑贴面常发生在攀爬段的前一段——需看下一途经点）
-func _climb_assist_active(waypoint: Vector3) -> bool:
-	if not _needs_climb(waypoint) \
-			and not (_seg_idx + 1 < _segments.size()
-					and _needs_climb(_segments[_seg_idx + 1]["end"])):
-		return false
-	var d := waypoint - _player.global_position
-	d.y = 0.0
-	return d.length() < 3.0
-
-
 ## 途经点是否需要登台（目标面高于脚底 0.3 以上）
 func _needs_climb(target: Vector3) -> bool:
 	return _waypoint_surface_y(target) - _feet_y() > 0.3
-
-
-## 攀爬辅助（2026-08-14 修复轮）：斜向贴墙滑行会让 step-up 前向探针沿切线方向
-## 永远错过台面（探针朝速度方向、台阶在墙后——实测西塔坡道东侧斜滑一路滑过
-## 可登台阶、贴死在 0.75m 级面（step-up 上限 0.62 拒绝，且胶囊嵌入台阶角缺口
-## 冻结）。分两档：
-##   - 贴面处台面高 ≤ STEP_MAX（可登）：按墙面法线正对按压，step-up 面朝台阶触发；
-##   - 台面高 > STEP_MAX（不可登）：沿墙朝上一途经点方向横移，找低端可登级。
-func _climb_press(waypoint: Vector3, delta: float) -> void:
-	# 按压方向 = 朝途经点水平方向（途经点必在墙后——斜滑贴面时墙面法线朝向
-	# 不定，直接朝途经点按压即可面朝台阶）
-	var press_dir := waypoint - _player.global_position
-	press_dir.y = 0.0
-	if press_dir.length() <= 0.001:
-		_cmd.move_axis = Vector2.ZERO
-		return
-	press_dir = press_dir.normalized()
-	var target := waypoint
-	var feet := _feet_y()
-	var top := _face_top_at(waypoint, press_dir)
-	if not (top < INF and top - feet <= _player.STEP_MAX):
-		# 途经点贴面不可登（该级 > STEP_MAX）：沿墙面切线两侧偏移探测可登级
-		# （台阶坡道的可登级在低端一侧——西塔坡道斜滑贴死教训）
-		var tangent := Vector3(-press_dir.z, 0.0, press_dir.x)
-		for off in [-0.7, 0.7]:
-			var cand: Vector3 = waypoint + tangent * float(off)
-			var t2 := _face_top_at(cand, press_dir)
-			if t2 < INF and t2 - feet <= _player.STEP_MAX:
-				target = cand
-				break
-	_cmd.move_axis = Vector2(0, 1) if _steer_toward(target, delta) else Vector2.ZERO
-
-
-## 指定 xz 点的贴面台面高度探测（模拟 step-up 相位2 探针）：从该点沿按压方向
-## 偏移 0.6m、抬升 STEP_MAX，向下射线取落地高度（法线合格）；无合格命中 → INF。
-## 射线必须下探到脚底以下（STEP_MAX + FEET_OFFSET + 0.3）——过短会漏掉地面
-## 与低台面（历史坑：1.22m 射线从 1.54 出发够不到 0 地面，全 INF）
-func _face_top_at(point: Vector3, press_dir: Vector3) -> float:
-	var space := _player.get_world_3d().direct_space_state
-	var origin := Vector3(point.x, _feet_y(), point.z) + press_dir * 0.6 \
-			+ Vector3.UP * _player.STEP_MAX
-	var q := PhysicsRayQueryParameters3D.create(
-			origin, origin + Vector3.DOWN * (_player.STEP_MAX + FEET_OFFSET + 0.3),
-			1, [_player.get_rid()])
-	var hit := space.intersect_ray(q)
-	# 射线起点（脚底 + STEP_MAX ≈ 0.63）可能落在高台级（>0.62）内部——此时命中
-	# 的是台级底面（y≈脚底），非顶面（历史坑：0.75m 级面被误判为 0.0 可登，
-	# 贴死楔角）；底面命中与地面命中（y≤脚底+0.02）一律视为不可登
-	if hit.is_empty() or float(hit["normal"].y) < _floor_normal_y 			or float(hit["position"].y) <= _feet_y() + 0.02:
-		return INF
-	return float(hit["position"].y)
 
 
 # ---- WALK ----
@@ -748,11 +683,8 @@ func _walk_tick(delta: float) -> void:
 	# 行走段（含下坠段：反向穿越上跳链接 = 自由落体下边缘——navmesh 下行本
 	# 无需跳跃，起跳执行只会反跳回低处徒增卡死面）
 	var waypoint: Vector3 = seg["end"]
-	if _climb_assist_active(waypoint):
-		_climb_press(waypoint, delta)
-	else:
-		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
-				if _steer_toward(waypoint, delta) else Vector2.ZERO
+	_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
+			if _steer_toward(waypoint, delta) else Vector2.ZERO
 	if _arrived(waypoint):
 		_seg_idx += 1
 		_reset_stuck()
@@ -1000,8 +932,11 @@ func _runup_tick(delta: float) -> void:
 	# ≤0.3m 的线窗口位于最小转弯圆之内不可达（TURN_RATE 4 rad/s 时 R_min =
 	# v/ω ≈ 0.52m > 窗口半径）→ 改为到起跳点水平距 ≤ 0.6m 的圆盘（0.6 > R_min
 	# 保证收敛可达；落点接收区 1-2m 宽，横向精度无必要）。保留 height_ok、
-	# 速度门与 along < -1.0 超跑恢复（along 仍按投影计算，仅用于恢复判定）
-	if to_h.length() <= 0.6 and height_ok:
+	# 速度门与 along < -1.0 超跑恢复（along 仍按投影计算，仅用于恢复判定）。
+	# 近墙抑制：前方 1.0m 内有墙体时不抢跑——贴墙预跳/停摆两条先行触发
+	# 处理（起跳点贴障碍的链接如 Crate_WN：圆盘 0.6 环在墙探 0.6 射程之前
+	# 0.25m 抢先触发，起跳点漂移 → 落点漂移 → 下游相位破坏）
+	if to_h.length() <= 0.6 and height_ok and not _wall_ahead(1.0):
 		if _jump_v <= 0.4 or hspeed >= _jump_v * 0.9:
 			_trigger_jump()
 			return
@@ -1014,14 +949,14 @@ func _runup_tick(delta: float) -> void:
 		_end_attempt("stuck", "助跑卡死")
 
 
-## 前方墙体探测：从脚上 0.7m 沿 travel_dir 射 0.6m（脚上高度避开地面/台阶
-## 棱线——0.25m 坡道级不触发，0.9m 箱/1.2m+ 墙触发；排除自身胶囊）
-func _wall_ahead() -> bool:
+## 前方墙体探测：从脚上 0.7m 沿 travel_dir 射 dist（默认 0.6m；脚上高度避开
+## 地面/台阶棱线——0.25m 坡道级不触发，0.9m 箱/1.2m+ 墙触发；排除自身胶囊）
+func _wall_ahead(dist: float = WALL_PROBE_DIST) -> bool:
 	var space := _player.get_world_3d().direct_space_state
 	var origin := _player.global_position
 	origin.y = _feet_y() + 0.7
 	var q := PhysicsRayQueryParameters3D.create(
-			origin, origin + _travel_dir * WALL_PROBE_DIST, 1, [_player.get_rid()])
+			origin, origin + _travel_dir * dist, 1, [_player.get_rid()])
 	return not space.intersect_ray(q).is_empty()
 
 
