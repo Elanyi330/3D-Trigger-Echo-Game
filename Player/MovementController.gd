@@ -41,6 +41,9 @@ var direction := Vector3()
 var input_axis := Vector2()
 # 下蹲状态（M1 任务3）：由 Crouch.gd 进入/退出下蹲时联动设置；下蹲时加速目标用 crouch_speed 固定
 var is_crouching: bool = false
+# 命令接管（2026-08-14）：非空时移动/跳跃输入来源切换为命令接口（AI/自动遍历接入点）。
+# 物理公式/参数零改动——输入来源不是移动语义，MOVEMENT_REV 不 bump（测试钉死）。
+var command_override: MovementCommand = null
 # 移动状态（M1 任务8 精度模型）：水平速度 > 0.1 m/s 时 true（_physics_process 更新）——
 # WeaponCore 散布惩罚查询（move_spread_multiplier）；不依赖输入轴（斜坡滑行等实际位移也算移动）
 var is_moving: bool = false
@@ -51,8 +54,12 @@ var is_moving: bool = false
 
 # Called every physics tick. 'delta' is constant
 func _physics_process(delta: float) -> void:
-	input_axis = Input.get_vector(&"move_back", &"move_forward",
-			&"move_left", &"move_right")
+	# 命令接管（2026-08-14）：MovementCommand.move_axis 语义 x=左右/y=前后 →
+	# 转置映射到控制器内部轴（x=前后/y=左右，即 Input.get_vector 返回值结构）。
+	# 无命令时行为与原先完全一致（Input 路径）。
+	input_axis = Vector2(command_override.move_axis.y, command_override.move_axis.x) \
+			if command_override != null \
+			else Input.get_vector(&"move_back", &"move_forward", &"move_left", &"move_right")
 
 	direction_input()
 
@@ -60,7 +67,15 @@ func _physics_process(delta: float) -> void:
 	var was_on_floor := is_on_floor()
 
 	if is_on_floor():
-		if Input.is_action_just_pressed(&"jump"):
+		# 命令接管（2026-08-14）：jump_pressed 为单帧边沿，读取即清零（消费语义）；
+		# 无命令时行为与原先完全一致（Input 边沿）。
+		var jump_pressed := false
+		if command_override != null:
+			jump_pressed = command_override.jump_pressed
+			command_override.jump_pressed = false
+		else:
+			jump_pressed = Input.is_action_just_pressed(&"jump")
+		if jump_pressed:
 			velocity.y = jump_height
 			# 空中控制定档（起跳瞬间一次写入，F2）：起跳时水平速度 < 阈值 = 原地跳
 			# → REST 档（可空中转向）；否则跑跳 → RUN 档（proj≫cap 天然零加速）

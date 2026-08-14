@@ -138,18 +138,18 @@ func set_progress(visited: int, total: int) -> void
 
 **验证**：`-gselect=test_auto_traversal_record` 全绿 + 全量不回归。
 
-### T5 L_M2 装配 + HUD + 操控（标准）
+### T5 L_M2 装配 + HUD + 输入锁定（标准）
 
 **文件**：改 `Levels/M2_TDM/L_M2.gd`。
 
-**规格**：
-- `_ready`：先建 `AutoTraversal` 节点 add_child（**在 Player 之前**——命令先行，读玩家上一帧状态），再建玩家，后 `autopilot.setup(_player, nav_region, _auto_record, _hud_cb)`；记录器 `_auto_record` 用当前布局哈希 setup。
-- 按键（`_input`，仿 K/R 模式）：`KEY_P` → 切换自动遍历（激活时挂起 JumpRecorder + 显示面板）；**Esc**：自动激活时 → 暂停自动 + 显示暂停面板（继续/停止自动操作/退出游戏三按钮——`_input` 内 ui_cancel 分支改为面板开关，原退出逻辑搬入面板按钮）；自动未激活时 Esc 行为不变（直接退出）。
-- 手动停止：自动激活期间任一 WASD/空格真实输入（`_unhandled_input`/`_input` 检测 move/jump 动作）→ 停止自动操作（面板显示"已停止"）。
-- HUD 面板（`_hud_label` 工厂 + Panel，右上角）：`自动遍历中/已暂停`｜目标面名｜动作｜`已处理 X/160 · 成功 S · 失败 F`｜`P 暂停 · Esc 菜单`；信号驱动刷新（attempt_finished/progress_changed）。
-- 暂停面板：三个 TextButton/按钮（复用结算面板 StyleBox 风格），回调=继续/停止+隐藏/quit。
+**规格**（2026-08-14 用户拍板修正：全锁 + Esc 直接退出，无暂停面板）：
+- `_ready`：先建 `AutoTraversal` 节点 add_child（**在 Player 之前**——命令先行，读玩家上一帧状态），再建玩家，后 `autopilot.setup(_player, nav_region, _auto_record, _hud_cb)`；记录器 `_auto_record` 用当前布局哈希 setup（哈希一致自动恢复 summary → 跨会话续跑）。
+- **P 键启动**（`_input`，仅 autopilot idle 时响应 KEY_P）：启动 = 挂起 JumpRecorder（recording_enabled=false）+ 挂起轮询输入节点（`_manager.process_mode=DISABLED`、玩家下 Crouch 节点 process_mode=DISABLED）+ 显示 HUD 面板。运行中 P 无效。
+- **输入锁定**（`_input`，autopilot active 时）：`ui_cancel` → `get_tree().quit()`（**Esc 直接退出程序=训练结束**）；其余一切事件 → `get_viewport().set_input_as_handled()`（拦截 L_M2 自身 K/R/切枪路线 + Head 事件式鼠标视角）。
+- done（160 面全处理）→ 解锁：恢复 JumpRecorder/WeaponManager/Crouch 状态 + HUD 显示完成。
+- HUD 面板（`_hud_label` 工厂 + Panel，右上角）：`自动遍历中`｜目标面名｜动作｜`已处理 X/160 · 成功 S · 失败 F`｜`Esc 退出程序`；信号驱动刷新（attempt_finished/progress_changed）。
 
-**验证**：`godot --headless --path . -s addons/gut/gut_cmdln.gd` 全量（含 test_integration 既有 L_M2 场景测试不回归）+ 手动冒烟说明写入报告（headless 无法验证 UI，由控制器实机冒烟或交用户验收）。
+**验证**：`godot --headless --path . -s addons/gut/gut_cmdln.gd` 全量（含 test_integration 既有 L_M2 场景测试不回归）+ 锁定行为实机验证交用户验收（headless 无法测 UI/Input 锁定——报告注明）。
 
 ### T6 后处理分析（标准）
 

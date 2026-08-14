@@ -119,11 +119,18 @@ user://auto_traversal/
 - 一次 attempt = 一次"目标面到达尝试"（含 0..N 次跳跃重试），帧采样从寻路开始到判定结束。
 - 确定性：无随机（贪心+固定参数网格）。
 
-### 5.5 HUD 与操控
+### 5.5 HUD 与操控（2026-08-14 用户拍板修正：全锁 + Esc 直接退出）
 
-- 右上角面板：`自动遍历中/已暂停`｜目标：<面名>｜动作：寻路/行走/跳跃n/重试｜`已处理 X/160（导航面 138 + 先验不可达 22）· 成功 S · 失败 F`｜`P 暂停 · Esc 菜单`。
-- P：切换自动遍历；Esc：暂停面板（**继续 / 停止自动操作 / 退出游戏**——用户"退出界面暂停"需求）；任意真实手动输入（WASD/空格等）→ 立即停止自动操作（自动指令走 command_override 不产生真实 Input，不会自停）。
-- 自动遍历期间 `JumpRecorder.recording_enabled = false`（结束时恢复）。
+- **P：启动自动遍历**（仅 idle 时响应；运行中 P 无效，无切换回退——训练结束方式=退出程序）。
+- **运行期间所有玩家操作按钮锁定**：
+  - 事件式输入（鼠标视角 Head._input / 切枪换弹瞄准 / K/R 键）：L_M2._input 全量 `set_input_as_handled()`（ui_cancel 除外）——根节点先于子节点收到事件，消费即拦截；
+  - **轮询式输入**（WeaponManager 开火轮询 `is_action_pressed("fire")`、Crouch 蹲伏轮询 `is_action_pressed("sprint")`）：事件消费拦不住 Input 轮询 → 运行期间这两个节点 `process_mode = DISABLED` 挂起（done/结束后恢复）。
+  - MovementController 的移动/跳跃已被 command_override 接管，真实输入天然无效。
+- **Esc：直接退出程序**（ui_cancel → get_tree().quit()，训练结束；记录已实时落盘不丢）。
+- **跨会话续跑**：manifest/summary 哈希一致即恢复已访问面集合，下次启动 P 从上次进度继续（"Esc 退出"流程的闭环）。
+- 全部 160 面处理完（done）→ 解锁操作 + HUD 显示完成（Esc 仍退出，P 可重启新一轮）。
+- HUD 右上角面板：`自动遍历中`｜目标：<面名>｜动作：寻路/行走/跳跃n/重试｜`已处理 X/160 · 成功 S · 失败 F`｜`Esc 退出程序`。
+- 自动遍历期间 `JumpRecorder.recording_enabled = false`（独立记录决策 3 落地；done/结束后恢复）。
 
 ### 5.6 后处理分析（tools/analyze_auto_traversal.py）
 
