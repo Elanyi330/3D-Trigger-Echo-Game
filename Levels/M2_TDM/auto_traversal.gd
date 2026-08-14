@@ -98,7 +98,6 @@ var _jump_seg := {}
 # 会话计时（active 期间累计；达上限 → 暂停）
 var _session_timeout := SESSION_TIMEOUT
 var _session_t := 0.0
-var _dbg5 := 0
 
 
 ## 装配。hud: Callable 接收 {"state": str, "target": str, "action": str, "visited": int,
@@ -695,12 +694,6 @@ func _climb_press(waypoint: Vector3, delta: float) -> void:
 	var target := waypoint
 	var feet := _feet_y()
 	var top := _face_top_at(waypoint, press_dir)
-	if _dbg5 < 40:
-		_dbg5 += 1
-		if _dbg5 % 5 == 0:
-			print("DBG5 pos=(%.2f,%.2f) wp=(%.2f,%.2f) top=%.2f feet=%.2f" % [
-				_player.global_position.x, _player.global_position.z,
-				waypoint.x, waypoint.z, top, feet])
 	if not (top < INF and top - feet <= _player.STEP_MAX):
 		# 途经点贴面不可登（该级 > STEP_MAX）：沿墙面切线两侧偏移探测可登级
 		# （台阶坡道的可登级在低端一侧——西塔坡道斜滑贴死教训）
@@ -726,7 +719,10 @@ func _face_top_at(point: Vector3, press_dir: Vector3) -> float:
 			origin, origin + Vector3.DOWN * (_player.STEP_MAX + FEET_OFFSET + 0.3),
 			1, [_player.get_rid()])
 	var hit := space.intersect_ray(q)
-	if hit.is_empty() or float(hit["normal"].y) < _floor_normal_y:
+	# 射线起点（脚底 + STEP_MAX ≈ 0.63）可能落在高台级（>0.62）内部——此时命中
+	# 的是台级底面（y≈脚底），非顶面（历史坑：0.75m 级面被误判为 0.0 可登，
+	# 贴死楔角）；底面命中与地面命中（y≤脚底+0.02）一律视为不可登
+	if hit.is_empty() or float(hit["normal"].y) < _floor_normal_y 			or float(hit["position"].y) <= _feet_y() + 0.02:
 		return INF
 	return float(hit["position"].y)
 
