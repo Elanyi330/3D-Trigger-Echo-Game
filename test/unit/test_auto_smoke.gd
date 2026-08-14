@@ -3,12 +3,14 @@
 # 装配同 probe_navmesh 流程 + test_auto_command 的 Player 实例化：
 #   MapGreybox + NavigationRegion3D(navmesh.res) + 54 NavigationLink3D（snap）+
 #   Player.tscn + AutoTraversal（先于 Player add_child，命令先行树序）。
-# 测试 1 目标限定 ["WestTowerBox", "WestClusterN_Box", "AltarPlatform", "UmbrellaN"]：
+# 测试 1 目标限定 ["WestTowerBox", "WestClusterN_Box", "AltarPlatform", "CorridorSlab",
+#   "UmbrellaN"]：
 #   WestTowerBox=跳跃链接目标（TowerBox_W Δh0.9）；WestClusterN_Box=brief 逃生
 #   条款的等价跳跃目标（Crate_WN Δh0.9）；AltarPlatform=步行目标——面心被基座+
 #   四斜板密封成导航孤岛，验证 2026-08-14 拍板的目标点回退（面中心→四角/边中点）
-#   后经偏点可达（verdict ≠ "no_path"）；UmbrellaN=不可达面——验证 no_path 记录
-#   且 plan 字段为空（审查 Minor 1 修复验证）。
+#   后经偏点可达（verdict ≠ "no_path"）；CorridorSlab=水平跳回归锚（2026-08-14
+#   修复轮：RampTopToCorridor_E 同高 2m 跳——最小转弯圆 bug 的唯一触发形态）；
+#   UmbrellaN=不可达面——验证 no_path 记录且 plan 字段为空（审查 Minor 1 修复验证）。
 # 测试 2：30 分钟会话超时暂停 + restart_session 恢复（注入 0.5s 超时）。
 # 断点：done 或 success≥2 或 90s 超时（超时即失败，防 CI 挂死）。
 # T3 唯一允许的慢测试（物理秒 30-60s）；其余逻辑测试保持毫秒级。
@@ -95,10 +97,13 @@ func test_full_traversal() -> void:
 	# WestTowerBox=跳跃链接目标（TowerBox_W Δh0.9）；WestClusterN_Box=brief 逃生
 	# 条款的等价跳跃目标（Crate_WN Δh0.9）；AltarPlatform=步行目标（面心被基座+
 	# 四斜板密封成导航孤岛——验证 2026-08-14 拍板的目标点回退后经偏点可达）；
+	# CorridorSlab=水平跳回归锚（路径必经 RampTopToCorridor_E 同高 2m 跳——最小
+	# 转弯圆 bug 的唯一触发形态，冒烟此前全是 dist=0 垂直跳所以没抓到）；
 	# UmbrellaN=不可达面（probe_navmesh 不可能清单）——验证 no_path 记录 + 审查
 	# Minor 1 修复：no_path 的 plan 字段为空（不带上一目标旧数据）。
 	autopilot.set_target_faces(
-			["WestTowerBox", "WestClusterN_Box", "AltarPlatform", "UmbrellaN"])
+			["WestTowerBox", "WestClusterN_Box", "AltarPlatform", "CorridorSlab",
+			"UmbrellaN"])
 	autopilot.start()
 
 	# 8. 驱动循环至 done / 90s 超时（三目标全部处理完才 done——success 提前
@@ -126,6 +131,11 @@ func test_full_traversal() -> void:
 	assert_true(pf.has("AltarPlatform"), "AltarPlatform 应有 attempt 记录")
 	assert_ne(pf["AltarPlatform"]["verdict"], "no_path",
 			"AltarPlatform 应经目标点回退（面中心→四角/边中点）可达，非 no_path")
+	# 水平跳回归锚（2026-08-14 修复轮）：RampTopToCorridor_E 同高跳必经此目标——
+	# 最小转弯圆 bug 教训：触发窗口改圆盘 + 助跑 8s 超时兜底后必须可完成
+	assert_true(pf.has("CorridorSlab"), "CorridorSlab 应有 attempt 记录")
+	assert_eq(pf["CorridorSlab"]["verdict"], "success",
+			"水平跳目标 CorridorSlab 应成功（转圈 bug 回归锚）")
 	# 不可达面 + 审查 Minor 1 修复：no_path 的 plan 字段为空（不带上一目标旧数据）
 	assert_true(pf.has("UmbrellaN"), "UmbrellaN 应有 attempt 记录")
 	assert_eq(pf["UmbrellaN"]["verdict"], "no_path", "伞顶不可达 → no_path")
