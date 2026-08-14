@@ -24,6 +24,7 @@ const GREYBOX := preload("res://Levels/M2_TDM/map_greybox.gd")
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 const FRIENDLY_TINT := Color(0.3, 0.65, 0.35)  # 友方绿（与玩家本色一致）
+const JUMP_CORE := preload("res://Levels/M2_TDM/jump_record_core.gd")  # 自动遍历地图哈希（2026-08-14）
 
 @export var range_mode := false  # 2026-08-13 用户需求：取消无限弹药/无限手雷——全部有限（弹药箱补给）
 
@@ -68,6 +69,17 @@ var _result_f_col: Label
 var _result_e_col: Label
 var _result_hint: Label
 
+# ---- 自动遍历（2026-08-14，T5 装配）----
+var _autopilot: AutoTraversal
+var _auto_record: AutoTraversalRecord
+var _auto_panel: Panel
+var _auto_state_label: Label
+var _auto_target_label: Label
+var _auto_action_label: Label
+var _auto_progress_label: Label
+var _auto_hint_label: Label
+var _auto_hud_cache: Dictionary = {}
+
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -76,6 +88,11 @@ func _ready() -> void:
 	gb.name = "Greybox"
 	add_child(gb)
 	gb.build()
+	# 自动遍历器先于玩家入树（2026-08-14）：树序=命令先行——_physics_process 按树序处理，
+	# 遍历器先读玩家上一帧状态、写本帧 MovementCommand，玩家控制器同帧消费。
+	_autopilot = AutoTraversal.new()
+	_autopilot.name = "AutoTraversal"
+	add_child(_autopilot)
 	# 玩家（Player.tscn：MovementController + Head + Crouch）
 	_player = load("res://Player/Player.tscn").instantiate()
 	_player.name = "Player"
@@ -88,6 +105,18 @@ func _ready() -> void:
 	_setup_tdm()
 	# 导航（2026-08-13 navmesh 阶段 2/3）：烘焙网格 + 28 处人类验证跳跃链接（M3 AI 寻路消费）
 	_setup_navigation()
+	# 自动遍历装配（2026-08-14，T5）：独立记录器（地图哈希防污染）+ 目标面 160 + HUD
+	# 回调 + 信号。setup 会写入 command_override——装配后立即置空（正常游戏走 Input 路径；
+	# P 启动时 _start_auto_traversal 重新 setup 接管命令；TDD 钉死"置空恢复 Input"）。
+	_auto_record = AutoTraversalRecord.new()
+	_auto_record.setup(JUMP_CORE.map_hash(LAYOUT.all_solids(), MovementController.MOVEMENT_REV))
+	_auto_record.set_target_faces(160)
+	_autopilot.setup(_player, _auto_record, _auto_hud)
+	_autopilot.attempt_finished.connect(_on_auto_attempt)
+	_autopilot.progress_changed.connect(_on_auto_progress)
+	_autopilot.timeout_paused.connect(_on_auto_timeout)
+	_autopilot.finished.connect(_on_auto_finished)
+	_player.command_override = null  # 释放命令接管（恢复 Input 路径）
 	# 跳跃记录（任务 15）：记录跳建筑操作供 AI 学习；地图哈希不符自动清空旧记录。
 	_recorder = JumpRecorder.new()
 	_recorder.name = "JumpRecorder"
@@ -551,6 +580,23 @@ func _setup_hud() -> void:
 	layer.add_child(minimap)
 	minimap.setup(LAYOUT.all_solids(), _player, _enemy_entities)
 	_minimap = minimap
+	# 自动遍历面板（右上角，2026-08-14）：P 启动后显示；状态/目标面/动作/进度 + 提示小字
+	_auto_panel = Panel.new()
+	var asb := StyleBoxFlat.new()
+	asb.bg_color = Color(0.03, 0.05, 0.08, 0.92)
+	asb.border_color = Color(0.45, 0.6, 0.8)
+	asb.set_border_width_all(3)
+	asb.set_corner_radius_all(12)
+	_auto_panel.add_theme_stylebox_override("panel", asb)
+	layer.add_child(_auto_panel)
+	_auto_panel.position = Vector2(vp.x - 432, 12)
+	_auto_panel.size = Vector2(420, 200)
+	_auto_state_label = _hud_label(layer, Vector2(vp.x - 420, 18), "自动遍历中", 22, Color(0.45, 1, 0.6))
+	_auto_target_label = _hud_label(layer, Vector2(vp.x - 420, 52), "目标面 —", 18, Color(0.8, 0.9, 1))
+	_auto_action_label = _hud_label(layer, Vector2(vp.x - 420, 80), "动作 —", 18, Color(0.8, 0.9, 1))
+	_auto_progress_label = _hud_label(layer, Vector2(vp.x - 420, 108), "本轮 0/剩余 160 · 累计成功 0 · 失败 0", 18, Color(0.8, 0.9, 1))
+	_auto_hint_label = _hud_label(layer, Vector2(vp.x - 420, 136), "Esc 退出程序", 14, Color(0.55, 0.65, 0.75))
+	_set_auto_panel_visible(false)
 	# 弹药/切枪信号刷新
 	_manager.weapon_ammo_updated.connect(_on_ammo_updated)
 	_manager.weapon_switched.connect(_on_weapon_switched)
@@ -714,16 +760,39 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# 自动遍历输入锁（2026-08-14 用户拍板）：active/paused_timeout 期间锁全部键与鼠标事件，
+	# 仅放行 Esc（直接退出程序）与 paused_timeout 下的 R（重启测试流程，交下方 KEY_R 分支）。
+	# 注：Head 事件式鼠标视角由 process_mode 挂起覆盖（Head._input 先于本节点收到事件，
+	# set_input_as_handled 拦不住它——headless 探针实测）；_unhandled_input 在此被消费后不会到达。
+	if _autopilot and (_autopilot.active or _autopilot.session_state == "paused_timeout"):
+		if event.is_action_pressed(&"ui_cancel"):
+			get_tree().quit()  # Esc 直接退出程序（自动遍历的训练结束方式——用户拍板）
+			return
+		var r_restart: bool = event is InputEventKey and event.pressed and not event.echo \
+				and event.keycode == KEY_R and _autopilot.session_state == "paused_timeout"
+		if not r_restart:
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed(&"ui_cancel"):
 		get_tree().quit()
 	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_K:
+		if event.keycode == KEY_P:
+			# P 启动自动遍历（2026-08-14）：仅 idle 可启动（active/paused_timeout 已被上方
+			# 锁拦截；done 后不重启——一轮训练一次跑完）
+			if _autopilot and not _autopilot.active and not _autopilot.done \
+					and _autopilot.session_state != "paused_timeout":
+				_start_auto_traversal()
+		elif event.keycode == KEY_K:
 			# K 自杀测试键（临时，正式游戏去除）：验证死亡/复活/结算全流程——敌人 M3 前不会攻击玩家
 			if _life:
 				_life.take_damage(999.0)
 		elif event.keycode == KEY_R:
-			# R 重开（结算后可用；_input 处理保证 UI 面板不吞键——2026-08-13 用户反馈修复）
-			if _match and _match.state == TdmMatch.State.RESULT:
+			# R：自动遍历 30 分钟暂停后重启测试流程优先；否则结算后重开比赛
+			# （_input 处理保证 UI 面板不吞键——2026-08-13 用户反馈修复）
+			if _autopilot and _autopilot.session_state == "paused_timeout":
+				_auto_hint_label.text = "Esc 退出程序"  # 清暂停提示（面板保留显示）
+				_autopilot.restart_session()
+			elif _match and _match.state == TdmMatch.State.RESULT:
 				_restart_match()
 
 
@@ -745,3 +814,97 @@ func _unhandled_input(event: InputEvent) -> void:
 		_manager.switch_to(3)
 	elif event.is_action_pressed(&"next_weapon"):
 		_manager.next_weapon()
+
+
+# ---- 自动遍历装配（2026-08-14，T5）----
+
+## P 启动：挂起人类语料记录 + 冻结 8 分钟局时（用户拍板）+ 锁定开火/蹲伏/头部
+## 事件与轮询 + 重新 setup 接管命令 + 显示面板 + 启动
+func _start_auto_traversal() -> void:
+	_recorder.recording_enabled = false  # 挂起人类语料记录（自动帧不混入 jump_training）
+	_match.process_mode = Node.PROCESS_MODE_DISABLED    # 8 分钟局时临时取消（冻结计分板时间）
+	_manager.process_mode = Node.PROCESS_MODE_DISABLED  # 开火轮询锁定
+	var crouch := _player.get_node_or_null("Crouch")
+	if crouch:
+		crouch.process_mode = Node.PROCESS_MODE_DISABLED  # 蹲伏轮询锁定
+	var head := _player.get_node_or_null("Head")
+	if head:
+		head.process_mode = Node.PROCESS_MODE_DISABLED  # 头部事件鼠标视角 + 摇杆轮询锁定
+	_autopilot.setup(_player, _auto_record, _auto_hud)  # 重新接管命令（_ready 装配后已置空）
+	_set_auto_panel_visible(true)
+	_autopilot.start()
+
+
+## 面板 + 五行标签统一显隐（标签挂在 CanvasLayer 下，不随面板 visible 联动）
+func _set_auto_panel_visible(v: bool) -> void:
+	_auto_panel.visible = v
+	_auto_state_label.visible = v
+	_auto_target_label.visible = v
+	_auto_action_label.visible = v
+	_auto_progress_label.visible = v
+	_auto_hint_label.visible = v
+
+
+## HUD 回调（AutoTraversal 状态/目标/动作变化时）：HUD 未建或面板不可见 → 仅存缓存
+func _auto_hud(d: Dictionary) -> void:
+	_auto_hud_cache = d
+	if _auto_panel == null or not _auto_panel.visible:
+		return
+	var state: String = str(d.get("state", ""))
+	if state == "完成":
+		state = "遍历完成"
+	elif state != "已暂停（30 分钟到）" and state != "遍历完成":
+		state = "自动遍历中"
+	_auto_state_label.text = state
+	_auto_target_label.text = "目标面 %s" % str(d.get("target", "—"))
+	_auto_action_label.text = "动作 %s" % str(d.get("action", ""))
+	var visited := int(d.get("visited", 0))
+	var total := int(d.get("total", 0))
+	# 口径（控制器拍板）：visited/total = 本轮（R 重启后归零）；success/fail = 累计
+	_auto_progress_label.text = "本轮 %d/剩余 %d · 累计成功 %d · 失败 %d" \
+			% [visited, maxi(total - visited, 0), int(d.get("success", 0)), int(d.get("fail", 0))]
+	_auto_hint_label.text = "Esc 退出程序"
+	if d.has("hint") and str(d["hint"]) != "":
+		_auto_hint_label.text += " · " + str(d["hint"])
+
+
+## attempt 收尾：刷目标面/判定（数字经 progress_changed 刷新）
+func _on_auto_attempt(face: String, verdict: String) -> void:
+	var d := _auto_hud_cache.duplicate()
+	d["target"] = face
+	d["action"] = verdict
+	_auto_hud(d)
+
+
+## 进度刷新（visited/total 本轮口径；success/fail 累计口径）
+func _on_auto_progress(visited: int, total: int, success: int, fail: int) -> void:
+	var d := _auto_hud_cache.duplicate()
+	d["visited"] = visited
+	d["total"] = total
+	d["success"] = success
+	d["fail"] = fail
+	_auto_hud(d)
+
+
+## 30 分钟暂停：面板追加重启提示（AutoTraversal 已先发含 hint 的 HUD 回调，此处兜底置文案）
+func _on_auto_timeout() -> void:
+	if _auto_panel != null and _auto_panel.visible and _auto_hint_label != null:
+		_auto_hint_label.text = "Esc 退出程序 · 按 R 重启测试流程"
+
+
+## 160 面全处理完成：恢复人类语料记录/局时/开火/蹲伏/头部 + 释放命令接管（输入锁
+## 依赖状态，done 后自然放行）。注意：paused_timeout 不走这里（R 重启继续训练；Esc 已退出）。
+func _on_auto_finished() -> void:
+	_recorder.recording_enabled = true
+	_match.process_mode = Node.PROCESS_MODE_INHERIT
+	_manager.process_mode = Node.PROCESS_MODE_INHERIT
+	var crouch := _player.get_node_or_null("Crouch")
+	if crouch:
+		crouch.process_mode = Node.PROCESS_MODE_INHERIT
+	var head := _player.get_node_or_null("Head")
+	if head:
+		head.process_mode = Node.PROCESS_MODE_INHERIT
+	_player.command_override = null  # 释放命令接管（恢复 Input 路径）
+	var d := _auto_hud_cache.duplicate()
+	d["state"] = "遍历完成"
+	_auto_hud(d)
