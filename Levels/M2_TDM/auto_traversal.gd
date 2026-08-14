@@ -98,6 +98,7 @@ var _jump_seg := {}
 # 会话计时（active 期间累计；达上限 → 暂停）
 var _session_timeout := SESSION_TIMEOUT
 var _session_t := 0.0
+var _dbg5 := 0
 
 
 ## 装配。hud: Callable 接收 {"state": str, "target": str, "action": str, "visited": int,
@@ -657,20 +658,11 @@ func _stuck_check(delta: float) -> bool:
 	return _stuck_t >= STUCK_TIME
 
 
-## 攀爬辅助激活：贴墙且距途经点较近，且当前或下一途经点需登台（斜滑贴面
-## 常发生在攀爬段的前一段——只看当前途经点会错过最佳登台位置，滑到不可登的
-## 高台级后才贴面）
+## 攀爬辅助激活：距途经点较近且当前或下一途经点需登台。不要求贴墙——斜滑
+## 在无接触段就把玩家带进台阶角缺口（实测西塔坡道：滑到 0.75m 级面贴死，
+## 该级 > step-up 0.62 不可登且胶囊嵌入台阶角缺口冻结）；攀爬临近即接管，
+## 按台面探测引导到可登级贴面（斜滑贴面常发生在攀爬段的前一段——需看下一途经点）
 func _climb_assist_active(waypoint: Vector3) -> bool:
-	if _seg_idx == 5 and _dbg4 < 80:
-		_dbg4 += 1
-		if _dbg4 % 8 == 0:
-			print("DBG assist? wall=%s wp=(%.2f,%.2f) pos=(%.2f,%.2f) needs=%s" % [
-				_player.is_on_wall(), waypoint.x, waypoint.z,
-				_player.global_position.x, _player.global_position.z,
-				_needs_climb(waypoint) or (_seg_idx + 1 < _segments.size()
-						and _needs_climb(_segments[_seg_idx + 1]["end"]))])
-	if not _player.is_on_wall():
-		return false
 	if not _needs_climb(waypoint) \
 			and not (_seg_idx + 1 < _segments.size()
 					and _needs_climb(_segments[_seg_idx + 1]["end"])):
@@ -703,12 +695,18 @@ func _climb_press(waypoint: Vector3, delta: float) -> void:
 	var target := waypoint
 	var feet := _feet_y()
 	var top := _face_top_at(waypoint, press_dir)
+	if _dbg5 < 40:
+		_dbg5 += 1
+		if _dbg5 % 5 == 0:
+			print("DBG5 pos=(%.2f,%.2f) wp=(%.2f,%.2f) top=%.2f feet=%.2f" % [
+				_player.global_position.x, _player.global_position.z,
+				waypoint.x, waypoint.z, top, feet])
 	if not (top < INF and top - feet <= _player.STEP_MAX):
 		# 途经点贴面不可登（该级 > STEP_MAX）：沿墙面切线两侧偏移探测可登级
 		# （台阶坡道的可登级在低端一侧——西塔坡道斜滑贴死教训）
 		var tangent := Vector3(-press_dir.z, 0.0, press_dir.x)
 		for off in [-0.7, 0.7]:
-			var cand := waypoint + tangent * off
+			var cand: Vector3 = waypoint + tangent * float(off)
 			var t2 := _face_top_at(cand, press_dir)
 			if t2 < INF and t2 - feet <= _player.STEP_MAX:
 				target = cand
