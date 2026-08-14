@@ -32,7 +32,7 @@ const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest �
 ## 遍历逻辑版本键（2026-08-15）：参与自动记录哈希——逻辑变更（链接触发/快照语义等）
 ## 自动作废旧记录重来（与 MovementController.MOVEMENT_REV 同铁律模式）。
 ## r1 = 首版（磁盘触发+最小转弯圆 bug 已修）；r2 起逻辑再变须 bump。
-const TRAVERSAL_REV := "at-r2:linksync+disk-trigger"
+const TRAVERSAL_REV := "at-r3:zone-aim+runup-relax+teleport-fix"
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
@@ -114,9 +114,10 @@ func setup(player: MovementController, record: AutoTraversalRecord, hud: Callabl
 	_hud = hud
 	player.command_override = _cmd
 	_map_rid = player.get_world_3d().navigation_map
-	# _spawn 为导航点（2026-08-15 控制器裁决 1）：_teleport_to 统一 +0.515 补偿
-	# （FEET_OFFSET − NAV_OFFSET）——传送语义全走导航点，不再混用表面原点
-	_spawn = NavigationServer3D.map_get_closest_point(_map_rid, LAYOUT.player_spawn())
+	# _spawn 原值（2026-08-15 F3 审查 2）：setup 在 L_M2._ready 同步调用时导航未同步，
+	# map_get_closest_point 查询返回原值（非导航点）→ 快照移到 start()（P 时刻地图
+	# 必已激活）——_teleport_to 的 y 补偿以导航点为基准，快照必须可靠。
+	_spawn = LAYOUT.player_spawn()
 	_floor_normal_y = cos(player.floor_max_angle)
 	_faces_by_name = {}
 	for f0 in JE.faces():
@@ -143,6 +144,9 @@ func start() -> void:
 	active = true
 	session_state = "active"
 	_session_t = 0.0
+	# _spawn 快照到导航点（2026-08-15 F3 审查 2）：start 时地图必已激活（P 时刻），
+	# 此处快照才可靠——setup 在 _ready 同步调用时导航未同步（查询返回原值）。
+	_spawn = NavigationServer3D.map_get_closest_point(_map_rid, _spawn)
 	_snap_links()
 	_build_queue()
 	_cmd.move_axis = Vector2.ZERO
@@ -553,14 +557,18 @@ func _floor_name() -> String:
 	return ""
 
 
-## 传送实现（2026-08-15 控制器裁决 1）：目标恒为导航点 y（表面+NAV_OFFSET 0.3~0.4），
-## 站立 origin = 表面+FEET_OFFSET（0.915）→ origin.y = 导航 y + (FEET_OFFSET − NAV_OFFSET)
-## （=+0.515）。旧代码直接放 origin 到导航 y → 胶囊嵌体 ~0.515m 被物理推出
-## （CrateToCluster_WN 箱顶重试后掉到箱东侧地面贴墙卡死的根因）。
-## 所有调用点（spawn/anchor）均为导航点，统一走本补偿；velocity 清零。
+## 传送实现（2026-08-15 控制器裁决 1 + F3 审查 7）：目标恒为导航点 y（表面+偏移），
+## 站立 origin = 表面+FEET_OFFSET（0.915）。偏移取导航面实测漂移下界 0.3：
+## origin.y = 导航 y + (FEET_OFFSET − 0.3)（=+0.615）——导航面偏移实测 0.3~0.4 漂移，
+## 用下界保证落地时脚 ≤ 表面（宁浮 0.1 不嵌 0.1），交给 floor-snap 沉降。
+## 旧代码直接放 origin 到导航 y → 胶囊嵌体被物理推出（CrateToCluster_WN 箱顶重试后
+## 掉到箱东侧地面贴墙卡死的根因）。所有调用点（spawn/anchor）均为导航点，统一走
+## 本补偿；velocity 清零 + 清跳跃边沿（F3 审查 5：边沿仅落地帧被消费——空中触发后
+## 重试传送会携带陈旧边沿，首个落地帧幽灵跳）。
 func _teleport_to(pos: Vector3) -> void:
-	_player.global_position = pos + Vector3(0.0, FEET_OFFSET - NAV_OFFSET, 0.0)
+	_player.global_position = pos + Vector3(0.0, FEET_OFFSET - 0.3, 0.0)
 	_player.velocity = Vector3.ZERO
+	_cmd.jump_pressed = false
 
 
 ## 全部目标处理完 → done=true; active=false → finished 信号
@@ -810,12 +818,6 @@ func _enter_jump(seg: Dictionary) -> void:
 	var h := Vector3(_to_point.x - _from_point.x, 0.0, _to_point.z - _from_point.z)
 	var dist := h.length()
 	_travel_dir = h.normalized() if dist > 0.01 else Vector3.ZERO
-	# 小面助跑速度门放宽（2026-08-15 控制器裁决 3）：可用助跑 = from 面矩形沿
-	# travel_dir 反方向到锚点钳制边界的实际长度（与 _compute_anchor 的 clamp 几何
-	# 一致）；< 1.2m → 0.9v 门在该助跑内不可达（箱顶 0.5m 助跑实测门永达不到、冲出
-	# 箱缘坠地）→ 放宽 0.6v：REST 档空中转向补足——静止跳起后空中可加速至 ~3m/s，
-	# 落点近缘可达。
-	_speed_gate_relaxed = _runup_available(fface) < 1.2
 	var p := pick_jump_speed(_delta_h, dist, _human_p50(_from_face, _to_face))
 	_jump_v = float(p["v"])
 	# 物理包络钳制（2026-08-15 审查 B-3）：速度门 hspeed ≥ 0.9v 的物理可达上限
@@ -827,6 +829,13 @@ func _enter_jump(seg: Dictionary) -> void:
 	_runup_recover = 0
 	_runup_t = 0.0
 	_anchor = _compute_anchor(fface)
+	# 小面助跑速度门放宽（2026-08-15 控制器裁决 3 + F3 审查 4）：可用助跑 = 锚点
+	# 实测水平距（先算锚点再判定——锚点才是真实助跑距离，面矩形测距被导航侵蚀/
+	# 界外锚点失真）；< 1.2m → 0.9v 门在该助跑内不可达（箱顶 0.5m 助跑实测门永远
+	# 达不到、冲出箱缘坠地）→ 放宽 0.6v：REST 档空中转向补足——静止跳起后空中可
+	# 加速至 ~3m/s，落点近缘可达。
+	_speed_gate_relaxed = Vector2(_from_point.x - _anchor.x,
+			_from_point.z - _anchor.z).length() < 1.2
 	_air_t = 0.0
 	var w := JumpSolver.catch_window(_delta_h)
 	_air_timeout = float(w["t_max"]) + 1.5
@@ -859,26 +868,6 @@ func _zone_nearest_point(from: Vector3, to: Vector3) -> Vector3:
 	var p := _zone_rect.position
 	var s := _zone_rect.size
 	return Vector3(clampf(from.x, p.x, p.x + s.x), to.y, clampf(from.z, p.y, p.y + s.y))
-
-
-## 可用助跑距离：from 面矩形沿 travel_dir 反方向的边界长度（锚点被面矩形钳制即止于此，
-## 与 _compute_anchor 的 clamp 几何一致）；无面/零方向 → RUNUP_LEN（2026-08-15 裁决 3）
-func _runup_available(fface: Dictionary) -> float:
-	if fface.is_empty():
-		return RUNUP_LEN
-	var d := -_travel_dir
-	if d.length() <= 0.01:
-		return RUNUP_LEN
-	var c: Vector2 = fface["center"]
-	var s: Vector2 = fface["size"]
-	var t := INF
-	if absf(d.x) > 0.001:
-		var bx: float = c.x + s.x * 0.5 if d.x > 0.0 else c.x - s.x * 0.5
-		t = minf(t, (bx - _from_point.x) / d.x)
-	if absf(d.z) > 0.001:
-		var bz: float = c.y + s.y * 0.5 if d.z > 0.0 else c.y - s.y * 0.5
-		t = minf(t, (bz - _from_point.z) / d.z)
-	return minf(maxf(t, 0.0), RUNUP_LEN)
 
 
 ## 数据集边匹配：(from_face,to_face) 与 (to_face,from_face) 任一匹配 → 该边；
@@ -952,6 +941,27 @@ func _jump_tick(delta: float) -> void:
 			_air_tick(delta)
 
 
+## 触发路径统一门控谓词（2026-08-15 F3 审查 3）：三条触发路径（墙探预跳/停摆/圆盘）
+## 共用速度门 + 方向锥。速度门：hspeed ≥ gate_speed（调用方按 relaxed 口径传
+## 0.6/0.9v）；近静止（hspeed ≤ 0.5m/s，贴墙停摆场景）放行——贴墙起跳本就低速，
+## REST 漂移是设计内。方向锥（require_heading）：水平速度与 travel_dir 同向
+## （投影 ≥ 0.6×|v|，约 ±53°）——小面助跑从侧面触发会把起跳速度正交化
+## （实测 CrateToCluster_WN 向北飞出箱顶落回地面）；近静止时方向无意义跳过。
+## _jump_v ≤ 0.4（近乎原地跳）恒放行。
+func _try_trigger(gate_speed: float, require_heading: bool) -> bool:
+	if _jump_v <= 0.4:
+		return true
+	var v_h := Vector2(_player.velocity.x, _player.velocity.z)
+	var hspeed := v_h.length()
+	if hspeed > 0.5 and hspeed < gate_speed:
+		return false
+	if require_heading and hspeed > 0.5:
+		var td := Vector2(_travel_dir.x, _travel_dir.z)
+		if td.length() > 0.01 and v_h.dot(td) < 0.6 * hspeed:
+			return false
+	return true
+
+
 ## 助跑：直线朝 from_point 前进（move_axis 幅值缩放使目标速度 = 起跳速度 v——
 ## 控制器 lerp 加速度收敛到 |direction|×speed，设计文档「直线加速至 v」）。
 ## 触发：沿 travel_dir 的水平投影到 from_point 的距离 ≤ trigger_distance(v)
@@ -972,17 +982,21 @@ func _runup_tick(delta: float) -> void:
 			_from_point.z - _player.global_position.z)
 	var along: float = to_h.dot(_travel_dir)  # 停摆触发判定用
 	var height_ok: bool = _waypoint_surface_y(_from_point) - _feet_y() <= 0.3
-	var hspeed := Vector2(_player.velocity.x, _player.velocity.z).length()
-	var travel_dir_flat := Vector2(_travel_dir.x, _travel_dir.z)  # 方向门判定用（xz 投影）
+	var gate_speed: float = _jump_v * (0.6 if _speed_gate_relaxed else 0.9)
 	# 前向墙体探测预跳：起跳点贴近障碍时（如 Crate_WN 起跳点距箱面仅 0.25m <
 	# 胶囊半径 0.5），触发线不可达——等贴墙停摆起跳会把速度降为 ~0（REST 漂移
-	# 补正脆弱，落点随起跳速度摆动）。探测 travel_dir 前方 0.6m 内墙体且速度
-	# 已达标 → 以当前速度立即起跳（RUN 档弹道，无漂移依赖）
-	if hspeed >= _jump_v * 0.9 and _wall_ahead():
+	# 补正脆弱，落点随起跳速度摆动）。探测 travel_dir 前方 0.6m 内墙体且门控
+	# 通过 → 以当前速度立即起跳（RUN 档弹道，无漂移依赖）。
+	# 三路径统一门控（2026-08-15 F3 审查 3）：原速度门只盖圆盘一条路径——
+	# 墙探硬编码 0.9v（relaxed 口径漏）、停摆无门（任意速度贴墙即跳）；
+	# 现三路径共用 _try_trigger（速度门 + 方向锥，gate 随 relaxed 口径）。
+	if _try_trigger(gate_speed, true) and _wall_ahead():
 		_trigger_jump()
 		return
-	# 撞墙停摆兜底（探测未覆盖的贴墙情形）
-	if _player.is_on_wall() and along <= STALL_TRIGGER_ALONG and _runup_t >= 0.5:
+	# 撞墙停摆兜底（探测未覆盖的贴墙情形）：近静止（≤0.5m/s）时 _try_trigger 放行
+	# ——贴墙起跳本就低速，REST 漂移是设计内
+	if _player.is_on_wall() and along <= STALL_TRIGGER_ALONG and _runup_t >= 0.5 \
+			and _try_trigger(gate_speed, true):
 		_trigger_jump()
 		return
 	# 触发条件（2026-08-14 修复轮改圆盘）：原沿线投影 ≤ trigger_distance 且横向
@@ -994,15 +1008,7 @@ func _runup_tick(delta: float) -> void:
 	# 处理（起跳点贴障碍的链接如 Crate_WN：圆盘 0.6 环在墙探 0.6 射程之前
 	# 0.25m 抢先触发，起跳点漂移 → 落点漂移 → 下游相位破坏）
 	if to_h.length() <= 0.6 and height_ok and not _wall_ahead(1.0):
-		# 速度门：小面助跑（可用 <1.2m）放宽 0.6v（2026-08-15 裁决 3——REST 档空中
-		# 转向补足，落点近缘可达）；正常 0.9v
-		# 方向门（2026-08-15 实测 CrateToCluster_WN）：圆盘无方向要求——小面助跑时
-		# 玩家从侧面进入圆盘即触发，起跳速度与 travel_dir 正交（实测向北飞出箱顶
-		# 落回地面）→ 要求水平速度与 travel_dir 同向（投影 ≥ 0.6×|v|，约 ±53° 锥）。
-		var v_h := Vector2(_player.velocity.x, _player.velocity.z)
-		var heading_ok: bool = travel_dir_flat.length() <= 0.01 \
-				or v_h.dot(travel_dir_flat) >= 0.6 * hspeed
-		if heading_ok and (_jump_v <= 0.4 or hspeed >= _jump_v * (0.6 if _speed_gate_relaxed else 0.9)):
+		if _try_trigger(gate_speed, true):
 			_trigger_jump()
 			return
 	elif _stuck_check(delta):
@@ -1136,6 +1142,10 @@ func _jump_fail(verdict: String, reason: String) -> void:
 	elif _jump_retry == 2:
 		_from_point += _travel_dir * 0.1
 		_anchor = _compute_anchor(_faces_by_name.get(_from_face, {}))
+		# 起跳点前移后 relaxed 同步重算（F3 审查 6）：与 _enter_jump 同口径
+		# （锚点实测水平距 <1.2m → 0.6v 门）——起跳点前移改变锚点距离
+		_speed_gate_relaxed = Vector2(_from_point.x - _anchor.x,
+				_from_point.z - _anchor.z).length() < 1.2
 	_teleport_to(_anchor)
 	_teleported = true
 	_reset_stuck()

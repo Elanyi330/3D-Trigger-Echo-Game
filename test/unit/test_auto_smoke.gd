@@ -19,6 +19,9 @@
 #   与测试 1 隔离独立断言，贪心队列顺序不再互相影响；原定 WestClusterN_Panel 双链接
 #   链，实测箱→面板跳无法稳定 success 后按控制器回退条款改 WestClusterN_Box
 #   （Crate_WN 单链；链接未注册时同样必 no_path）。
+# 测试 5：test_chain_plan_two_links——规划层双链接链锚（F3 审查 8b）：直接
+#   map_get_path(spawn→WestClusterN_Panel) + classify_segments 断言 ≥2 jump 段
+#   （面板链执行属 M4，规划层必须出双链接链）。
 # 断点：done 或 success≥2 或 90s 超时（超时即失败，防 CI 挂死）。
 # T3 唯一允许的慢测试（物理秒 30-60s）；其余逻辑测试保持毫秒级。
 extends GutTest
@@ -64,16 +67,31 @@ func _assemble() -> Dictionary:
 		add_child_autofree(link)
 		links.append(link)
 
-	# 3. 等待导航同步 → 端点 snap（同 probe_navmesh 流程）→ 再等同步
-	await wait_physics_frames(10)
+	# 3. 等地图两轮迭代后 snap（2026-08-15 F3 审查 8c 实测修正）：iter 1 = 首同步
+	#    （链接以原始端点注册，悬空者如 Crate_WN 原始端点在箱体内部被静默丢弃）；
+	#    iter ≥ 2 后再 snap 链接端点才稳定进入寻路图——iter 1 即 snap（或固定
+	#    10 帧、map_is_active 哨兵）实测西箱/西塔目标 no_path（路径止于箱旁地面）。
+	#    判定用 map_get_iteration_id（引擎「查询先于首同步」报错的官方建议口径；
+	#    GUT 实测 map_is_active 在从未同步的地图上返回 true 不可靠）。以装配前
+	#    基值 +2 为门槛——后续测试的地图继承前测迭代数，绝对值门槛会提前放行。
 	var map_rid := get_viewport().get_world_3d().navigation_map
+	var base_iter := NavigationServer3D.map_get_iteration_id(map_rid)
+	for i in 60:
+		await wait_physics_frames(1)
+		if NavigationServer3D.map_get_iteration_id(map_rid) >= base_iter + 2:
+			break
 	for lk in links:
 		var nav_link := lk as NavigationLink3D
 		nav_link.start_position = NavigationServer3D.map_get_closest_point(
 				map_rid, nav_link.start_position)
 		nav_link.end_position = NavigationServer3D.map_get_closest_point(
 				map_rid, nav_link.end_position)
-	await wait_physics_frames(5)
+	# snap 改动链接端点 → 等地图完成下一轮迭代（链接重注册）再继续
+	var pre_snap_iter := NavigationServer3D.map_get_iteration_id(map_rid)
+	for i in 60:
+		await wait_physics_frames(1)
+		if NavigationServer3D.map_get_iteration_id(map_rid) > pre_snap_iter:
+			break
 
 	# 4. AutoTraversal 先于 Player add_child（命令先行树序）
 	var autopilot := AT.new()
@@ -83,10 +101,12 @@ func _assemble() -> Dictionary:
 	player.position = LAYOUT.player_spawn()
 	add_child_autofree(player)
 
-	# 5. 记录器（临时目录 + 当前布局哈希）
+	# 5. 记录器（临时目录 + 当前布局哈希；rev 追加口径与 L_M2 生产一致——
+	#    2026-08-15 F3 审查 8d）
 	var record := AutoTraversalRecord.new()
 	var hash_str: String = JumpRecordCore.map_hash(
-			LAYOUT.all_solids(), MovementController.MOVEMENT_REV)
+			LAYOUT.all_solids(),
+			MovementController.MOVEMENT_REV + "|" + AT.TRAVERSAL_REV)
 	record.setup(hash_str, TMP_DIR)
 	record.set_target_faces(160)
 	return {"autopilot": autopilot, "player": player, "record": record,
@@ -194,6 +214,47 @@ func test_link_chain_regression() -> void:
 	assert_true(pf.has("WestClusterN_Box"), "WestClusterN_Box 应有 attempt 记录")
 	assert_eq(pf["WestClusterN_Box"]["verdict"], "success",
 			"链接链目标 WestClusterN_Box 应成功（链接注册回归锚）")
+	assert_ne(pf["WestClusterN_Box"]["link"], "",
+			"链接必须被使用（F3 审查 8a——与 WestTowerBox 断言口径一致）")
+
+
+# 双链接链规划回归锚（2026-08-15 F3 审查 8b）：面板链执行仍属 M4（1m 箱顶起跳方向
+# 无法收敛，见 test_link_chain_regression 注释），但规划层必须出双链接链——直接
+# map_get_path(spawn→WestClusterN_Panel 中心) + classify_segments 断言 ≥2 个 jump 段。
+# 链接未注册时纯步行图 0 段（实机 91 no_path 的暴露形态），本测试确定性钉死
+# 「链接注册 + 链式规划」两层。
+func test_chain_plan_two_links() -> void:
+	var a := await _assemble()
+	var map_rid := get_viewport().get_world_3d().navigation_map
+	# 面表查 WestClusterN_Panel（与 AutoTraversal 同源 JE.faces()）
+	var panel: Dictionary = {}
+	for f0 in AT.JE.faces():
+		var f: Dictionary = f0
+		if f["name"] == "WestClusterN_Panel":
+			panel = f
+	assert_true(not panel.is_empty(), "WestClusterN_Panel 应在面表中")
+	var c: Vector2 = panel["center"]
+	var target := Vector3(c.x, float(panel["top_y"]) + 0.4, c.y)
+	var closest := NavigationServer3D.map_get_closest_point(map_rid, target)
+	var path: PackedVector3Array = NavigationServer3D.map_get_path(
+			map_rid, AT.LAYOUT.player_spawn(), closest, true)
+	# links 缓存重建（与 _assemble 的 snap 同口径）
+	var links := []
+	for l0 in AT.LAYOUT.jump_links():
+		var l: Dictionary = l0
+		links.append({
+			"name": l["name"],
+			"from": NavigationServer3D.map_get_closest_point(map_rid, l["from"]),
+			"to": NavigationServer3D.map_get_closest_point(map_rid, l["to"]),
+		})
+	var segs := AutoTraversal.classify_segments(path, links)
+	var jumps := 0
+	for s0 in segs:
+		var s: Dictionary = s0
+		if s["kind"] == "jump":
+			jumps += 1
+	assert_gte(jumps, 2,
+			"spawn→WestClusterN_Panel 规划应含 ≥2 个跳跃段（Crate_WN + CrateToCluster_WN 双链接链；实际 %d 段）" % jumps)
 
 
 # 会话超时暂停 + 重启（2026-08-14 用户拍板：单次自动运行 ≤30 分钟——注入 0.5s 验证）
