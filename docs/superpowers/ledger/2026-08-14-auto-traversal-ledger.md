@@ -36,3 +36,15 @@
 2. RESULT 态按 P 的边界（结算冻结玩家→stuck 循环）未处理——实际不可达（训练期间局时冻结+玩家不射击），低风险。
 3. 输入锁定/UI 手感 headless 不可验——实机验收归用户。
 4. AutoTraversal 完成后（done）与 M4 的关系：跳跃引擎（参数选择/助跑/触发/判定）即 ②(4) M3/M4 接口的执行原型；auto_verification.json 可并入 jump_edges_dataset.json。
+
+## F2/F3 修复优化轮（2026-08-15，用户失败样本分析驱动）
+
+**失败样本分析**（160 attempts / 65 成功 / 95 失败）：91 个 no_path 的"距目标距离"精确等于目标下方垂直高度差（rim 3.04=墙高+偏移、箱 0.94、高棚 3.60=棚顶 4.9−摊阁 1.2）→ 路径终点全在目标正下方 = **导航图内无链接**；用户 65 个成功面零链接依赖面 vs headless 同构建链接正常 → 根因：`L_M2._snap_nav_links` 5 帧固定等待在**实机全场景**下不足，54 链接悬空被静默丢弃（2026-08-13 历史坑复发）。
+
+**F2**（链接注册 + 记录版本键）：map_is_active 哨兵轮询（≤60 帧）+ P 启动二次快照（`_snap_nav_links_now`）+ `TRAVERSAL_REV` 版本键接 MOVEMENT_REV 追加行（旧记录自动作废）+ test_l2_nav_link_snap（54 链接×2 端点 <0.1m 自洽）。**扩展轮**（裁决 4 项+实现者实测逼出 2 守卫）：传送 y 补偿（origin=导航点+0.515，脚面语义统一）/接收区最近点瞄准（+<1.2m 短跳守卫）/小面助跑速度门放宽 0.6v（+方向锥 ±53°）/冒烟隔离拆分；**WestClusterN_Panel 锚回退 WestClusterN_Box**（箱顶→面板跳 R_min 1.17m>1m 箱顶几何不可达——面板链执行留待 M4 zone 级）。
+
+**F3**（多路审查 8 项）：TRAVERSAL_REV bump r3（语义变更未 bump 的洞）/`_spawn` 快照移入 start()（setup 时导航未同步的掩蔽态）/`_try_trigger` 谓词统一三路径门控（墙探 0.9v 硬编码+停摆无门的洞）/`_runup_available` 改锚点实测（面矩形测距被侵蚀失真）/传送清 jump_pressed 边沿（幽灵跳）/重试 2 后 relaxed 重算/传送偏移保守化（FEET_OFFSET−0.3=+0.615，宁浮 0.1 不嵌 0.1）/冒烟补强（link 使用断言 + test_chain_plan_two_links 双链接规划锚 + 迭代哨兵 + 哈希口径一致）。**实现者实证发现**：map_is_active 在未同步地图上返回 true 不可靠——链接需**两轮地图迭代**（iter 1 注册原始端点悬空者被弃，iter ≥2 后 snap 才入图），测试哨兵改基值相对 iter≥+2（生产侧由 P 时刻二次快照兜底 + test_l2_nav_link_snap 钉终态）。
+
+**验证**：GUT **387/387**、冒烟 5/5（两遍确定性：5 目标 success+UmbrellaN no_path+链接使用断言+双链接规划锚+超时暂停重启+链接快照终态）、probe_v3_walk 79/79。TRAVERSAL_REV r3 → 用户实机记录自动清空重建（预期——r2 时代的 91 条错误 no_path 作废，修复后全量重测）。
+
+**遗留（已明确）**：箱顶→簇板链（CrateToCluster 类）执行 = M4 zone 级执行范畴（规划层已锚定）；10 条端点级 infeasible 链接的面级执行实测待用户实机覆盖（analyze_auto_traversal.py 的「面级执行实测」小节）。
