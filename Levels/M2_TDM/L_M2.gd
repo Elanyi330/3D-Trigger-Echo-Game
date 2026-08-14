@@ -109,7 +109,11 @@ func _ready() -> void:
 	# 回调 + 信号。setup 会写入 command_override——装配后立即置空（正常游戏走 Input 路径；
 	# P 启动时 _start_auto_traversal 重新 setup 接管命令；TDD 钉死"置空恢复 Input"）。
 	_auto_record = AutoTraversalRecord.new()
-	_auto_record.setup(JUMP_CORE.map_hash(LAYOUT.all_solids(), MovementController.MOVEMENT_REV))
+	# 记录哈希 = 布局哈希 + "MOVEMENT_REV|TRAVERSAL_REV"（复用 map_hash 的 rev 追加行
+	# 机制）：遍历逻辑变更（2026-08-15 链接触发/快照语义修复）→ 哈希变 → 作废旧记录
+	# 重来——与 MovementController.MOVEMENT_REV 同铁律模式。
+	_auto_record.setup(JUMP_CORE.map_hash(LAYOUT.all_solids(),
+			MovementController.MOVEMENT_REV + "|" + AutoTraversal.TRAVERSAL_REV))
 	_auto_record.set_target_faces(160)
 	_autopilot.setup(_player, _auto_record, _auto_hud)
 	_autopilot.attempt_finished.connect(_on_auto_attempt)
@@ -200,11 +204,28 @@ func _setup_navigation() -> void:
 		_build_nav_debug(nav_mesh)  # 自绘导航面+链接（Forward Mobile 不渲染 NavigationServer 调试层）
 
 
-## 等导航同步后把 link 端点 snap 到导航面（端点悬空 → 整条 link 被丢弃，links:0 根因）
+## 等导航地图首次同步（历史教训：未同步时查询返回原值/悬空端点 → 整条 link 被静默丢弃。
+## 实机全场景首帧同步慢于 headless，5 帧固定等待不足——2026-08-15 用户实机 91 个
+## no_path（路径终点全部落在目标正下方=无链接图）根因。改 map_is_active 哨兵轮询，
+## ≤60 帧兜底（超时打警告继续快照，不阻塞）。
 func _snap_nav_links() -> void:
-	# 2026-08-13 实测：首次物理帧时 map 尚未完成首次同步，查询会报错——多等几帧
-	for i in 5:
+	var map_rid := get_world_3d().navigation_map
+	var active := false
+	for i in 60:
 		await get_tree().physics_frame
+		if NavigationServer3D.map_is_active(map_rid):
+			active = true
+			break
+	if not active:
+		push_warning("L_M2: 导航地图 60 帧内未激活，链接快照可能悬空")
+	_snap_nav_links_now()
+
+
+## 同步快照（不 await）：把全部 NavigationLink3D 端点 snap 到导航面
+## （端点悬空 → 整条 link 被丢弃，links:0 根因）。
+## 两份调用点：_snap_nav_links（deferred 版：先等地图首次同步哨兵）+ P 启动即时版
+## （P 时刻地图必已激活，二次快照兜底初次快照失效场景——2026-08-15 链接同步修复）。
+func _snap_nav_links_now() -> void:
 	var map_rid := get_world_3d().navigation_map
 	for c in get_children():
 		if c is NavigationLink3D:
@@ -830,6 +851,8 @@ func _start_auto_traversal() -> void:
 	var head := _player.get_node_or_null("Head")
 	if head:
 		head.process_mode = Node.PROCESS_MODE_DISABLED  # 头部事件鼠标视角 + 摇杆轮询锁定
+	# P 时刻地图必已激活——二次快照兜底初次快照失效场景（2026-08-15 链接同步修复）
+	_snap_nav_links_now()
 	_autopilot.setup(_player, _auto_record, _auto_hud)  # 重新接管命令（_ready 装配后已置空）
 	_set_auto_panel_visible(true)
 	_autopilot.start()

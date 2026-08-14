@@ -12,6 +12,9 @@
 #   修复轮：RampTopToCorridor_E 同高 2m 跳——最小转弯圆 bug 的唯一触发形态）；
 #   UmbrellaN=不可达面——验证 no_path 记录且 plan 字段为空（审查 Minor 1 修复验证）。
 # 测试 2：30 分钟会话超时暂停 + restart_session 恢复（注入 0.5s 超时）。
+# 测试 3：test_l2_nav_link_snap——L_M2.tscn 实例化 90 物理帧后全部 NavigationLink3D
+#   端点自身即导航点（<0.1m）——实机链接静默丢弃回归锚（2026-08-15：固定 5 帧等待
+#   在实机全场景同步前快照 → 端点悬空 → 整条 link 被丢 → 91 no_path 根因）。
 # 断点：done 或 success≥2 或 90s 超时（超时即失败，防 CI 挂死）。
 # T3 唯一允许的慢测试（物理秒 30-60s）；其余逻辑测试保持毫秒级。
 extends GutTest
@@ -101,9 +104,12 @@ func test_full_traversal() -> void:
 	# 转弯圆 bug 的唯一触发形态，冒烟此前全是 dist=0 垂直跳所以没抓到）；
 	# UmbrellaN=不可达面（probe_navmesh 不可能清单）——验证 no_path 记录 + 审查
 	# Minor 1 修复：no_path 的 plan 字段为空（不带上一目标旧数据）。
+	# WestClusterN_Panel=双链接链目标（Crate_WN + CrateToCluster_WN 两跳）——
+	# 链接链回归锚：2026-08-15 实机链接静默丢弃教训（91 no_path 的暴露形态，
+	# 纯步行图时该面必 no_path；链接注册生效后必须 success）。
 	autopilot.set_target_faces(
 			["WestTowerBox", "WestClusterN_Box", "AltarPlatform", "CorridorSlab",
-			"UmbrellaN"])
+			"UmbrellaN", "WestClusterN_Panel"])
 	autopilot.start()
 
 	# 8. 驱动循环至 done / 90s 超时（三目标全部处理完才 done——success 提前
@@ -136,6 +142,12 @@ func test_full_traversal() -> void:
 	assert_true(pf.has("CorridorSlab"), "CorridorSlab 应有 attempt 记录")
 	assert_eq(pf["CorridorSlab"]["verdict"], "success",
 			"水平跳目标 CorridorSlab 应成功（转圈 bug 回归锚）")
+	# 链接链回归锚（2026-08-15 实机链接静默丢弃教训）：WestClusterN_Panel 必经
+	# Crate_WN + CrateToCluster_WN 双链接链——链接未注册时该面必 no_path，
+	# success 即证链接注册生效
+	assert_true(pf.has("WestClusterN_Panel"), "WestClusterN_Panel 应有 attempt 记录")
+	assert_eq(pf["WestClusterN_Panel"]["verdict"], "success",
+			"双链接链目标 WestClusterN_Panel 应成功（链接注册回归锚）")
 	# 不可达面 + 审查 Minor 1 修复：no_path 的 plan 字段为空（不带上一目标旧数据）
 	assert_true(pf.has("UmbrellaN"), "UmbrellaN 应有 attempt 记录")
 	assert_eq(pf["UmbrellaN"]["verdict"], "no_path", "伞顶不可达 → no_path")
@@ -213,6 +225,37 @@ func test_session_timeout_pause_and_restart() -> void:
 			if head.get("verdict", "") == "aborted":
 				aborted_seen = true
 	assert_true(aborted_seen, "暂停时进行中的 attempt 应按 aborted 收尾落盘")
+
+
+# L_M2 场景链接注册回归锚（2026-08-15）：实机全场景（武器/敌人/特效）首帧同步慢于
+# headless，固定 5 帧等待在同步前快照 → 54 链接端点悬空 → 整条被静默丢弃 → 纯步行图
+# （91 no_path：路径终点全部落在目标正下方）。修复后 _snap_nav_links 改 map_is_active
+# 哨兵轮询（≤60 帧兜底）——本测试实例化真实 L_M2.tscn，90 帧后断言每条 link 端点
+# 自身即导航点（closest 距离 < 0.1；悬空 0.4 → ≥0.1 判失败）。失败时打印 link 名。
+# 注：L_M2 的 _input/计时器等在 GUT 内安全（test_integration 装配 L_Main 先例）；
+# L_M2._ready 会 setup 真实记录目录 user://auto_traversal——TRAVERSAL_REV 参与哈希后
+# 作废旧记录属预期（brief 验证 4：记录目录随哈希不符自动清空）。
+func test_l2_nav_link_snap() -> void:
+	var level: Node = load("res://Levels/M2_TDM/L_M2.tscn").instantiate()
+	add_child_autofree(level)
+	await wait_physics_frames(90)
+	var map_rid := get_viewport().get_world_3d().navigation_map
+	var checked := 0
+	for c in level.get_children():
+		if c is NavigationLink3D:
+			var link := c as NavigationLink3D
+			var s: Vector3 = NavigationServer3D.map_get_closest_point(
+					map_rid, link.start_position)
+			var e: Vector3 = NavigationServer3D.map_get_closest_point(
+					map_rid, link.end_position)
+			assert_lt(link.start_position.distance_to(s), 0.1,
+					"link %s start 端点应已 snap 到导航面（距 %.3fm）"
+					% [link.name, link.start_position.distance_to(s)])
+			assert_lt(link.end_position.distance_to(e), 0.1,
+					"link %s end 端点应已 snap 到导航面（距 %.3fm）"
+					% [link.name, link.end_position.distance_to(e)])
+			checked += 1
+	assert_gt(checked, 0, "L_M2 场景应含 NavigationLink3D 链接")
 
 
 # ---- 工具（独立实现——测试不依赖被测代码） ----
