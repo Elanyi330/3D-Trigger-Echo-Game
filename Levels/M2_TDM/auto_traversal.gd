@@ -98,7 +98,6 @@ var _jump_seg := {}
 # 会话计时（active 期间累计；达上限 → 暂停）
 var _session_timeout := SESSION_TIMEOUT
 var _session_t := 0.0
-var _dbg4 := 0
 
 
 ## 装配。hud: Callable 接收 {"state": str, "target": str, "action": str, "visited": int,
@@ -662,13 +661,14 @@ func _stuck_check(delta: float) -> bool:
 ## 常发生在攀爬段的前一段——只看当前途经点会错过最佳登台位置，滑到不可登的
 ## 高台级后才贴面）
 func _climb_assist_active(waypoint: Vector3) -> bool:
-	var needs := _needs_climb(waypoint) or (_seg_idx + 1 < _segments.size()
-			and _needs_climb(_segments[_seg_idx + 1]["end"]))
-	if needs and _dbg4 < 60:
+	if _seg_idx == 5 and _dbg4 < 80:
 		_dbg4 += 1
-		print("DBG assist? wall=%s wp=(%.2f,%.2f) pos=(%.2f,%.2f) seg=%d" % [
-			_player.is_on_wall(), waypoint.x, waypoint.z,
-			_player.global_position.x, _player.global_position.z, _seg_idx])
+		if _dbg4 % 8 == 0:
+			print("DBG assist? wall=%s wp=(%.2f,%.2f) pos=(%.2f,%.2f) needs=%s" % [
+				_player.is_on_wall(), waypoint.x, waypoint.z,
+				_player.global_position.x, _player.global_position.z,
+				_needs_climb(waypoint) or (_seg_idx + 1 < _segments.size()
+						and _needs_climb(_segments[_seg_idx + 1]["end"]))])
 	if not _player.is_on_wall():
 		return false
 	if not _needs_climb(waypoint) \
@@ -700,29 +700,29 @@ func _climb_press(waypoint: Vector3, delta: float) -> void:
 		_cmd.move_axis = Vector2.ZERO
 		return
 	press_dir = press_dir.normalized()
-	var target := _player.global_position
-	var top := _face_top_ahead(press_dir)
-	if top < INF and top - _feet_y() <= _player.STEP_MAX:
-		# 可登：正对按压促 step-up
-		target = _player.global_position + press_dir * 2.0
-	else:
-		# 不可登：沿墙朝上一途经点方向横移（台阶坡道的可登级在低端）
-		var to_prev: Vector3 = _segments[_seg_idx]["start"] - _player.global_position
-		to_prev.y = 0.0
-		var slide := to_prev - press_dir * to_prev.dot(press_dir)
-		if slide.length() <= 0.3:
-			slide = press_dir * 0.5  # 兜底：仍朝墙面轻压（防彻底停摆）
-		target = _player.global_position + slide * 1.5
+	var target := waypoint
+	var feet := _feet_y()
+	var top := _face_top_at(waypoint, press_dir)
+	if not (top < INF and top - feet <= _player.STEP_MAX):
+		# 途经点贴面不可登（该级 > STEP_MAX）：沿墙面切线两侧偏移探测可登级
+		# （台阶坡道的可登级在低端一侧——西塔坡道斜滑贴死教训）
+		var tangent := Vector3(-press_dir.z, 0.0, press_dir.x)
+		for off in [-0.7, 0.7]:
+			var cand := waypoint + tangent * off
+			var t2 := _face_top_at(cand, press_dir)
+			if t2 < INF and t2 - feet <= _player.STEP_MAX:
+				target = cand
+				break
 	_cmd.move_axis = Vector2(0, 1) if _steer_toward(target, delta) else Vector2.ZERO
 
 
-## 贴面处台面高度探测（模拟 step-up 相位2 探针）：从玩家位置沿按压方向偏移
-## 0.6m、抬升 STEP_MAX，向下射线取落地高度（法线合格）；无合格命中 → INF。
+## 指定 xz 点的贴面台面高度探测（模拟 step-up 相位2 探针）：从该点沿按压方向
+## 偏移 0.6m、抬升 STEP_MAX，向下射线取落地高度（法线合格）；无合格命中 → INF。
 ## 射线必须下探到脚底以下（STEP_MAX + FEET_OFFSET + 0.3）——过短会漏掉地面
 ## 与低台面（历史坑：1.22m 射线从 1.54 出发够不到 0 地面，全 INF）
-func _face_top_ahead(press_dir: Vector3) -> float:
+func _face_top_at(point: Vector3, press_dir: Vector3) -> float:
 	var space := _player.get_world_3d().direct_space_state
-	var origin := _player.global_position + press_dir * 0.6 \
+	var origin := Vector3(point.x, _feet_y(), point.z) + press_dir * 0.6 \
 			+ Vector3.UP * _player.STEP_MAX
 	var q := PhysicsRayQueryParameters3D.create(
 			origin, origin + Vector3.DOWN * (_player.STEP_MAX + FEET_OFFSET + 0.3),
