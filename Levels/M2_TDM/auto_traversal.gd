@@ -26,13 +26,18 @@ const VERT_KEEP := 0.2             # 与前保留点导航高度差 ≥ 此值�
 const STALL_TRIGGER_ALONG := 0.8   # 助跑撞墙停摆触发：距起跳点投影 ≤ 此值且贴墙 → 起跳
 const TURN_STOP_ANGLE := 1.4      # rad（≈80°）：转向差超过此值 → 原地转向（防满速甩尾）
 const WALL_PROBE_DIST := 0.6      # 助跑前向墙体探测距离：触墙前提前起跳（见 _runup_tick）
+const SESSION_TIMEOUT := 1800.0   # 单次自动运行上限（秒）——用户拍板 2026-08-14：≤30 分钟
+const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest 落到邻近面，probe_navmesh 同口径）
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
 signal finished
+signal timeout_paused
 
 var active := false
 var done := false
+## 会话状态：idle / active / paused_timeout / done（String 状态字段）
+var session_state := "idle"
 
 enum _State { PLAN, WALK, JUMP }
 enum _JumpPhase { TO_ANCHOR, RUNUP, AIR }
@@ -90,6 +95,10 @@ var _runup_t := 0.0
 var _walk_replanned := false
 var _jump_seg := {}
 
+# 会话计时（active 期间累计；达上限 → 暂停）
+var _session_timeout := SESSION_TIMEOUT
+var _session_t := 0.0
+
 
 ## 装配。hud: Callable 接收 {"state": str, "target": str, "action": str, "visited": int,
 ## "total": int, "success": int, "fail": int}（T5 接 HUD；测试可传空 Callable）。
@@ -121,8 +130,35 @@ func start() -> void:
 		return
 	if active or done:
 		return
+	if session_state == "paused_timeout":
+		return  # 暂停后经 restart_session() 恢复，不重复启动
 	active = true
+	session_state = "active"
+	_session_t = 0.0
 	_snap_links()
+	_build_queue()
+	_cmd.move_axis = Vector2.ZERO
+	_cmd.jump_pressed = false
+	if _pending.is_empty():
+		_finish_all()
+		return
+	_next_target()
+
+
+## 单次运行上限（测试注入钩子；默认 SESSION_TIMEOUT 1800s）
+func set_session_timeout(seconds: float) -> void:
+	_session_timeout = maxf(seconds, 0.01)
+
+
+## 超时暂停后重启：清暂停、计时归零、active=true；进度从 summary 继续
+## （不清记录——per_face 保留；被 "aborted" 收尾的面视为未完成，重启后重试）
+func restart_session() -> void:
+	if session_state != "paused_timeout":
+		return
+	session_state = "active"
+	active = true
+	done = false
+	_session_t = 0.0
 	_build_queue()
 	_cmd.move_axis = Vector2.ZERO
 	_cmd.jump_pressed = false
@@ -166,7 +202,10 @@ func _build_queue() -> void:
 	_pending = []
 	for n0 in names:
 		var n: String = n0
-		if per_face.has(n):
+		# 已访问（per_face 有记录且最新 verdict ≠ "aborted"）跳过；超时 "aborted"
+		# 收尾的面视为未完成——restart_session 后重试（进度从 summary 继续，记录不清）
+		var entry: Dictionary = per_face.get(n, {})
+		if entry.has("verdict") and entry["verdict"] != "aborted":
 			continue
 		if not _faces_by_name.has(n):
 			continue
@@ -254,25 +293,71 @@ func _next_target() -> void:
 	if face.is_empty():
 		_next_target()
 		return
-	var c: Vector2 = face["center"]
-	var target_point := Vector3(c.x, float(face["top_y"]) + 0.4, c.y)
-	var closest := NavigationServer3D.map_get_closest_point(_map_rid, target_point)
-	_last_path = NavigationServer3D.map_get_path(
-			_map_rid, _player.global_position, closest, true)
-	_last_path = _simplify_path(_last_path)
+	# 目标点回退（2026-08-14 拍板）：面中心不一定在导航面上（祭坛台面心被基座+
+	# 四斜板密封成导航孤岛）——按序尝试 面中心 → 面矩形四角 → 四边中点（固定
+	# 顺序确定性）；全部路径末端距目标 > NO_PATH_DIST 才判 no_path
+	var plan := _plan_to_face(face)
+	if plan["found"] == false:
+		# no_path 无计划：清空路径/段再开 attempt——_build_plan_dict 读到的是
+		# 上一目标的 _last_path/_segments，不清理 plan 字段会带旧数据
+		# （T6 分析会采信，失真不可接受）
+		_last_path = PackedVector3Array()
+		_segments = []
+		_begin_attempt("")
+		_end_attempt("no_path", "路径末端距目标 %.2fm（面中心及四角/边中点均不可达）"
+				% plan["best_end"])
+		return
+	_last_path = _simplify_path(plan["path"])
 	_segments = classify_segments(_last_path, _links) if not _last_path.is_empty() else []
 	_seg_idx = 0
-	var end_dist := 999.0
-	if not _last_path.is_empty():
-		end_dist = _last_path[_last_path.size() - 1].distance_to(closest)
-	if _last_path.is_empty() or end_dist > NO_PATH_DIST:
-		_begin_attempt("")
-		_end_attempt("no_path", "路径末端距目标 %.2fm" % end_dist)
-		return
 	_begin_attempt(_first_link_name())
 	_state = _State.WALK
 	_reset_stuck()
 	_hud_update("行走", "寻路")
+
+
+## 面目标点按序寻路（确定性）：面中心 → 四角（固定顺序）→ 四边中点。
+## 每个候选：先验 snap 距离 ≤ TARGET_SNAP_TOL（防 closest 落到邻近面）且
+## 路径末端距 snap 点 ≤ NO_PATH_DIST → 采用；全不可达 → found=false + best_end
+## （各候选路径末端距的最小值，供 no_path 失败原因）。
+func _plan_to_face(face: Dictionary) -> Dictionary:
+	var best_end := 999.0
+	var from := _player.global_position
+	for cand in _face_target_candidates(face):
+		var closest := NavigationServer3D.map_get_closest_point(_map_rid, cand)
+		if closest.distance_to(cand) > TARGET_SNAP_TOL:
+			continue
+		var path: PackedVector3Array = NavigationServer3D.map_get_path(
+				_map_rid, from, closest, true)
+		if path.size() < 2:
+			continue
+		var end_dist: float = path[path.size() - 1].distance_to(closest)
+		best_end = minf(best_end, end_dist)
+		if end_dist <= NO_PATH_DIST:
+			return {"found": true, "path": path, "closest": closest, "best_end": best_end}
+	return {"found": false, "path": PackedVector3Array(), "closest": Vector3.ZERO,
+			"best_end": best_end}
+
+
+## 目标候选点（固定顺序确定性）：面中心 → 四角 (+x,+z)/(−x,+z)/(+x,−z)/(−x,−z)
+## → 四边中点 (+x)/(−x)/(+z)/(−z)。y 均为面顶 + 0.4（导航面高度口径）
+func _face_target_candidates(face: Dictionary) -> Array:
+	var c: Vector2 = face["center"]
+	var sz: Vector2 = face["size"]
+	var hx: float = sz.x * 0.5
+	var hz: float = sz.y * 0.5
+	var y: float = float(face["top_y"]) + 0.4
+	return [
+		Vector3(c.x, y, c.y),
+		Vector3(c.x + hx, y, c.y + hz),
+		Vector3(c.x - hx, y, c.y + hz),
+		Vector3(c.x + hx, y, c.y - hz),
+		Vector3(c.x - hx, y, c.y - hz),
+		Vector3(c.x + hx, y, c.y),
+		Vector3(c.x - hx, y, c.y),
+		Vector3(c.x, y, c.y + hz),
+		Vector3(c.x, y, c.y - hz),
+	]
 
 
 ## 路径段分类：path 相邻点对与 links 端点（已 snap 的 from/to）首尾双向匹配 ≤1.0m → 跳跃段；
@@ -346,6 +431,11 @@ func _physics_process(delta: float) -> void:
 		return
 	if _player == null:
 		return
+	# 会话计时（active 期间累计）：达上限 → 暂停（进行中 attempt 按 "aborted" 收尾）
+	_session_t += delta
+	if _session_t >= _session_timeout:
+		_pause_timeout()
+		return
 	# 坠落：y < FALL_Y → 传送 spawn（teleported 标记）→ verdict "fell"
 	if _player.global_position.y < FALL_Y:
 		_teleport_to(_spawn)
@@ -385,6 +475,8 @@ func _first_link_name() -> String:
 
 ## plan 序列化（JSON 安全：路径点/段表转普通数组）
 func _build_plan_dict() -> Dictionary:
+	if _last_path.is_empty():
+		return {}  # no_path 无计划（防御：正常情况下 _next_target 已先清空）
 	var pts := []
 	for p in _last_path:
 		pts.append([snappedf(p.x, 0.001), snappedf(p.y, 0.001), snappedf(p.z, 0.001)])
@@ -400,6 +492,12 @@ func _build_plan_dict() -> Dictionary:
 
 ## 收 attempt：end_attempt + set_progress + 信号 + HUD → 下一目标
 func _end_attempt(verdict: String, failure_reason: String) -> void:
+	_finalize_attempt(verdict, failure_reason)
+	_next_target()
+
+
+## attempt 收尾落盘（不含下一目标调度——超时暂停的 "aborted" 收尾复用本函数）
+func _finalize_attempt(verdict: String, failure_reason: String) -> void:
 	if not _attempt_active:
 		return
 	_attempt_active = false
@@ -413,7 +511,6 @@ func _end_attempt(verdict: String, failure_reason: String) -> void:
 	progress_changed.emit(_processed, _total_targets,
 			int(counters.get("success", 0)), int(counters.get("failed", 0)))
 	_hud_update(verdict, verdict)
-	_next_target()
 
 
 ## 每物理帧采样（t_ms/p/v/yaw/pitch=head.rotation.x/axis/crouch=false/
@@ -458,9 +555,34 @@ func _teleport_to(pos: Vector3) -> void:
 func _finish_all() -> void:
 	done = true
 	active = false
+	session_state = "done"
 	_cmd.move_axis = Vector2.ZERO
 	_hud_update("完成", "完成")
 	finished.emit()
+
+
+## 会话超时暂停：进行中 attempt 按 "aborted" 收尾落盘（failure_reason="30 分钟到"），
+## active=false、状态 paused_timeout、发 timeout_paused + HUD（hint 供 T5 显示 R 重启）
+func _pause_timeout() -> void:
+	if _attempt_active:
+		_finalize_attempt("aborted", "30 分钟到")
+	active = false
+	session_state = "paused_timeout"
+	_cmd.move_axis = Vector2.ZERO
+	_cmd.jump_pressed = false
+	if _hud.is_valid():
+		var counters: Dictionary = _record.summary_dict().get("counters", {})
+		_hud.call({
+			"state": "已暂停（30 分钟到）",
+			"target": _target_name,
+			"action": "完成",
+			"visited": _processed,
+			"total": _total_targets,
+			"success": int(counters.get("success", 0)),
+			"fail": int(counters.get("failed", 0)),
+			"hint": "按 R 重启测试流程",
+		})
+	timeout_paused.emit()
 
 
 ## HUD 回调（状态/目标/动作变化时；动作 ∈ "寻路/行走/跳跃n/重试/完成"）
@@ -580,16 +702,10 @@ func _replan_from_current() -> bool:
 	var face: Dictionary = _faces_by_name.get(_target_name, {})
 	if face.is_empty():
 		return false
-	var c: Vector2 = face["center"]
-	var target_point := Vector3(c.x, float(face["top_y"]) + 0.4, c.y)
-	var closest := NavigationServer3D.map_get_closest_point(_map_rid, target_point)
-	var path: PackedVector3Array = NavigationServer3D.map_get_path(
-			_map_rid, _player.global_position, closest, true)
-	if path.size() < 2:
+	var plan := _plan_to_face(face)
+	if plan["found"] == false:
 		return false
-	if path[path.size() - 1].distance_to(closest) > NO_PATH_DIST:
-		return false
-	_last_path = _simplify_path(path)
+	_last_path = _simplify_path(plan["path"])
 	_segments = classify_segments(_last_path, _links)
 	_seg_idx = 0
 	return true

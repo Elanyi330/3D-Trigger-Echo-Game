@@ -3,9 +3,12 @@
 # 装配同 probe_navmesh 流程 + test_auto_command 的 Player 实例化：
 #   MapGreybox + NavigationRegion3D(navmesh.res) + 54 NavigationLink3D（snap）+
 #   Player.tscn + AutoTraversal（先于 Player add_child，命令先行树序）。
-# 目标限定 ["WestTowerBox", "WestClusterN_Box"]（两个跳跃链接目标 Δh0.9；
-# brief 原文 AltarPlatform 步行目标实测导航孤岛阻断、EastPavilion 实测楔角卡死，
-# 按 brief 逃生条款换等价跳跃目标 WestClusterN_Box）。
+# 测试 1 目标限定 ["WestTowerBox", "WestClusterN_Box", "AltarPlatform"]：
+#   WestTowerBox=跳跃链接目标（TowerBox_W Δh0.9）；WestClusterN_Box=brief 逃生
+#   条款的等价跳跃目标（Crate_WN Δh0.9）；AltarPlatform=步行目标——面心被基座+
+#   四斜板密封成导航孤岛，验证 2026-08-14 拍板的目标点回退（面中心→四角/边中点）
+#   后经偏点可达（verdict ≠ "no_path"）。
+# 测试 2：30 分钟会话超时暂停 + restart_session 恢复（注入 0.5s 超时）。
 # 断点：done 或 success≥2 或 90s 超时（超时即失败，防 CI 挂死）。
 # T3 唯一允许的慢测试（物理秒 30-60s）；其余逻辑测试保持毫秒级。
 extends GutTest
@@ -27,7 +30,10 @@ func after_each() -> void:
 	_clean_tmp()
 
 
-func test_full_traversal() -> void:
+# 装配：灰盒 + 导航区域 + 54 链接（snap）+ AutoTraversal（先于 Player）+ 记录器。
+# 返回 {"autopilot": AutoTraversal, "player": MovementController,
+#        "record": AutoTraversalRecord, "hash": String}。
+func _assemble() -> Dictionary:
 	# 1. 灰盒 + 导航区域
 	var map := MapGreybox.new()
 	add_child_autofree(map)
@@ -73,29 +79,31 @@ func test_full_traversal() -> void:
 			LAYOUT.all_solids(), MovementController.MOVEMENT_REV)
 	record.setup(hash_str, TMP_DIR)
 	record.set_target_faces(160)
+	return {"autopilot": autopilot, "player": player, "record": record,
+			"hash": hash_str}
+
+
+func test_full_traversal() -> void:
+	var a := await _assemble()
+	var autopilot: AutoTraversal = a["autopilot"]
+	var record: AutoTraversalRecord = a["record"]
+	var hash_str: String = a["hash"]
 
 	# 6-7. 装配 + 限定目标 + 启动
-	autopilot.setup(player, record, Callable())
-	# 两个跳跃链接目标（brief 逃生条款：WestClusterN_Box 为 brief 原文建议的等价
-	# 跳跃目标，Crate_WN 链接 Δh0.9 人类 p50=4.012）。原步行目标 AltarPlatform 实测
-	# 意外阻断：祭坛面心 (0,0.6,0) 被基座+四斜板面接触密封成导航孤岛（path 末端距
-	# 目标 2.38m > 0.8 → no_path 判据命中）；EastPavilion 步道为 台阶+摊阁 直角
-	# 楔角几何（贴墙+登台互斥，step-up 净空三连被相邻墙体接触阻断，实测卡死）。
-	# 两目标路径均为开阔地行走 + 直坡道 + 跳跃，无楔角几何。
-	autopilot.set_target_faces(["WestTowerBox", "WestClusterN_Box"])
+	autopilot.setup(a["player"], record, Callable())
+	# WestTowerBox=跳跃链接目标（TowerBox_W Δh0.9）；WestClusterN_Box=brief 逃生
+	# 条款的等价跳跃目标（Crate_WN Δh0.9）；AltarPlatform=步行目标（面心被基座+
+	# 四斜板密封成导航孤岛——验证 2026-08-14 拍板的目标点回退后经偏点可达）。
+	autopilot.set_target_faces(["WestTowerBox", "WestClusterN_Box", "AltarPlatform"])
 	autopilot.start()
 
-	# 8. 驱动循环至 done / success≥2 / 90s 超时
+	# 8. 驱动循环至 done / 90s 超时（三目标全部处理完才 done——success 提前
+	# 断点会跳过 AltarPlatform 的偏点回退验证）
 	var max_frames := int(MAX_SECONDS * 60.0)
 	var frames := 0
-	while frames < max_frames:
+	while frames < max_frames and not autopilot.done:
 		await wait_physics_frames(1)
 		frames += 1
-		if autopilot.done:
-			break
-		var counters: Dictionary = record.summary_dict().get("counters", {})
-		if int(counters.get("success", 0)) >= 2:
-			break
 	print("SMOKE frames=", frames,
 			" done=", autopilot.done,
 			" summary=", record.summary_dict())
@@ -110,6 +118,10 @@ func test_full_traversal() -> void:
 			"跳跃链接目标 WestTowerBox 应成功")
 	assert_ne(pf["WestTowerBox"]["link"], "",
 			"WestTowerBox 的 attempt 应经跳跃链接执行")
+	# 目标点回退验证：AltarPlatform 面心为导航孤岛，经偏点回退后不得判 no_path
+	assert_true(pf.has("AltarPlatform"), "AltarPlatform 应有 attempt 记录")
+	assert_ne(pf["AltarPlatform"]["verdict"], "no_path",
+			"AltarPlatform 应经目标点回退（面中心→四角/边中点）可达，非 no_path")
 
 	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
 	assert_true(adir != null and adir.get_files().size() > 0,
@@ -119,6 +131,62 @@ func test_full_traversal() -> void:
 	assert_eq(manifest["map_hash"], hash_str,
 			"manifest.map_hash == 当前布局哈希")
 	assert_gte(record.attempt_count(), 2, "attempt_count ≥ 2")
+
+
+# 会话超时暂停 + 重启（2026-08-14 用户拍板：单次自动运行 ≤30 分钟——注入 0.5s 验证）
+func test_session_timeout_pause_and_restart() -> void:
+	var a := await _assemble()
+	var autopilot: AutoTraversal = a["autopilot"]
+	var record: AutoTraversalRecord = a["record"]
+
+	var hud_states: Array = []
+	var got_signal := [false]
+	autopilot.setup(a["player"], record, func(p: Dictionary) -> void:
+		hud_states.append(str(p.get("state", ""))))
+	autopilot.timeout_paused.connect(func() -> void: got_signal[0] = true)
+	autopilot.set_session_timeout(0.5)
+	autopilot.set_target_faces(["WestClusterN_Box"])
+	autopilot.start()
+
+	# 等 timeout_paused（≤10s 防挂）
+	var frames := 0
+	while frames < 600 and not got_signal[0]:
+		await wait_physics_frames(1)
+		frames += 1
+	assert_true(got_signal[0], "超时到点应触发 timeout_paused 信号（实际 %d 帧）" % frames)
+	assert_eq(autopilot.session_state, "paused_timeout", "状态应为 paused_timeout")
+	assert_false(autopilot.active, "暂停后 active=false")
+	var paused_seen := false
+	for st in hud_states:
+		if String(st).contains("已暂停"):
+			paused_seen = true
+	assert_true(paused_seen, "hud 回调状态应含「已暂停」")
+
+	# 重启：清暂停、计时归零、进度从 summary 继续（aborted 面重试）
+	autopilot.restart_session()
+	assert_true(autopilot.active, "restart_session 后 active=true")
+	assert_eq(autopilot.session_state, "active", "restart_session 后状态 active")
+
+	# 计时已归零：再跑 0.5s 又触发一次 timeout_paused
+	got_signal[0] = false
+	frames = 0
+	while frames < 600 and not got_signal[0]:
+		await wait_physics_frames(1)
+		frames += 1
+	assert_true(got_signal[0],
+			"重启后计时归零——再 0.5s 又触发 timeout_paused（实际 %d 帧）" % frames)
+	assert_eq(autopilot.session_state, "paused_timeout", "二次暂停状态 paused_timeout")
+
+	# aborted 收尾落盘验证
+	var aborted_seen := false
+	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
+	if adir != null:
+		for f in adir.get_files():
+			var head: Dictionary = JSON.parse_string(
+					FileAccess.get_file_as_string(TMP_DIR.path_join("attempts").path_join(f)).split("\n")[0])
+			if head.get("verdict", "") == "aborted":
+				aborted_seen = true
+	assert_true(aborted_seen, "暂停时进行中的 attempt 应按 aborted 收尾落盘")
 
 
 # ---- 工具（独立实现——测试不依赖被测代码） ----
