@@ -127,6 +127,8 @@ user://auto_traversal/
   - **轮询式输入**（WeaponManager 开火轮询 `is_action_pressed("fire")`、Crouch 蹲伏轮询 `is_action_pressed("sprint")`）：事件消费拦不住 Input 轮询 → 运行期间这两个节点 `process_mode = DISABLED` 挂起（done/结束后恢复）。
   - MovementController 的移动/跳跃已被 command_override 接管，真实输入天然无效。
 - **Esc：直接退出程序**（ui_cancel → get_tree().quit()，训练结束；记录已实时落盘不丢）。
+- **单次自动运行 30 分钟上限（用户 2026-08-14 拍板）**：active 期间累计计时达 1800s → 界面暂停（paused_timeout，未完成 attempt 按 aborted 收尾落盘）+ HUD 显示**「按 R 重启测试流程」**；R 键 = restart_session（进度从 summary 保留继续，新一个 30 分钟窗口）。
+- **训练期间临时取消一局 8 分钟时间上限（用户拍板）**：L_M2 在自动运行期间 `_match.process_mode = DISABLED` 冻结局时（防结算面板冻结玩家中断训练），done/退出后恢复。
 - **跨会话续跑**：manifest/summary 哈希一致即恢复已访问面集合，下次启动 P 从上次进度继续（"Esc 退出"流程的闭环）。
 - 全部 160 面处理完（done）→ 解锁操作 + HUD 显示完成（Esc 仍退出，P 可重启新一轮）。
 - HUD 右上角面板：`自动遍历中`｜目标：<面名>｜动作：寻路/行走/跳跃n/重试｜`已处理 X/160 · 成功 S · 失败 F`｜`Esc 退出程序`。
