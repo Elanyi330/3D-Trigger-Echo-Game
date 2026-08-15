@@ -56,3 +56,11 @@
 **修复**：链接节点改**地图同步后创建**（`_create_nav_links_after_sync`：迭代哨兵基值相对 +2——navmesh 第二迭代才可查询，实现者实测 iter 1 仍返 (0,0,0)；`_query_nav_point` 瞬时失败重试 ≤10 帧——GUT 复现率 1/3 的再同步窗口 flake）+ 删除旧快照函数 + TRAVERSAL_REV r4。
 **验证**：probe_lifecycle2 **存活 54/54、死亡 0**、spawn→箱顶路径到达；冒烟 5/5×10 遍确定性；GUT 387/387；walk 79/79；navmesh 全过。审查 APPROVE_WITH_NOTES（2 Minor 文案/注释）。
 **教训（重要）**：①NavigationLink3D **被丢弃即永久**——必须首注册有效端点，事后快照无法复活；②map_is_active 假阳性不可作哨兵；③navmesh 区域解析需两轮迭代；④closest 查询在迭代达标后仍有瞬时失败窗口（需重试）。
+
+## F5-F7 执行层优化轮（2026-08-15，用户"失败率非常高"反馈驱动）
+
+**失败样本分析**（r4 时代 160 attempts 67/93）：no_path 剩余 ~30 全为真不可达面（正确数据）；主导失败=**卡死 28**（压墙干顶机制：位置冻结/速度非零/命令前进——样本逐帧实证）+ **跳空 16**（箱→面板 M4 类 + 链中跳）。
+**F5**：行走滑墙（实现者实证修正：速度方向不可用→改"到目标方向投影到墙面+固定侧向兜底"）+ 行走坠落重规划；8 分钟数据验证 stuck 28→2（降 93%）。
+**F6**：TO_ANCHOR 滑墙+坠落→重试、阈值 0.5→0.2；GateN_WingE 转 jump_missed（机制生效）；RimW_B 定位坡面基座棱角（is_on_wall=false 不触发——单面残余，机制文档化）。
+**F7（多路 finder 共识 Critical）**：press→follow 循环饿死卡死检测（锁存不清 press_t+超时重置卡死 → 冻结楔角无限循环挂到会话超时）——锁存清 press/超时退出喂卡死计时/`_reset_wall_state` 五调用点/TO_ANCHOR 实际指令语义/坠落检查前置+垂直退出/`_to_anchor_max_feet` 假阳性防护/r7。数据验证：stuck 3/105、max attempt 70.5s 无挂死、滑墙触发 87→22（循环假触发消除）。
+**终审 APPROVE_WITH_NOTES**：3 Minor（`_skip_jump`/`restart_session` 补 `_reset_wall_state`、注释精度）记下轮。
