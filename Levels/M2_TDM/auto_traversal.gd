@@ -1119,9 +1119,24 @@ func _jump_tick(delta: float) -> void:
 				return
 			# 以起跳速度 v 为目标的节流接近锚点（设计文档「直线加速至 v」：
 			# 全速冲刺会在锚点留下 ~6.35m/s 惯性，起跳速度远超规划 v 导致飞过落点）
-			_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
-					_approach_throttle(_anchor))) \
-					if _steer_toward(_anchor, delta) else Vector2.ZERO
+			# 修复 5（2026-08-15）：可攀踢面正压转向（与 WALK 同口径；锚点面高差
+			# _waypoint_surface_y(_anchor) − _feet_y()）——斜向压入的切向滑移把角色
+			# 沿踢面滑出坡道西缘；正对后斜切角归零、step-up 垂直抬升
+			var _riser_face := false
+			if _player.is_on_wall() and _waypoint_surface_y(_anchor) - _feet_y() > 0.0 \
+					and _waypoint_surface_y(_anchor) - _feet_y() <= 0.62:
+				for ci in _player.get_slide_collision_count():
+					var cn := _player.get_slide_collision(ci).get_normal()
+					if absf(cn.y) < 0.5:
+						_riser_face = true
+						_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
+								_approach_throttle(_anchor))) \
+								if _steer_toward(_player.global_position + cn, delta) else Vector2.ZERO
+						break
+			if not _riser_face:
+				_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
+						_approach_throttle(_anchor))) \
+						if _steer_toward(_anchor, delta) else Vector2.ZERO
 			# 压墙检测传实际施加的指令（F7-3）：先转向再取 _cmd 幅值——与 WALK
 			# 同口径；预测节流在转向帧假积累的洞
 			# 滑墙仅介入水平面途经点（面高−脚高 ≤ 0）：可攀台阶面的踢面是要爬的
