@@ -26,6 +26,7 @@ const VERT_KEEP := 0.2             # 与前保留点导航高度差 ≥ 此值�
 const STALL_TRIGGER_ALONG := 0.8   # 助跑撞墙停摆触发：距起跳点投影 ≤ 此值且贴墙 → 起跳
 const TURN_STOP_ANGLE := 1.4      # rad（≈80°）：转向差超过此值 → 原地转向（防满速甩尾）
 const RUNUP_TURN_GATE := 0.3   # rad（≈17°）：助跑转向门——转向差超此值原地转（F8 直线助跑）
+const VERTICAL_LINK_DIST := 0.05  # snap 后 from/to 水平距 < 此值 = 垂直链接（F12 原地直上跳）
 const WALL_PROBE_DIST := 0.6      # 助跑前向墙体探测距离：触墙前提前起跳（见 _runup_tick）
 const SESSION_TIMEOUT := 1800.0   # 单次自动运行上限（秒）——用户拍板 2026-08-14：≤30 分钟
 const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest 落到邻近面，probe_navmesh 同口径）
@@ -99,6 +100,7 @@ var _delta_h := 0.0
 var _runup_recover := 0
 var _runup_t := 0.0
 var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速度门 0.6v（2026-08-15 裁决 3）
+var _vertical_jump := false  # 当前跳跃为垂直链接模式（F12）：AIR 零水平输入、停摆唯一触发
 var _to_anchor_max_feet := 0.0    # TO_ANCHOR 期间脚高最大值（坠落判定的假阳性防护，2026-08-15 F7-5）
 var _walk_replanned := false
 var _jump_seg := {}
@@ -991,6 +993,7 @@ func _seg_is_down_drop(seg: Dictionary) -> bool:
 ## 助跑锚点（xz 钳入 from 面矩形）与空中超时（catch_window(delta_h).t_max + 1.5s）
 func _enter_jump(seg: Dictionary) -> void:
 	_jump_seg = seg
+	_vertical_jump = false
 	var link: Dictionary = seg["link"]
 	var lf: Vector3 = link["from"]
 	var lt: Vector3 = link["to"]
@@ -1018,6 +1021,10 @@ func _enter_jump(seg: Dictionary) -> void:
 	var zone_target: Vector3 = _zone_nearest_point(_from_point, _to_point)
 	if Vector2(zone_target.x - _from_point.x, zone_target.z - _from_point.z).length() >= 1.2:
 		_to_point = zone_target
+	# F12 垂直链接检测：snap 后 from/to 水平距 < VERTICAL_LINK_DIST（Crate_WN/WS/ES/EN
+	# 类「原地直上箱顶」链接——travel_dir 为零向量，方向语义不存在；执行改垂直模式）
+	_vertical_jump = Vector2(_to_point.x - _from_point.x,
+			_to_point.z - _from_point.z).length() < VERTICAL_LINK_DIST
 	# 起跳参数：edge 人类 p50（无 → 0）；v 钳入求解器可行带
 	var h := Vector3(_to_point.x - _from_point.x, 0.0, _to_point.z - _from_point.z)
 	var dist := h.length()
@@ -1218,6 +1225,12 @@ func _runup_tick(delta: float) -> void:
 	if _runup_t > 8.0:
 		_recover_runup()
 		return
+	# F11 压墙恢复：0.5s 压墙锁存 _wall_follow 后不走滑墙、直接 recover 回锚点重跑
+	# （≤3 次有界，_teleport_to 自带 _reset_wall_state 清锁存）——助跑楔墙冻结
+	# （EastSpurN「助跑卡死」：轨道漂移进墙角全速压墙位移 0）的有界化根治
+	if _wall_follow:
+		_recover_runup()
+		return
 	# F8 直线助跑：转向差 ≤ RUNUP_TURN_GATE 才前进（超差 → axis=0 原地转，TURN_RATE
 	# 4 rad/s 最坏 180° 转 0.78s）——消除纯追踪最小转弯圆轨道（R_min=v/ω 恒大于
 	# 0.6m 触发圆盘，v>2.4 时永不收敛的 30-43s 转圈根因）
@@ -1239,7 +1252,7 @@ func _runup_tick(delta: float) -> void:
 	# 墙探硬编码 0.9v（relaxed 口径漏）、停摆无门（任意速度贴墙即跳）；
 	# 现三路径共用 _try_trigger（速度门 + 方向锥，gate 随 relaxed 口径；
 	# F9 近静止按路径声明放行：停摆 true / 墙探·圆盘 false）。
-	if _try_trigger(gate_speed, true, false) and _wall_ahead():
+	if not _vertical_jump and _try_trigger(gate_speed, true, false) and _wall_ahead():
 		_trigger_jump()
 		return
 	# 撞墙停摆兜底（探测未覆盖的贴墙情形）：近静止（≤0.5m/s）按停摆路径声明放行
@@ -1248,6 +1261,9 @@ func _runup_tick(delta: float) -> void:
 			and _try_trigger(gate_speed, true, true):
 		_trigger_jump()
 		return
+	# F11 压墙检测放停摆之后：起跳点贴墙是设计内停摆跳（沿 ≤0.8 + on_wall 先行触发），
+	# 不能被压墙 recover 抢走；只有停摆不满足（跑道中段障碍楔死）才落压墙 → recover
+	_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(), delta)
 	# 触发条件（2026-08-14 修复轮改圆盘）：原沿线投影 ≤ trigger_distance 且横向
 	# ≤0.3m 的线窗口位于最小转弯圆之内不可达（TURN_RATE 4 rad/s 时 R_min =
 	# v/ω ≈ 0.52m > 窗口半径）→ 改为到起跳点水平距 ≤ 0.6m 的圆盘（0.6 > R_min
@@ -1327,7 +1343,7 @@ func _trigger_jump() -> void:
 func _air_tick(delta: float) -> void:
 	_air_t += delta
 	_steer_toward(_to_point, delta)
-	_cmd.move_axis = Vector2(0, 1)
+	_cmd.move_axis = Vector2.ZERO if _vertical_jump else Vector2(0, 1)
 	var on_floor := _player.is_on_floor()
 	var floor_now := _floor_name()
 	var verdict: Dictionary = landing_verdict(on_floor, floor_now,
