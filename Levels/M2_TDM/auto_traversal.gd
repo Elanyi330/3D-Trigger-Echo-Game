@@ -32,7 +32,7 @@ const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest �
 ## 遍历逻辑版本键（2026-08-15）：参与自动记录哈希——逻辑变更（链接触发/快照语义等）
 ## 自动作废旧记录重来（与 MovementController.MOVEMENT_REV 同铁律模式）。
 ## r1 = 首版（磁盘触发+最小转弯圆 bug 已修）；r2 起逻辑再变须 bump。
-const TRAVERSAL_REV := "at-r6:anchor-wall-follow"
+const TRAVERSAL_REV := "at-r7:wall-loop-liveness"
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
@@ -98,6 +98,7 @@ var _delta_h := 0.0
 var _runup_recover := 0
 var _runup_t := 0.0
 var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速度门 0.6v（2026-08-15 裁决 3）
+var _to_anchor_max_feet := 0.0    # TO_ANCHOR 期间脚高最大值（坠落判定的假阳性防护，2026-08-15 F7-5）
 var _walk_replanned := false
 var _jump_seg := {}
 # 行走滑墙（2026-08-15 F5）：压墙干顶是 26 卡死样本的共同机制
@@ -510,6 +511,7 @@ func _build_plan_dict() -> Dictionary:
 
 ## 收 attempt：end_attempt + set_progress + 信号 + HUD → 下一目标
 func _end_attempt(verdict: String, failure_reason: String) -> void:
+	_reset_wall_state()  # 跨 attempt 状态泄漏洞（F7-2）
 	_finalize_attempt(verdict, failure_reason)
 	_next_target()
 
@@ -572,6 +574,7 @@ func _floor_name() -> String:
 ## 本补偿；velocity 清零 + 清跳跃边沿（F3 审查 5：边沿仅落地帧被消费——空中触发后
 ## 重试传送会携带陈旧边沿，首个落地帧幽灵跳）。
 func _teleport_to(pos: Vector3) -> void:
+	_reset_wall_state()  # 跨传送状态泄漏洞（F7-2）
 	_player.global_position = pos + Vector3(0.0, FEET_OFFSET - 0.3, 0.0)
 	_player.velocity = Vector3.ZERO
 	_cmd.jump_pressed = false
@@ -690,15 +693,24 @@ func _stuck_check(delta: float) -> bool:
 ## 方向投影到墙面（减去墙法向分量；墙法向取滑动碰撞）。注意速度方向本身仍是
 ## 入墙的愿望向（控制器逐帧重建速度，move_and_slide 不写回切向——F5 样本实测
 ## 速度非零而位移冻结），直接用它只会继续干顶。投影 ≈0（target 正穿墙后）→
-## 固定侧向兜底（法向水平旋转 90°，确定性）。位移恢复 >0.3m 或 ≥2s → 退出。
-## 返回 true = 本帧滑墙接管（调用方设 move_axis 后 return）。
+## 固定侧向兜底（法向水平旋转 90°，确定性）。返回 true = 本帧滑墙接管。
+## 退出语义（2026-08-15 F7-1/4）：位移恢复 >0.3m 退出并重置卡死计时；2s 超时
+## 退出**不**重置卡死——冻结楔角下 press→follow 循环继续，但 _stuck_check 计时
+## 持续累积，5s 后照常裁决 stuck+传送（有界性恢复）；锁存起 |Δy| > 0.5 退出
+## （贴墙坠落不被滑墙掩盖）也不重置卡死。
 func _wall_follow_step(target: Vector3, delta: float) -> bool:
 	_wall_follow_t += delta
+	if absf(_player.global_position.y - _wall_follow_origin.y) > 0.5:
+		_wall_follow = false  # 垂直退出（坠落）——不重置卡死，交卡死/坠落兜底
+		return false
 	var follow_moved := Vector2(_player.global_position.x - _wall_follow_origin.x,
 			_player.global_position.z - _wall_follow_origin.z).length()
-	if follow_moved > 0.3 or _wall_follow_t >= 2.0:
-		_wall_follow = false  # 位移恢复/超时 → 退出滑墙，回到正常追踪
+	if follow_moved > 0.3:
+		_wall_follow = false  # 位移恢复 → 退出并重置卡死计时
 		_reset_stuck()
+		return false
+	if _wall_follow_t >= 2.0:
+		_wall_follow = false  # 超时退出——不重置卡死（喂卡死计时，F7-1 有界性）
 		return false
 	var to_t := target - _player.global_position
 	to_t.y = 0.0
@@ -725,7 +737,8 @@ func _wall_follow_step(target: Vector3, delta: float) -> bool:
 ## 压墙检测（滑墙前置，F5/F6 共享）：压墙期间（on_wall + 命令速度 ≥0.2——F6 阈值
 ## 放宽：RimW_B 样本低速节流 ~0.45 贴塔坡道棱角低于 0.5 漏检）位移 ≥0.05m 即
 ## 刷新窗口重新计时（=在滑动，非冻结干顶）；冻结（位移 <0.05m）才累计计时，
-## 0.5s 触发滑墙模式。
+## 0.5s 触发滑墙模式。锁存时清零 _wall_press_t（F7-1：滑墙结束后再压墙重新
+## 计时，防 press→follow 循环饿死卡死检测）。
 func _wall_press_detect(cmd_speed: float, delta: float) -> void:
 	if _player.is_on_wall() and cmd_speed >= 0.2:
 		if Vector2(_player.global_position.x - _wall_press_origin.x,
@@ -741,6 +754,17 @@ func _wall_press_detect(cmd_speed: float, delta: float) -> void:
 		_wall_follow = true
 		_wall_follow_t = 0.0
 		_wall_follow_origin = _player.global_position
+		_wall_press_t = 0.0
+
+
+## 滑墙状态生命周期重置（2026-08-15 F7-2）：跨相位/传送/attempt 的状态泄漏洞——
+## _enter_jump/_jump_success/_jump_fail/_end_attempt/_teleport_to 入口调用。
+func _reset_wall_state() -> void:
+	_wall_follow = false
+	_wall_follow_t = 0.0
+	_wall_follow_origin = Vector3.ZERO
+	_wall_press_t = 0.0
+	_wall_press_origin = Vector3.ZERO
 
 
 ## 逐段行走（jump 段前停下进入 JUMP）：cmd.move_axis=(0,1) 前进；
@@ -762,6 +786,15 @@ func _walk_tick(delta: float) -> void:
 	# 行走段（含下坠段：反向穿越上跳链接 = 自由落体下边缘——navmesh 下行本
 	# 无需跳跃，起跳执行只会反跳回低处徒增卡死面）
 	var waypoint: Vector3 = seg["end"]
+	# 行走坠落重规划（2026-08-15 F5，F7-4 前置到滑墙之前——贴墙坠落不被滑墙
+	# 掩盖）：掉下高面后旧路径失效——继续按旧路径方位会把玩家带进墙里干顶
+	# （RimW_B 样本机制）。每帧检查脚低于当前段终点表面 2.0m → 从当前位置重寻路
+	# （失败继续原路径交卡死兜底；每 attempt 一次有界）。
+	if _feet_y() < _waypoint_surface_y(waypoint) - 2.0 and not _walk_replanned:
+		if _replan_from_current():
+			_walk_replanned = true
+			_reset_stuck()
+			return
 	# 行走滑墙（2026-08-15 F5/F6 共享 _wall_follow_step）：压墙干顶是 26 卡死
 	# 样本的共同机制——纯方位追踪压墙只会顶着墙原地磨（位移 ~0 但速度/命令非零）。
 	# 人类绕墙行为的最小实现：连续 0.5s 压墙 → 滑墙（到途经点方向投影到墙面，
@@ -772,14 +805,6 @@ func _walk_tick(delta: float) -> void:
 	_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(), delta)
 	_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 			if _steer_toward(waypoint, delta) else Vector2.ZERO
-	# 行走坠落重规划（2026-08-15 F5）：掉下高面后旧路径失效——继续按旧路径方位
-	# 会把玩家带进墙里干顶（RimW_B 样本机制）。每帧检查脚低于当前段终点表面
-	# 2.0m → 从当前位置重寻路（失败继续原路径交卡死兜底；每 attempt 一次有界）。
-	if _feet_y() < _waypoint_surface_y(waypoint) - 2.0 and not _walk_replanned:
-		if _replan_from_current():
-			_walk_replanned = true
-			_reset_stuck()
-			return
 	if _arrived(waypoint):
 		_seg_idx += 1
 		_reset_stuck()
@@ -921,6 +946,8 @@ func _enter_jump(seg: Dictionary) -> void:
 	_air_timeout = float(w["t_max"]) + 1.5
 	_jump_phase = _JumpPhase.TO_ANCHOR
 	_state = _State.JUMP
+	_to_anchor_max_feet = _feet_y()  # 进入 TO_ANCHOR 时置当前脚高（F7-5 假阳性防护基准）
+	_reset_wall_state()  # 跨相位状态泄漏洞（F7-2）
 	_reset_stuck()
 	_hud_update("跳跃", "跳跃%d" % (_jump_retry + 1))
 
@@ -1002,25 +1029,30 @@ func _jump_tick(delta: float) -> void:
 			if _jump_already_crossed(_jump_seg):
 				_skip_jump(_jump_seg)
 				return
+			# TO_ANCHOR 坠落（F6；F7-4 前置到滑墙之前——贴墙坠落不被滑墙掩盖；
+			# F7-5 假阳性防护：曾到过锚点高度才判坠落——坡道低位进场/锚点 snap 到
+			# 高位邻面时不误判）。坠落离锚 → 走既有重试路径（传送回锚点重跑，
+			# 优于干顶卡死；3 次重试仍坠则记录）——不动锚点重算（简单方案）。
+			_to_anchor_max_feet = maxf(_to_anchor_max_feet, _feet_y())
+			if _to_anchor_max_feet > _waypoint_surface_y(_anchor) - 2.0 \
+					and _feet_y() < _waypoint_surface_y(_anchor) - 2.0:
+				_jump_fail("jump_missed", "锚点坠落")
+				return
 			# TO_ANCHOR 滑墙（2026-08-15 F6）：GateN_WingE「助跑锚点卡死」=
 			# 坠落压墙干顶（样本①同款）——与 WALK 相同机制接入共享滑墙。
 			if _wall_follow and _wall_follow_step(_anchor, delta):
 				_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
 						_approach_throttle(_anchor)))
 				return
-			_wall_press_detect(minf(_runup_throttle(),
-					_approach_throttle(_anchor)), delta)
-			# TO_ANCHOR 坠落（F6）：脚低于锚点表面 2m（坠落离锚）→ 走既有重试
-			# 路径（传送回锚点重跑，优于干顶卡死；3 次重试仍坠则记录）——不动
-			# 锚点重算（简单方案）。
-			if _feet_y() < _waypoint_surface_y(_anchor) - 2.0:
-				_jump_fail("jump_missed", "锚点坠落")
-				return
 			# 以起跳速度 v 为目标的节流接近锚点（设计文档「直线加速至 v」：
 			# 全速冲刺会在锚点留下 ~6.35m/s 惯性，起跳速度远超规划 v 导致飞过落点）
 			_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
 					_approach_throttle(_anchor))) \
 					if _steer_toward(_anchor, delta) else Vector2.ZERO
+			# 压墙检测传实际施加的指令（F7-3）：先转向再取 _cmd 幅值——与 WALK
+			# 同口径；预测节流在转向帧假积累的洞
+			_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(),
+					delta)
 			if _arrived(_anchor):
 				_jump_phase = _JumpPhase.RUNUP
 				_runup_t = 0.0
@@ -1191,6 +1223,7 @@ func _air_tick(delta: float) -> void:
 ## 逗留会产生连续两个同链接 jump 段，同一链接只执行一次）；落面 == 目标面 →
 ## 该目标面 success，否则继续走剩余段
 func _jump_success() -> void:
+	_reset_wall_state()  # 跨相位状态泄漏洞（F7-2）
 	_seg_idx += 1
 	while _seg_idx < _segments.size():
 		var s: Dictionary = _segments[_seg_idx]
@@ -1221,6 +1254,7 @@ func _current_link_name() -> String:
 ## 跳跃失败：≤ JUMP_RETRIES 次重试（第 2 次 v×1.05 钳 cap、第 3 次 from_point
 ## 沿 travel_dir 前移 0.1m；重试前传送回 anchor）；3 次失败 → 记录 → 传送 spawn
 func _jump_fail(verdict: String, reason: String) -> void:
+	_reset_wall_state()  # 跨相位状态泄漏洞（F7-2）
 	_jump_retry += 1
 	_params_used = _jump_params.duplicate()
 	_params_used["retries"] = _jump_retry
