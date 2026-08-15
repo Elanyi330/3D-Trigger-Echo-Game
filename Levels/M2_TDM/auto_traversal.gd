@@ -27,6 +27,7 @@ const STALL_TRIGGER_ALONG := 0.8   # 助跑撞墙停摆触发：距起跳点投�
 const TURN_STOP_ANGLE := 1.4      # rad（≈80°）：转向差超过此值 → 原地转向（防满速甩尾）
 const RUNUP_TURN_GATE := 0.3   # rad（≈17°）：助跑转向门——转向差超此值原地转（F8 直线助跑）
 const VERTICAL_LINK_DIST := 0.05  # snap 后 from/to 水平距 < 此值 = 垂直链接（F12 原地直上跳）
+const ANCHOR_REACH_EPS := 0.1  # 锚点可达性判差容差（F10）
 const WALL_PROBE_DIST := 0.6      # 助跑前向墙体探测距离：触墙前提前起跳（见 _runup_tick）
 const SESSION_TIMEOUT := 1800.0   # 单次自动运行上限（秒）——用户拍板 2026-08-14：≤30 分钟
 const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest 落到邻近面，probe_navmesh 同口径）
@@ -103,6 +104,7 @@ var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速�
 var _vertical_jump := false  # 当前跳跃为垂直链接模式（F12）：AIR 零水平输入、停摆唯一触发
 var _to_anchor_max_feet := 0.0    # TO_ANCHOR 期间脚高最大值（坠落判定的假阳性防护，2026-08-15 F7-5）
 var _walk_replanned := false
+var _anchor_fallback_done := false  # 锚点不可达重寻路一次性守卫（F10，跨 attempt 状态泄漏防护）
 var _jump_seg := {}
 # 行走滑墙（2026-08-15 F5）：压墙干顶是 26 卡死样本的共同机制
 var _wall_press_t := 0.0          # 压墙累计计时
@@ -525,6 +527,7 @@ func _begin_attempt(link: String) -> void:
 	_teleported = false
 	_params_used = {}
 	_walk_replanned = false
+	_anchor_fallback_done = false
 	_record.begin_attempt(_target_name, link, _build_plan_dict())
 
 
@@ -1049,6 +1052,17 @@ func _enter_jump(seg: Dictionary) -> void:
 	# 加速至 ~3m/s，落点近缘可达。
 	_speed_gate_relaxed = Vector2(_from_point.x - _anchor.x,
 			_from_point.z - _anchor.z).length() < 1.2
+	# F10 锚点可达性预检：锚点面高 − 脚高 > STEP_MAX(0.62) + 容差 → 步行不可达
+	# （箱顶锚点 + 人在箱底类压墙 23s 的根治——0.8m > step-up 0.62 走不上去）。
+	# 重寻路一次（新路径可含 Crate_WS 类上箱链接 → 正常执行）；仍不可达 → 诚实失败。
+	# 不判「锚点低于脚」：下行走下边缘是设计内，TO_ANCHOR 坠落重试已兜底。
+	if _waypoint_surface_y(_anchor) - _feet_y() > 0.62 + ANCHOR_REACH_EPS:
+		if not _anchor_fallback_done and _replan_from_current():
+			_anchor_fallback_done = true
+			return
+		_end_attempt("jump_missed", "锚点不可达（面高差 %.2fm）"
+				% (_waypoint_surface_y(_anchor) - _feet_y()))
+		return
 	_air_t = 0.0
 	var w := JumpSolver.catch_window(_delta_h)
 	_air_timeout = float(w["t_max"]) + 1.5

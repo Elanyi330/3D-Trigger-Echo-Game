@@ -141,10 +141,12 @@ func _assemble() -> Dictionary:
 			"hash": hash_str}
 
 
-## 驱动至 done 或帧数上限（≤MAX_SECONDS），返回消耗帧数
-func _drive(autopilot: AutoTraversal, record: AutoTraversalRecord) -> int:
+## 驱动至 done 或帧数上限（≤max_seconds，默认 MAX_SECONDS），返回消耗帧数。
+## 测试 12（F10）按 brief 用 90s 上限（面板跳重试路径更长），加默认参不扰既有调用。
+func _drive(autopilot: AutoTraversal, record: AutoTraversalRecord,
+		max_seconds: float = MAX_SECONDS) -> int:
 	var frames := 0
-	var max_frames := int(MAX_SECONDS * 60.0)
+	var max_frames := int(max_seconds * 60.0)
 	while frames < max_frames and not autopilot.done:
 		await wait_physics_frames(1)
 		frames += 1
@@ -288,3 +290,61 @@ func test_normal_link_still_works() -> void:
 	assert_eq(pf["WestTowerBox"]["verdict"], "success",
 			"正常链接目标 WestTowerBox 应 success（F11/F12 不破坏正常跳跃）")
 	assert_ne(pf["WestTowerBox"]["link"], "", "链接必须被使用")
+
+
+# 12. 锚点不可达诚实失败锚（F10）：WestClusterS_Panel——23s 压墙样本（锚点在 0.8m
+#     箱顶、人在箱底）。目标限定 ["WestClusterS_Panel"]，驱动 ≤90s →
+#     断言：per_face 有记录；verdict != "stuck"；且（verdict == "success" 或
+#     failure_reason 含 "锚点不可达"）——重寻路经 Crate_WS 上箱后可 success（更优
+#     结局），两种结局都证明压墙卡死路径被根治；另断言该 attempt 帧数 < 40*60
+#     （frame_count 从 attempts/ep_*.jsonl head 读）防压墙长挂回归
+func test_anchor_unreachable_fallback() -> void:
+	var a := await _assemble()
+	var autopilot: AutoTraversal = a["autopilot"]
+	var record: AutoTraversalRecord = a["record"]
+	autopilot.setup(a["player"], record, Callable())
+	autopilot.set_target_faces(["WestClusterS_Panel"])
+	autopilot.start()
+	var frames := await _drive(autopilot, record, 90.0)
+	# 装配竞态加固（与测试 10 同口径，2026-08-16 控制器裁决 + R2 审查 Major 1）：
+	# frames<120 且 no_path = start() 同步规划时导航图未就绪 → 清临时目录重新装配
+	# 完整重跑第二轮；第二轮仍同形态 → 直接失败。
+	if frames < 120 and record.summary_dict().get("per_face", {}) \
+			.get("WestClusterS_Panel", {}).get("verdict", "") == "no_path":
+		print("RUNUP12 retry: round1 frames=", frames)
+		autopilot.free()
+		a["player"].free()
+		_clean_tmp()
+		a = await _assemble()
+		autopilot = a["autopilot"]
+		record = a["record"]
+		autopilot.setup(a["player"], record, Callable())
+		autopilot.set_target_faces(["WestClusterS_Panel"])
+		autopilot.start()
+		frames = await _drive(autopilot, record, 90.0)
+		assert_false(frames < 120 and record.summary_dict().get("per_face", {}) \
+				.get("WestClusterS_Panel", {}).get("verdict", "") == "no_path",
+				"导航竞态二次重跑仍失败")
+	var head := {}
+	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
+	if adir != null:
+		for f in adir.get_files():
+			var h: Dictionary = JSON.parse_string(
+					FileAccess.get_file_as_string(
+					TMP_DIR.path_join("attempts").path_join(f)).split("\n")[0])
+			if h.get("face", "") == "WestClusterS_Panel":
+				head = h
+	print("RUNUP12 frames=", frames, " done=", autopilot.done,
+			" summary=", record.summary_dict())
+	assert_true(autopilot.done,
+			"WestClusterS_Panel 应在 90s 内完成（超时=压墙长挂未根治）")
+	var pf: Dictionary = record.summary_dict()["per_face"]
+	assert_true(pf.has("WestClusterS_Panel"), "WestClusterS_Panel 应有 attempt 记录")
+	var verdict: String = str(pf["WestClusterS_Panel"]["verdict"])
+	assert_ne(verdict, "stuck", "压墙卡死路径必须被根治（verdict 不得为 stuck）")
+	var reason: String = str(head.get("failure_reason", "MISSING"))
+	assert_true(verdict == "success" or reason.contains("锚点不可达"),
+			"结局应为 success 或诚实失败「锚点不可达」，实际 verdict=%s reason=%s"
+			% [verdict, reason])
+	assert_lt(int(head.get("frame_count", 1 << 30)), 40 * 60,
+			"attempt 帧数应 < 40*60（防压墙长挂回归）")
