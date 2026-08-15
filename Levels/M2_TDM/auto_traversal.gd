@@ -108,6 +108,7 @@ var _wall_press_origin := Vector3.ZERO
 var _wall_follow := false         # 滑墙模式
 var _wall_follow_t := 0.0
 var _wall_follow_origin := Vector3.ZERO
+var _wall_follow_dir := Vector3.ZERO  # 滑墙手性锁存（F8-F13 修复轮）：首帧锁存初始切向，滑墙期间保持
 
 # 会话计时（active 期间累计；达上限 → 暂停）
 var _session_timeout := SESSION_TIMEOUT
@@ -402,6 +403,19 @@ static func trigger_allowed(jump_v: float, hspeed: float, v_h: Vector2, td: Vect
 	if require_heading and td.length() > 0.01 and v_h.dot(td) < 0.9 * hspeed:
 		return false
 	return true
+
+
+## 滑墙切向（2026-08-15 F8-F13 修复轮）：到目标方向投影到墙面（减墙法向分量）；
+## 投影 < 0.1（目标正穿墙后）→ 用锁存手性（latched，滑墙期间保持的初始方向——
+## 防投影零点两侧翻转换向的 0.3m 滑移振荡）；锁存为零（首帧）→ 固定侧向兜底。
+static func wall_follow_tangent(to_t: Vector3, wall_n: Vector3, latched: Vector3) -> Vector3:
+	var tangent := to_t - wall_n * to_t.dot(wall_n)
+	tangent.y = 0.0
+	if tangent.length() < 0.1:
+		if latched.length() > 0.01:
+			return latched.normalized()
+		return Vector3(wall_n.z, 0.0, -wall_n.x)
+	return tangent.normalized()
 
 
 ## 路径段分类：path 相邻点对与 links 端点（已 snap 的 from/to）首尾双向匹配 ≤1.0m → 跳跃段；
@@ -745,14 +759,10 @@ func _wall_follow_step(target: Vector3, delta: float) -> bool:
 		if absf(cn.y) < 0.5:
 			wall_n = cn
 			break
-	var tangent := to_t
-	if wall_n.length() > 0.01:
-		tangent -= wall_n * tangent.dot(wall_n)
-	tangent.y = 0.0
-	if tangent.length() < 0.1:
-		tangent = Vector3(wall_n.z, 0.0, -wall_n.x)
+	var tangent: Vector3 = wall_follow_tangent(to_t, wall_n, _wall_follow_dir)
+	if _wall_follow_dir.length() <= 0.01 and tangent.length() > 0.01:
+		_wall_follow_dir = tangent  # 首帧锁存手性
 	if tangent.length() > 0.01:
-		tangent = tangent.normalized()
 		var tangent_yaw := atan2(-tangent.x, -tangent.z)
 		_player.rotation.y = lerp_angle(_player.rotation.y, tangent_yaw,
 				clampf(TURN_RATE * delta, 0.0, 1.0))
@@ -788,6 +798,7 @@ func _reset_wall_state() -> void:
 	_wall_follow = false
 	_wall_follow_t = 0.0
 	_wall_follow_origin = Vector3.ZERO
+	_wall_follow_dir = Vector3.ZERO
 	_wall_press_t = 0.0
 	_wall_press_origin = Vector3.ZERO
 
@@ -820,6 +831,18 @@ func _walk_tick(delta: float) -> void:
 			_walk_replanned = true
 			_reset_stuck()
 			return
+	# 滑墙前置可达性守卫（2026-08-15 F8-F13 修复轮）：途经点面高 − 脚高 >
+	# 0.72（step-up 0.62 + 容差）→ 到达判定必失败，滑墙无意义——优先重寻路绕行
+	# （WestTowerBox 基座压墙振荡 + 用户 23s 箱底压墙样本同源根治；重寻路后
+	# 新路径的首段为短段，不再切角穿墙）
+	if _wall_follow and _waypoint_surface_y(waypoint) - _feet_y() > 0.72:
+		if not _walk_replanned and _replan_from_current():
+			_walk_replanned = true
+			_reset_wall_state()
+			_reset_stuck()
+			return
+		_wall_follow = false  # 重寻路不可用 → 撤滑墙回普通转向（卡死检测有界兜底）
+		return
 	# 行走滑墙（2026-08-15 F5/F6 共享 _wall_follow_step）：压墙干顶是 26 卡死
 	# 样本的共同机制——纯方位追踪压墙只会顶着墙原地磨（位移 ~0 但速度/命令非零）。
 	# 人类绕墙行为的最小实现：连续 0.5s 压墙 → 滑墙（到途经点方向投影到墙面，

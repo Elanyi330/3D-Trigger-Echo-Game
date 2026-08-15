@@ -39,3 +39,16 @@ func test_trigger_allowed_determinism() -> void:
 	var a := AT.trigger_allowed(5.0, 4.5, Vector2(4.5, 0), Vector2(1, 0), 4.0, true, true)
 	var b := AT.trigger_allowed(5.0, 4.5, Vector2(4.5, 0), Vector2(1, 0), 4.0, true, true)
 	assert_eq(a, b)
+
+# 7. 滑墙切向手性锁存锚（纯逻辑）：投影充足 → 投影切线；投影 <0.1 + 锁存非零 →
+#    锁存方向；投影 <0.1 + 锁存零 → 固定兜底 (wall_n.z, -wall_n.x)
+func test_wall_follow_tangent_latch() -> void:
+	var wall_n := Vector3(1, 0, 0)
+	var t1: Vector3 = AT.wall_follow_tangent(Vector3(0, 0, 5), wall_n, Vector3.ZERO)
+	assert_eq(t1, Vector3(0, 0, 1))
+	var t2: Vector3 = AT.wall_follow_tangent(Vector3(1, 0, 0), wall_n, Vector3(0, 0, -1))
+	assert_eq(t2, Vector3(0, 0, -1))
+	var t3: Vector3 = AT.wall_follow_tangent(Vector3(1, 0, 0), wall_n, Vector3.ZERO)
+	assert_eq(t3, Vector3(0, 0, -1))
+	var t4: Vector3 = AT.wall_follow_tangent(Vector3(1, 0, 0.01), wall_n, Vector3(0, 0, 1))
+	assert_eq(t4, Vector3(0, 0, 1))
