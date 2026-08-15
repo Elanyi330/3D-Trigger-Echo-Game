@@ -406,3 +406,87 @@ func test_degenerate_runup_bounded() -> void:
 	assert_lt(int(head.get("frame_count", 1 << 30)), 35 * 60,
 			"attempt 帧数应 < 35*60（退化跑道死锁压缩），实际 %s"
 			% str(head.get("frame_count")))
+
+
+# 14. 途经点进展超时锚（F13）：EastTower（原 71s attempt：34s 转圈 + 21s 楔死冻结样本）
+#     目标限定 ["EastTower"]，驱动 ≤60s → 断言 attempt 帧数 < 40*60（有界压缩）且
+#     （verdict != "stuck" 或 failure_reason ∈ {"途经点 8s 无进展", "卡死：…"}）
+#     ——防 21s 冻结/长挂回归。注意 F8-F12 后 EastTower 可能 success 或 jump_missed，
+#     一律接受；唯一红线是超 40s 的 attempt
+func test_walk_waypoint_progress_timeout() -> void:
+	var a := await _assemble()
+	var autopilot: AutoTraversal = a["autopilot"]
+	var record: AutoTraversalRecord = a["record"]
+	autopilot.setup(a["player"], record, Callable())
+	autopilot.set_target_faces(["EastTower"])
+	autopilot.start()
+	var frames := await _drive(autopilot, record)
+	# 装配竞态加固（与测试 10/13 同口径，2026-08-16 控制器裁决 + R2 审查 Major 1）
+	if frames < 120 and record.summary_dict().get("per_face", {}) \
+			.get("EastTower", {}).get("verdict", "") == "no_path":
+		print("RUNUP14 retry: round1 frames=", frames)
+		autopilot.free()
+		a["player"].free()
+		_clean_tmp()
+		a = await _assemble()
+		autopilot = a["autopilot"]
+		record = a["record"]
+		autopilot.setup(a["player"], record, Callable())
+		autopilot.set_target_faces(["EastTower"])
+		autopilot.start()
+		frames = await _drive(autopilot, record)
+		assert_false(frames < 120 and record.summary_dict().get("per_face", {}) \
+				.get("EastTower", {}).get("verdict", "") == "no_path",
+				"导航竞态二次重跑仍失败")
+	var head := {}
+	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
+	if adir != null:
+		for f in adir.get_files():
+			var h: Dictionary = JSON.parse_string(
+					FileAccess.get_file_as_string(
+					TMP_DIR.path_join("attempts").path_join(f)).split("\n")[0])
+			if h.get("face", "") == "EastTower":
+				head = h
+	print("RUNUP14 frames=", frames, " done=", autopilot.done,
+			" summary=", record.summary_dict(), " head=", head)
+	assert_true(autopilot.done,
+			"EastTower 应在 %.0fs 内完成（超时即失败）" % MAX_SECONDS)
+	var pf: Dictionary = record.summary_dict()["per_face"]
+	assert_true(pf.has("EastTower"), "EastTower 应有 attempt 记录")
+	var verdict: String = str(pf["EastTower"]["verdict"])
+	var reason: String = str(head.get("failure_reason", ""))
+	assert_true(verdict != "stuck" or reason.begins_with("途经点 8s 无进展")
+			or reason.begins_with("卡死："),
+			"verdict=stuck 时 failure_reason 必须为有界裁决（途经点 8s 无进展/卡死），实际 %s"
+			% reason)
+	assert_lt(int(head.get("frame_count", 1 << 30)), 40 * 60,
+			"attempt 帧数应 < 40*60（21s 冻结/长挂压缩），实际 %s"
+			% str(head.get("frame_count")))
+
+
+# 15. 重寻路有界性（白盒，不装配）：autopilot = AT.new()（不需 add_child）→
+#     手动 _replan_count = 0、_map_rid 置空 RID 时 _replan_from_current 返回 false
+#     （faces 查不到目标面）——断言：_try_replan_from_current() 第 1 次 false（无目标面）
+#     无法测 true 分支，改测计数语义：直接设 _replan_count = MAX_REPLANS →
+#     _try_replan_from_current() 立即 false 且 _replan_count 不再增长
+#     （MAX_REPLANS=2 钉死——防无限重寻路挂死）
+func test_replan_bounded() -> void:
+	assert_eq(AT.MAX_REPLANS, 2, "MAX_REPLANS 必须钉死为 2（防无限重寻路挂死）")
+	var at := AT.new()
+	assert_false(at._try_replan_from_current(),
+			"无目标面（未 setup）时 _try_replan_from_current 应返回 false")
+	assert_eq(at._replan_count, 1, "首次调用应消耗一次计数（先计数后尝试）")
+	at._replan_count = AT.MAX_REPLANS
+	assert_false(at._try_replan_from_current(),
+			"计数耗尽后 _try_replan_from_current 应立即返回 false")
+	assert_eq(at._replan_count, AT.MAX_REPLANS,
+			"计数耗尽后 _replan_count 不得再增长（防无限重寻路挂死）")
+	at.free()
+
+
+# 16. TRAVERSAL_REV 版本键（铁律钉死）：断言
+#     AT.TRAVERSAL_REV == "at-r8:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress"
+func test_traversal_rev_r8() -> void:
+	assert_eq(AT.TRAVERSAL_REV,
+			"at-r8:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress",
+			"TRAVERSAL_REV 必须为 r8（版本键参与记录哈希，bump 作废旧记录）")

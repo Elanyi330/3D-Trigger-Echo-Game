@@ -28,6 +28,9 @@ const TURN_STOP_ANGLE := 1.4      # rad（≈80°）：转向差超过此值 →
 const RUNUP_TURN_GATE := 0.3   # rad（≈17°）：助跑转向门——转向差超此值原地转（F8 直线助跑）
 const VERTICAL_LINK_DIST := 0.05  # snap 后 from/to 水平距 < 此值 = 垂直链接（F12 原地直上跳）
 const ANCHOR_REACH_EPS := 0.1  # 锚点可达性判差容差（F10）
+const WP_TIMEOUT := 8.0      # 途经点进展超时（F13）：8s 未推进 → 强制重寻路
+const SEG_MOVE_MIN := 0.2    # 到达推进需本段实际位移 ≥ 此值（F13 防冻结点假到达重置卡死）
+const MAX_REPLANS := 2       # attempt 级重寻路次数上限（F13：原一次性 → 2 次有界）
 const WALL_PROBE_DIST := 0.6      # 助跑前向墙体探测距离：触墙前提前起跳（见 _runup_tick）
 const SESSION_TIMEOUT := 1800.0   # 单次自动运行上限（秒）——用户拍板 2026-08-14：≤30 分钟
 const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest 落到邻近面，probe_navmesh 同口径）
@@ -35,7 +38,8 @@ const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest �
 ## 遍历逻辑版本键（2026-08-15）：参与自动记录哈希——逻辑变更（链接触发/快照语义等）
 ## 自动作废旧记录重来（与 MovementController.MOVEMENT_REV 同铁律模式）。
 ## r1 = 首版（磁盘触发+最小转弯圆 bug 已修）；r2 起逻辑再变须 bump。
-const TRAVERSAL_REV := "at-r7:wall-loop-liveness"
+## r8 = F8-F13 六项执行层修复（直线助跑/触发锥/锚点预检/压墙恢复/垂直跳/行走进展）。
+const TRAVERSAL_REV := "at-r8:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress"
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
@@ -104,7 +108,9 @@ var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速�
 var _runup_degenerate := false  # 锚点-起跳点坍缩（<0.3m）：圆盘近静止放行（F-degen）
 var _vertical_jump := false  # 当前跳跃为垂直链接模式（F12）：AIR 零水平输入、停摆唯一触发
 var _to_anchor_max_feet := 0.0    # TO_ANCHOR 期间脚高最大值（坠落判定的假阳性防护，2026-08-15 F7-5）
-var _walk_replanned := false
+var _replan_count := 0               # 重寻路计数（F13 替代 _walk_replanned: bool）
+var _wp_t := 0.0                     # 当前途经点累计计时（F13）
+var _seg_move_origin := Vector3.ZERO # 当前段起点（F13 到达推进位移校验基准）
 var _anchor_fallback_done := false  # 锚点不可达重寻路一次性守卫（F10，跨 attempt 状态泄漏防护）
 var _jump_seg := {}
 # 行走滑墙（2026-08-15 F5）：压墙干顶是 26 卡死样本的共同机制
@@ -527,7 +533,9 @@ func _begin_attempt(link: String) -> void:
 	_attempt_link = link
 	_teleported = false
 	_params_used = {}
-	_walk_replanned = false
+	_replan_count = 0
+	_wp_t = 0.0
+	_seg_move_origin = _player.global_position
 	_anchor_fallback_done = false
 	_record.begin_attempt(_target_name, link, _build_plan_dict())
 
@@ -822,6 +830,7 @@ func _walk_tick(delta: float) -> void:
 	if _seg_idx >= _segments.size():
 		_end_attempt("success", "")
 		return
+	_wp_t += delta  # F13 途经点进展计时（超时检查在 _arrived 判定之前）
 	var seg: Dictionary = _segments[_seg_idx]
 	if seg["kind"] == "jump" and not _seg_is_down_drop(seg):
 		if _jump_already_crossed(seg):
@@ -838,10 +847,9 @@ func _walk_tick(delta: float) -> void:
 	# 行走坠落重规划（2026-08-15 F5，F7-4 前置到滑墙之前——贴墙坠落不被滑墙
 	# 掩盖）：掉下高面后旧路径失效——继续按旧路径方位会把玩家带进墙里干顶
 	# （RimW_B 样本机制）。每帧检查脚低于当前段终点表面 2.0m → 从当前位置重寻路
-	# （失败继续原路径交卡死兜底；每 attempt 一次有界）。
-	if _feet_y() < _waypoint_surface_y(waypoint) - 2.0 and not _walk_replanned:
-		if _replan_from_current():
-			_walk_replanned = true
+	# （失败继续原路径交卡死兜底；attempt 级计数有界——F13）。
+	if _feet_y() < _waypoint_surface_y(waypoint) - 2.0 and _replan_count < MAX_REPLANS:
+		if _try_replan_from_current():
 			_reset_stuck()
 			return
 	# 滑墙前置可达性守卫（2026-08-15 F8-F13 修复轮）：途经点面高 − 脚高 >
@@ -849,8 +857,7 @@ func _walk_tick(delta: float) -> void:
 	# （WestTowerBox 基座压墙振荡 + 用户 23s 箱底压墙样本同源根治；重寻路后
 	# 新路径的首段为短段，不再切角穿墙）
 	if _wall_follow and _waypoint_surface_y(waypoint) - _feet_y() > 0.72:
-		if not _walk_replanned and _replan_from_current():
-			_walk_replanned = true
+		if _try_replan_from_current():
 			_reset_wall_state()
 			_reset_stuck()
 			return
@@ -910,16 +917,39 @@ func _walk_tick(delta: float) -> void:
 	if not riser_face:
 		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 				if _steer_toward(steer_target, delta) else Vector2.ZERO
+	# F13 途经点进展超时：8s 未推进（轨道转圈/高度门挡住/压墙振荡）→ 强制重寻路；
+	# 计数耗尽仍无进展 → 有界 stuck 裁决（EastTower 类 30-70s 白转/冻结的压缩）
+	if _wp_t > WP_TIMEOUT:
+		if _try_replan_from_current():
+			_wp_t = 0.0
+			_seg_move_origin = _player.global_position
+			_reset_stuck()
+			return
+		_teleport_to(_spawn)
+		_teleported = true
+		_end_attempt("stuck", "途经点 %ds 无进展" % int(WP_TIMEOUT))
+		return
+	# F13 到达需位移（实现偏差，2026-08-16 实测驱动）：brief 原文「位移不足 → 不推进」
+	# 会推迟每个到达判定（含首段合法到达——箱顶 walk-off 首段仅 0.3m），轨迹扰动使
+	# WestTowerBox 回归测试（test 11）转向坡道西立面楔死（帧数据：miss waypoint
+	# (-19.85,7.59) 1.75m → (-21.5,7.009) 压墙 10s）。根因是「假到达重置卡死计时」
+	# （RC-3c：推进 seg 并 _reset_stuck → 卡死计时反复清零）而非推进本身——改为
+	# 推进照常、卡死/途经点计时重置门控位移 ≥ SEG_MOVE_MIN：冻结点假到达不再清卡死
+	# 计时（5s 卡死规则恢复），正常行走轨迹零扰动（与 F13 前全等）
 	if _arrived(waypoint):
 		_seg_idx += 1
-		_reset_stuck()
+		if Vector2(
+				_player.global_position.x - _seg_move_origin.x,
+				_player.global_position.z - _seg_move_origin.z).length() >= SEG_MOVE_MIN:
+			_wp_t = 0.0
+			_seg_move_origin = _player.global_position
+			_reset_stuck()
 		return
 	if _stuck_check(delta):
 		# 卡死重寻路（设计文档「卡死检测重寻路」）：满速行走 + 0.8m 途经点半径
 		# 在墙缝/窄巷会切角楔墙（实测：营地西侧门、簇板东北角）——从当前位置
-		# 重寻一次路（每 attempt 一次，确定性有界）；重寻仍卡 → stuck 记录
-		if not _walk_replanned and _replan_from_current():
-			_walk_replanned = true
+		# 重寻路（attempt 级计数有界——F13）；重寻仍卡 → stuck 记录
+		if _try_replan_from_current():
 			_reset_stuck()
 			return
 		_teleport_to(_spawn)
@@ -939,6 +969,15 @@ func _replan_from_current() -> bool:
 	_segments = classify_segments(_last_path, _links)
 	_seg_idx = 0
 	return true
+
+
+## 有界重寻路（F13）：计数 < MAX_REPLANS 才执行；成功置 _seg_idx=0 返回 true。
+## 全部重寻路调用点统一走此入口（行走坠落/卡死/途经点超时/锚点回退）——防无限重寻路挂死。
+func _try_replan_from_current() -> bool:
+	if _replan_count >= MAX_REPLANS:
+		return false
+	_replan_count += 1
+	return _replan_from_current()
 
 
 ## 跳过当前跳跃段（含紧邻同链接重复段）回到 WALK——用于「已物理越过豁口」
@@ -1065,7 +1104,7 @@ func _enter_jump(seg: Dictionary) -> void:
 	# 重寻路一次（新路径可含 Crate_WS 类上箱链接 → 正常执行）；仍不可达 → 诚实失败。
 	# 不判「锚点低于脚」：下行走下边缘是设计内，TO_ANCHOR 坠落重试已兜底。
 	if _waypoint_surface_y(_anchor) - _feet_y() > 0.62 + ANCHOR_REACH_EPS:
-		if not _anchor_fallback_done and _replan_from_current():
+		if not _anchor_fallback_done and _try_replan_from_current():
 			_anchor_fallback_done = true
 			return
 		_end_attempt("jump_missed", "锚点不可达（面高差 %.2fm）"
