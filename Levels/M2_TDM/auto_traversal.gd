@@ -1022,7 +1022,9 @@ func _enter_jump(seg: Dictionary) -> void:
 	if Vector2(zone_target.x - _from_point.x, zone_target.z - _from_point.z).length() >= 1.2:
 		_to_point = zone_target
 	# F12 垂直链接检测：snap 后 from/to 水平距 < VERTICAL_LINK_DIST（Crate_WN/WS/ES/EN
-	# 类「原地直上箱顶」链接——travel_dir 为零向量，方向语义不存在；执行改垂直模式）
+	# 类「原地直上箱顶」链接——travel_dir 为零向量，方向语义不存在；执行改垂直模式）。
+	# 当前 navmesh 下恒惰性（snap 水平距实测最小 0.732 ≫ 0.05，RC-2 已由 F8/F9 +
+	# 新 navmesh 根治；测试 9 惰性锚守护）——防御层，勿误读为死代码
 	_vertical_jump = Vector2(_to_point.x - _from_point.x,
 			_to_point.z - _from_point.z).length() < VERTICAL_LINK_DIST
 	# 起跳参数：edge 人类 p50（无 → 0）；v 钳入求解器可行带

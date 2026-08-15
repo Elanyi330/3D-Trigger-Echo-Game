@@ -222,14 +222,19 @@ func test_runup_no_wall_wedge_stuck() -> void:
 	autopilot.set_target_faces(["EastSpurN"])
 	autopilot.start()
 	var frames := await _drive(autopilot, record)
-	# 装配竞态加固（2026-08-16 控制器裁决）：2/4 次全文件运行出现 frames=0 的
-	# no_path（start() 同步规划时导航图未就绪的形态）——frames<120 且 no_path 时
-	# 清掉本次装配（防新旧玩家同点重叠互相推挤）重新装配重跑一次，第二次结果直接
-	# 采用（正常路径 498 帧 success，120 帧门槛不会误吞真实失败）。
+	# 装配竞态加固（2026-08-16 控制器裁决 + R2 审查 Major 1）：2/4 次全文件运行出现
+	# frames=0 的 no_path（start() 同步规划时导航图未就绪的形态）——frames<120 且
+	# no_path 时清临时目录（防第二轮 record.setup 走 manifest 重建分支后 per_face
+	# 继承旧 no_path 被 _build_queue 跳过——那样第二轮根本不驱动）并清掉本次装配
+	# （防新旧玩家同点重叠互相推挤）→ 重新装配完整重跑第二轮；第二轮仍同形态 →
+	# 直接失败（导航竞态二次重跑失败不可接受）。正常路径 498 帧 success，
+	# 120 帧门槛不会误吞真实失败。
 	if frames < 120 and record.summary_dict().get("per_face", {}) \
 			.get("EastSpurN", {}).get("verdict", "") == "no_path":
+		print("RUNUP10 retry: round1 frames=", frames)
 		autopilot.free()
 		a["player"].free()
+		_clean_tmp()
 		a = await _assemble()
 		autopilot = a["autopilot"]
 		record = a["record"]
@@ -237,6 +242,9 @@ func test_runup_no_wall_wedge_stuck() -> void:
 		autopilot.set_target_faces(["EastSpurN"])
 		autopilot.start()
 		frames = await _drive(autopilot, record)
+		assert_false(frames < 120 and record.summary_dict().get("per_face", {}) \
+				.get("EastSpurN", {}).get("verdict", "") == "no_path",
+				"导航竞态二次重跑仍失败")
 	var reason := "MISSING"
 	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
 	if adir != null:
