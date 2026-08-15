@@ -181,7 +181,9 @@ func _setup_tdm() -> void:
 
 ## 导航装配（2026-08-13 navmesh 阶段 2/3）：烘焙网格区域 + 跳跃链接。
 ## M3 AI 寻路（NavigationAgent3D）直接消费；--nav-debug 启动参数自绘网格与链接（阶段 5 验收）。
-## link 端点注册前 snap 到导航面：导航面 y 偏移不统一（实测 +0.3~0.4），端点悬空整条 link 被丢弃。
+## 2026-08-15 F4 决定性根因重构：链接不再随区域立即创建——_ready 时地图未同步，
+## 原始端点悬空 → 首注册被导航服务端全部丢弃，且丢弃永久（P 时刻再快照无法复活，
+## 控制器复刻实测 0/54）。改为等地图首轮迭代完成后创建（见 _create_nav_links_after_sync）。
 func _setup_navigation() -> void:
 	var nav_mesh: NavigationMesh = load("res://Levels/M2_TDM/navmesh.res")
 	if nav_mesh == null:
@@ -191,47 +193,61 @@ func _setup_navigation() -> void:
 	region.name = "NavRegion"
 	region.navigation_mesh = nav_mesh
 	add_child(region)
-	for l0 in LAYOUT.jump_links():
-		var l: Dictionary = l0
-		var link := NavigationLink3D.new()
-		link.name = "NavLink_" + str(l["name"])
-		link.start_position = l["from"]
-		link.end_position = l["to"]
-		link.bidirectional = true
-		add_child(link)
-	_snap_nav_links.call_deferred()
+	_create_nav_links_after_sync.call_deferred()
 	if "--nav-debug" in OS.get_cmdline_user_args():
 		_build_nav_debug(nav_mesh)  # 自绘导航面+链接（Forward Mobile 不渲染 NavigationServer 调试层）
 
 
-## 等导航地图首次同步（历史教训：未同步时查询返回原值/悬空端点 → 整条 link 被静默丢弃。
-## 实机全场景首帧同步慢于 headless，5 帧固定等待不足——2026-08-15 用户实机 91 个
-## no_path（路径终点全部落在目标正下方=无链接图）根因。改 map_is_active 哨兵轮询，
-## ≤60 帧兜底（超时打警告继续快照，不阻塞）。
-func _snap_nav_links() -> void:
+## 等地图两轮迭代完成后创建 54 跳跃链接（2026-08-15 F4）：首注册端点即
+## map_get_closest_point 有效导航点 → 永不因悬空被丢弃（被丢弃链接即便端点改回
+## 有效也不复活——丢弃永久性教训，控制器复刻实测 0/54）。哨兵用
+## map_get_iteration_id（iter_id 可靠；map_is_active 在未同步地图上假阳性放行，
+## F3 实证。probe_lifecycle2 实测：iter 1 时 closest 查询仍返回 (0,0,0)——区域
+## navmesh 解析在第二轮迭代才完成，iter 1 即创建会以零点注册重蹈丢弃）。门槛取
+## 函数入口基值 +2（绝对阈值在 GUT 等复用地图上会因继承前测迭代数而提前放行）。
+## ≤120 帧兜底：超时打警告仍创建（最坏退回旧行为）。
+func _create_nav_links_after_sync() -> void:
 	var map_rid := get_world_3d().navigation_map
-	var active := false
-	for i in 60:
+	var base_iter := NavigationServer3D.map_get_iteration_id(map_rid)
+	var synced := false
+	for i in 120:
 		await get_tree().physics_frame
-		if NavigationServer3D.map_is_active(map_rid):
-			active = true
+		if NavigationServer3D.map_get_iteration_id(map_rid) >= base_iter + 2:
+			synced = true
 			break
-	if not active:
-		push_warning("L_M2: 导航地图 60 帧内未激活，链接快照可能悬空")
-	_snap_nav_links_now()
+	if not synced:
+		push_warning("L_M2: 导航地图 120 帧内未完成两轮迭代，链接创建可能悬空")
+	var off_count := 0
+	for l0 in LAYOUT.jump_links():
+		var l: Dictionary = l0
+		var link := NavigationLink3D.new()
+		link.name = "NavLink_" + str(l["name"])
+		# 端点查询带重试（2026-08-15 F4 实测修正）：迭代达标后 closest 仍可能
+		# 瞬时返回 (0,0,0)（地图再同步窗口内查询失败，GUT 复用地图复现率 ~1/3）
+		# ——零点注册即被导航服务端丢弃且永久，宁可多等一帧（≤10 帧）。
+		link.start_position = await _query_nav_point(map_rid, l["from"])
+		link.end_position = await _query_nav_point(map_rid, l["to"])
+		link.bidirectional = true
+		add_child(link)
+		# 创建后自检：端点自身即导航点（closest 距自身 >0.1 = 未 snap 成功）
+		if NavigationServer3D.map_get_closest_point(map_rid, link.start_position) \
+				.distance_to(link.start_position) > 0.1 \
+				or NavigationServer3D.map_get_closest_point(map_rid, link.end_position) \
+				.distance_to(link.end_position) > 0.1:
+			off_count += 1
+	if off_count > 0:
+		push_warning("L_M2: %d 个链接端点未 snap 到导航面" % off_count)
 
 
-## 同步快照（不 await）：把全部 NavigationLink3D 端点 snap 到导航面
-## （端点悬空 → 整条 link 被丢弃，links:0 根因）。
-## 两份调用点：_snap_nav_links（deferred 版：先等地图首次同步哨兵）+ P 启动即时版
-## （P 时刻地图必已激活，二次快照兜底初次快照失效场景——2026-08-15 链接同步修复）。
-func _snap_nav_links_now() -> void:
-	var map_rid := get_world_3d().navigation_map
-	for c in get_children():
-		if c is NavigationLink3D:
-			var link := c as NavigationLink3D
-			link.start_position = NavigationServer3D.map_get_closest_point(map_rid, link.start_position)
-			link.end_position = NavigationServer3D.map_get_closest_point(map_rid, link.end_position)
+## 端点导航点查询（失败重试 ≤10 帧）：地图再同步窗口内 closest 可能瞬时返回
+## (0,0,0)——零点注册即被丢弃且永久（F4 教训），失败多等一帧重查。
+func _query_nav_point(map_rid: RID, p: Vector3) -> Vector3:
+	for i in 10:
+		var q := NavigationServer3D.map_get_closest_point(map_rid, p)
+		if q != Vector3.ZERO:
+			return q
+		await get_tree().physics_frame
+	return NavigationServer3D.map_get_closest_point(map_rid, p)
 
 
 ## 导航可视化（--nav-debug，2026-08-13）：半透明蓝导航面片 + 青色边线 + 绿色跳跃链接线。
@@ -851,8 +867,8 @@ func _start_auto_traversal() -> void:
 	var head := _player.get_node_or_null("Head")
 	if head:
 		head.process_mode = Node.PROCESS_MODE_DISABLED  # 头部事件鼠标视角 + 摇杆轮询锁定
-	# P 时刻地图必已激活——二次快照兜底初次快照失效场景（2026-08-15 链接同步修复）
-	_snap_nav_links_now()
+	# 链接在同步后一次性正确创建（F4：首注册即有效导航点），此处不再二次快照——
+	# 再快照无意义且无法复活已丢弃链接（丢弃永久性教训，控制器复刻实测 0/54）
 	_autopilot.setup(_player, _auto_record, _auto_hud)  # 重新接管命令（_ready 装配后已置空）
 	_set_auto_panel_visible(true)
 	_autopilot.start()
