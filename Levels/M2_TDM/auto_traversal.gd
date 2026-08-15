@@ -32,7 +32,7 @@ const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest �
 ## 遍历逻辑版本键（2026-08-15）：参与自动记录哈希——逻辑变更（链接触发/快照语义等）
 ## 自动作废旧记录重来（与 MovementController.MOVEMENT_REV 同铁律模式）。
 ## r1 = 首版（磁盘触发+最小转弯圆 bug 已修）；r2 起逻辑再变须 bump。
-const TRAVERSAL_REV := "at-r4:link-create-after-sync"
+const TRAVERSAL_REV := "at-r5:wall-follow+fall-replan"
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
@@ -100,6 +100,12 @@ var _runup_t := 0.0
 var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速度门 0.6v（2026-08-15 裁决 3）
 var _walk_replanned := false
 var _jump_seg := {}
+# 行走滑墙（2026-08-15 F5）：压墙干顶是 26 卡死样本的共同机制
+var _wall_press_t := 0.0          # 压墙累计计时
+var _wall_press_origin := Vector3.ZERO
+var _wall_follow := false         # 滑墙模式
+var _wall_follow_t := 0.0
+var _wall_follow_origin := Vector3.ZERO
 
 # 会话计时（active 期间累计；达上限 → 暂停）
 var _session_timeout := SESSION_TIMEOUT
@@ -698,8 +704,71 @@ func _walk_tick(delta: float) -> void:
 	# 行走段（含下坠段：反向穿越上跳链接 = 自由落体下边缘——navmesh 下行本
 	# 无需跳跃，起跳执行只会反跳回低处徒增卡死面）
 	var waypoint: Vector3 = seg["end"]
+	# 行走滑墙（2026-08-15 F5）：压墙干顶是 26 卡死样本的共同机制——纯方位追踪
+	# 压墙只会顶着墙原地磨（位移 ~0 但速度/命令非零）。人类绕墙行为的最小实现：
+	# 连续 0.5s 压墙（位移 <0.05m 且命令速度 ≥0.5 且 is_on_wall）→ 滑墙模式——
+	# 转向目标 = 到途经点方向投影到墙面（墙法向取自滑动碰撞；投影 ≈0 走固定侧向），
+	# 持续 ≤2s 或位移恢复 >0.3m 退出。
+	if _wall_follow:
+		_wall_follow_t += delta
+		var follow_moved := Vector2(_player.global_position.x - _wall_follow_origin.x,
+				_player.global_position.z - _wall_follow_origin.z).length()
+		if follow_moved > 0.3 or _wall_follow_t >= 2.0:
+			_wall_follow = false  # 位移恢复/超时 → 退出滑墙，回到正常追踪
+			_reset_stuck()
+		else:
+			# 滑墙切向 = 到途经点方向投影到墙面（减去墙法向分量）。注意速度方向
+			# 本身仍是入墙的愿望向（控制器逐帧重建速度，move_and_slide 不写回
+			# 切向——F5 样本实测速度非零而位移冻结），直接用它只会继续干顶。
+			# 投影 ≈0（途经点正穿墙后）→ 固定侧向兜底（法向水平旋转 90°，确定性）。
+			var to_wp := waypoint - _player.global_position
+			to_wp.y = 0.0
+			var wall_n := Vector3.ZERO
+			for ci in _player.get_slide_collision_count():
+				var cn := _player.get_slide_collision(ci).get_normal()
+				if absf(cn.y) < 0.5:
+					wall_n = cn
+					break
+			var tangent := to_wp
+			if wall_n.length() > 0.01:
+				tangent -= wall_n * tangent.dot(wall_n)
+			tangent.y = 0.0
+			if tangent.length() < 0.1:
+				tangent = Vector3(wall_n.z, 0.0, -wall_n.x)
+			if tangent.length() > 0.01:
+				tangent = tangent.normalized()
+				var tangent_yaw := atan2(-tangent.x, -tangent.z)
+				_player.rotation.y = lerp_angle(_player.rotation.y, tangent_yaw,
+						clampf(TURN_RATE * delta, 0.0, 1.0))
+			_cmd.move_axis = Vector2(0, _approach_throttle(waypoint))
+			return
+	# 压墙检测（滑墙前置）：压墙期间（on_wall + 命令速度 ≥0.5）位移 ≥0.05m 即
+	# 刷新窗口重新计时（=在滑动，非冻结干顶）；冻结（位移 <0.05m）才累计计时。
+	var cmd_speed := Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length()
+	if _player.is_on_wall() and cmd_speed >= 0.5:
+		if Vector2(_player.global_position.x - _wall_press_origin.x,
+				_player.global_position.z - _wall_press_origin.z).length() >= 0.05:
+			_wall_press_t = 0.0
+			_wall_press_origin = _player.global_position
+		else:
+			_wall_press_t += delta
+	else:
+		_wall_press_t = 0.0
+		_wall_press_origin = _player.global_position
+	if _wall_press_t >= 0.5:
+		_wall_follow = true
+		_wall_follow_t = 0.0
+		_wall_follow_origin = _player.global_position
 	_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 			if _steer_toward(waypoint, delta) else Vector2.ZERO
+	# 行走坠落重规划（2026-08-15 F5）：掉下高面后旧路径失效——继续按旧路径方位
+	# 会把玩家带进墙里干顶（RimW_B 样本机制）。每帧检查脚低于当前段终点表面
+	# 2.0m → 从当前位置重寻路（失败继续原路径交卡死兜底；每 attempt 一次有界）。
+	if _feet_y() < _waypoint_surface_y(waypoint) - 2.0 and not _walk_replanned:
+		if _replan_from_current():
+			_walk_replanned = true
+			_reset_stuck()
+			return
 	if _arrived(waypoint):
 		_seg_idx += 1
 		_reset_stuck()
