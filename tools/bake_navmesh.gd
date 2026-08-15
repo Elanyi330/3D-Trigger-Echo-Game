@@ -13,8 +13,8 @@ const OUT_PATH := "res://Levels/M2_TDM/navmesh.res"
 # 塔坡道烘焙替身（2026-08-15 用户拍板方案 A）：台阶整高盒烘焙几何互相重叠（窄边
 # 放大 1.2 后相邻盒叠 0.58m）把台阶顶面埋掉 → 烘焙出斜跨 5m 的悬空多边形（poly 637
 # 实锤）。替身=真斜坡平面（物理台阶经 step-up 0.25≤0.62 可走，导航面表达为斜坡是
-# 物理语义的忠实近似；斜坡梯度与台阶顶差 ≤0.125m < 到达高度门口径 0.3）。
-# 参数与 map_layout_v3.gd _ramp_steps 调用逐字同步（勿改布局，仅此处烘焙替身）。
+# 物理语义的忠实近似）。参数与 map_layout_v3.gd _ramp_steps 调用逐字同步
+# （勿改布局，仅此处烘焙替身）。
 const TOWER_RAMP_SLOPES := [
 	{"x0": -21.0, "x1": -18.5, "z0": 8.2, "z1": 2.0, "y0": 0.0, "y1": 2.5},
 	{"x0": 18.5, "x1": 21.0, "z0": -8.2, "z1": -2.0, "y0": 0.0, "y1": 2.5},
@@ -66,10 +66,7 @@ func _init() -> void:
 		if e["kind"] == "decor":
 			continue  # 钟饰无碰撞
 		var nm: String = e["name"]
-		# 2026-08-15 方案 A：塔坡道台阶实体跳过烘焙（仅这两组；祭坛坡道 RampE/RampW
-		# 工作正常不动），台阶区导航面由下方真斜坡替身四边形提供。
-		if nm.begins_with("WestTowerRamp") or nm.begins_with("EastTowerRamp"):
-			continue
+		var is_tower_ramp: bool = nm.begins_with("WestTowerRamp") or nm.begins_with("EastTowerRamp")
 		# 任一水平边 <1.2 的实体（簇板/斜板/微台阶/箱类）该边放大至 1.2（仅烘焙几何，
 		# 游戏几何不动）：agent_radius 0.25 侵蚀后 1.2-0.5=0.7m 顶面可烘出。
 		# Rail 栏板类跳过——放大会覆盖回廊面边缘（2026-08-13 实测破坏回廊导航面）；
@@ -77,6 +74,10 @@ func _init() -> void:
 		var bs: Vector3 = e["size"]
 		if str(e["name"]).contains("Rail"):
 			pass
+		elif is_tower_ramp:
+			# 2026-08-15 方案 A：塔坡道台阶实体跳过烘焙（仅这两组；祭坛坡道 RampE/RampW
+			# 工作正常不动），台阶区导航面由替身斜坡四边形提供。
+			continue
 		else:
 			if bs.x < 1.2:
 				bs.x = 1.2
@@ -99,7 +100,7 @@ func _init() -> void:
 		var vs := [v0, v1, v2, v3]
 		var cross_y: float = (v2 - v0).cross(v1 - v0).y
 		var tris := [[0, 2, 1], [0, 3, 2]] if cross_y < 0.0 else [[0, 1, 2], [0, 2, 3]]
-		print("塔坡道替身 x0=%+.1f z0=%+.1f z1=%+.1f 叉积y=%+.2f 绕序 %s" % [s["x0"], s["z0"], s["z1"], cross_y, str(tris)])
+		print("塔坡道替身 x0=%+.1f z0=%+.1f 叉积y=%+.2f 绕序 %s" % [s["x0"], s["z0"], cross_y, str(tris)])
 		for tri in tris:
 			for idx in tri:
 				st.set_normal(Vector3.UP)
