@@ -878,9 +878,19 @@ func _walk_tick(delta: float) -> void:
 				_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 						if _steer_toward(_player.global_position - cn, delta) else Vector2.ZERO
 				break
+	# 修复 7（2026-08-15）：可攀途经点前瞻转向——当前途经点面高−脚高 ∈ (0, 0.62] 时
+	# 转向下一途经点（若有）：斜向切入坡道（WestTowerRamp s05→s06 斜跨全坡宽 2.5m）
+	# 把踢面接触点带到坡道西缘（实测 x=-20.85 余量 0.15m，正压转向来不及介入）；
+	# 前瞻沿坡道轴向切入 → 接触点离缘 ~2m，触边前完成对齐（RampE 宽 3m 天然免疫、
+	# WestTowerRamp 2.5m 靠前瞻补偿）。节流仍以当前途经点为准（到达判定不变）。
+	var steer_target: Vector3 = waypoint
+	if _waypoint_surface_y(waypoint) - _feet_y() > 0.0 \
+			and _waypoint_surface_y(waypoint) - _feet_y() <= 0.62 \
+			and _seg_idx + 1 < _segments.size():
+		steer_target = _segments[_seg_idx + 1]["end"]
 	if not _riser_face:
 		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
-				if _steer_toward(waypoint, delta) else Vector2.ZERO
+				if _steer_toward(steer_target, delta) else Vector2.ZERO
 	if _arrived(waypoint):
 		_seg_idx += 1
 		_reset_stuck()
