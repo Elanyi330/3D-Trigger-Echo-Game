@@ -101,6 +101,7 @@ var _delta_h := 0.0
 var _runup_recover := 0
 var _runup_t := 0.0
 var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速度门 0.6v（2026-08-15 裁决 3）
+var _runup_degenerate := false  # 锚点-起跳点坍缩（<0.3m）：圆盘近静止放行（F-degen）
 var _vertical_jump := false  # 当前跳跃为垂直链接模式（F12）：AIR 零水平输入、停摆唯一触发
 var _to_anchor_max_feet := 0.0    # TO_ANCHOR 期间脚高最大值（坠落判定的假阳性防护，2026-08-15 F7-5）
 var _walk_replanned := false
@@ -1052,6 +1053,13 @@ func _enter_jump(seg: Dictionary) -> void:
 	# 加速至 ~3m/s，落点近缘可达。
 	_speed_gate_relaxed = Vector2(_from_point.x - _anchor.x,
 			_from_point.z - _anchor.z).length() < 1.2
+	# F-degen（2026-08-16）：锚点 snap 坍缩到侵蚀导航岛（1m 箱顶：锚点≈起跳点距
+	# 0.02-0.19m）→ F8 转向门对亚 0.2m 目标永不收敛、hspeed=0 被 F9 近静止拒放 →
+	# 8s recover 死循环（实测箱顶冻结 32s 仅靠 recover>3 强制跳有界）。跑道坍缩时
+	# 「加速到门速度」物理不存在——跳跃本质近静止（REST 漂移），圆盘放行即当前
+	# 强制跳同款结果但 ~2s 有界。
+	_runup_degenerate = Vector2(_from_point.x - _anchor.x,
+			_from_point.z - _anchor.z).length() < 0.3
 	# F10 锚点可达性预检：锚点面高 − 脚高 > STEP_MAX(0.62) + 容差 → 步行不可达
 	# （箱顶锚点 + 人在箱底类压墙 23s 的根治——0.8m > step-up 0.62 走不上去）。
 	# 重寻路一次（新路径可含 Crate_WS 类上箱链接 → 正常执行）；仍不可达 → 诚实失败。
@@ -1289,7 +1297,7 @@ func _runup_tick(delta: float) -> void:
 	# 处理（起跳点贴障碍的链接如 Crate_WN：圆盘 0.6 环在墙探 0.6 射程之前
 	# 0.25m 抢先触发，起跳点漂移 → 落点漂移 → 下游相位破坏）
 	if to_h.length() <= 0.6 and height_ok and not _wall_ahead(1.0):
-		if _try_trigger(gate_speed, true, false):
+		if _try_trigger(gate_speed, true, _runup_degenerate):
 			_trigger_jump()
 			return
 	elif _stuck_check(delta):

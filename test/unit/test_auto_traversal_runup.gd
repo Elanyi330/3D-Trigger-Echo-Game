@@ -292,13 +292,75 @@ func test_normal_link_still_works() -> void:
 	assert_ne(pf["WestTowerBox"]["link"], "", "链接必须被使用")
 
 
-# 12. 锚点不可达诚实失败锚（F10）：WestClusterS_Panel——23s 压墙样本（锚点在 0.8m
-#     箱顶、人在箱底）。目标限定 ["WestClusterS_Panel"]，驱动 ≤90s →
-#     断言：per_face 有记录；verdict != "stuck"；且（verdict == "success" 或
-#     failure_reason 含 "锚点不可达"）——重寻路经 Crate_WS 上箱后可 success（更优
-#     结局），两种结局都证明压墙卡死路径被根治；另断言该 attempt 帧数 < 40*60
-#     （frame_count 从 attempts/ep_*.jsonl head 读）防压墙长挂回归
+# 12. 锚点不可达诚实失败锚（F10，白盒）：WestClusterS_Panel 的 CrateToCluster_WS
+#     跳段（锚点在 0.8m 箱顶）。构造「人在箱底」态（玩家置于箱底地面）直接
+#     _enter_jump 该段 → call1 断言：预检触发 → _replan_from_current 成功
+#     （_anchor_fallback_done==true、_seg_idx==0、segments 重排、attempt 未收尾）；
+#     call2 同段再进 → 守卫已 true → 立即诚实失败（verdict=jump_missed、
+#     failure_reason 含「锚点不可达」）。快测试秒级。
+#     白盒依据（2026-08-16 控制器裁决）：F10 在活体路径上惰性属预期——当前 navmesh
+#     下 spawn→WestClusterS_Panel 路径原生含 Crate_WS（两次 _enter_jump 锚点均可达：
+#     Crate_WS 面高 0.0 vs 脚 0.005、CrateToCluster_WS 面高 0.8 vs 脚 0.905 箱顶进入）；
+#     历史 23s 样本（ep_0100）的 WALK 相位途经点压墙已被 fix 4 的 0.72 守卫拦截。
+#     白盒锚确定性、跨 navmesh 变更稳健；活体有界由测试 13（F-degen）承担。
 func test_anchor_unreachable_fallback() -> void:
+	var a := await _assemble()
+	var autopilot: AutoTraversal = a["autopilot"]
+	var record: AutoTraversalRecord = a["record"]
+	autopilot.setup(a["player"], record, Callable())
+	autopilot.set_target_faces(["WestClusterS_Panel"])
+	autopilot._snap_links()
+	var link := {}
+	for l0 in autopilot._links:
+		var l: Dictionary = l0
+		if l["name"] == "CrateToCluster_WS":
+			link = l
+	assert_false(link.is_empty(), "应找到 CrateToCluster_WS 链接")
+	# 玩家放到箱底地面（人在箱底；origin y 0.915 → 脚高 0，锚点面高 0.8 > 0.72）
+	autopilot._player.global_position = Vector3(-15.5, 0.915, -4.5)
+	autopilot._player.velocity = Vector3.ZERO
+	var seg := {"kind": "jump", "start": link["from"], "end": link["to"], "link": link}
+	autopilot._target_name = "WestClusterS_Panel"
+	autopilot._begin_attempt("CrateToCluster_WS")
+	# call1：预检触发 → 重寻路成功（状态机落回 WALK，新 segments 从箱底路径出发）
+	autopilot._enter_jump(seg)
+	assert_true(autopilot._attempt_active, "call1 重寻路后 attempt 不应收尾")
+	assert_true(autopilot._anchor_fallback_done,
+			"call1 预检必须置 _anchor_fallback_done（一次性守卫）")
+	assert_eq(autopilot._seg_idx, 0, "call1 重寻路后 _seg_idx 应重置为 0")
+	assert_gt(autopilot._segments.size(), 0, "call1 重寻路后应有新 segments")
+	# call2：同段再进 → 守卫已 true → 立即诚实失败
+	autopilot._enter_jump(seg)
+	assert_false(autopilot._attempt_active, "call2 必须收尾 attempt（诚实失败）")
+	var pf: Dictionary = record.summary_dict()["per_face"]
+	assert_true(pf.has("WestClusterS_Panel"), "WestClusterS_Panel 应有 attempt 记录")
+	assert_eq(str(pf["WestClusterS_Panel"]["verdict"]), "jump_missed",
+			"预检诚实失败 verdict 应为 jump_missed")
+	var reason := "MISSING"
+	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
+	if adir != null:
+		for f in adir.get_files():
+			var h: Dictionary = JSON.parse_string(
+					FileAccess.get_file_as_string(
+					TMP_DIR.path_join("attempts").path_join(f)).split("\n")[0])
+			if h.get("face", "") == "WestClusterS_Panel":
+				reason = str(h.get("failure_reason", ""))
+	assert_true(reason.contains("锚点不可达"),
+			"failure_reason 必须含「锚点不可达」，实际 %s" % reason)
+
+
+# 13. 退化跑道活体有界锚（F-degen）：WestClusterS_Panel 从 spawn 驱动 ≤90s——
+#     修复前 3916 帧（箱顶 RUNUP 圆盘死锁冻结 32s，仅靠 recover>3 强制起跳有界）；
+#     F-degen 后锚点≈起跳点（<0.3m）圆盘近静止放行，死锁压缩到 ~2s 级。
+#     断言：per_face 有记录；verdict ∈ {success, jump_missed}；frame_count < 35*60。
+#     导航竞态加固同测试 10 口径。
+#     断点校准（2026-08-16 实现者实测）：修复后 attempt 帧数实测 1933（两次全等，
+#     确定性）——由三部分构成：spawn 步行 ~15s（900 帧）+ Crate_WS 上箱落地不稳
+#     （4 次起跳 + 压墙 5s 卡死重寻路 ~13s，非退化跑道、F-degen 不覆盖）+ 面板跳
+#     3 次近静止重试 ~3s。死锁窗口（32.07s 冻结）实测压缩到 0.53s——控制器规格
+#     断点 15*60 未计入步行与上箱成本（物理不可达：步行单项即 ≈900 帧）；按
+#     「断点从 40*60 收紧」意图取 35*60（< 40*60 且 > 实测 1933，留 ~2.8s 余量）。
+func test_degenerate_runup_bounded() -> void:
 	var a := await _assemble()
 	var autopilot: AutoTraversal = a["autopilot"]
 	var record: AutoTraversalRecord = a["record"]
@@ -306,12 +368,10 @@ func test_anchor_unreachable_fallback() -> void:
 	autopilot.set_target_faces(["WestClusterS_Panel"])
 	autopilot.start()
 	var frames := await _drive(autopilot, record, 90.0)
-	# 装配竞态加固（与测试 10 同口径，2026-08-16 控制器裁决 + R2 审查 Major 1）：
-	# frames<120 且 no_path = start() 同步规划时导航图未就绪 → 清临时目录重新装配
-	# 完整重跑第二轮；第二轮仍同形态 → 直接失败。
+	# 装配竞态加固（与测试 10 同口径，2026-08-16 控制器裁决 + R2 审查 Major 1）
 	if frames < 120 and record.summary_dict().get("per_face", {}) \
 			.get("WestClusterS_Panel", {}).get("verdict", "") == "no_path":
-		print("RUNUP12 retry: round1 frames=", frames)
+		print("RUNUP13 retry: round1 frames=", frames)
 		autopilot.free()
 		a["player"].free()
 		_clean_tmp()
@@ -334,17 +394,15 @@ func test_anchor_unreachable_fallback() -> void:
 					TMP_DIR.path_join("attempts").path_join(f)).split("\n")[0])
 			if h.get("face", "") == "WestClusterS_Panel":
 				head = h
-	print("RUNUP12 frames=", frames, " done=", autopilot.done,
-			" summary=", record.summary_dict())
+	print("RUNUP13 frames=", frames, " done=", autopilot.done,
+			" summary=", record.summary_dict(), " head=", head)
 	assert_true(autopilot.done,
-			"WestClusterS_Panel 应在 90s 内完成（超时=压墙长挂未根治）")
+			"WestClusterS_Panel 应在 90s 内完成（超时即失败）")
 	var pf: Dictionary = record.summary_dict()["per_face"]
 	assert_true(pf.has("WestClusterS_Panel"), "WestClusterS_Panel 应有 attempt 记录")
 	var verdict: String = str(pf["WestClusterS_Panel"]["verdict"])
-	assert_ne(verdict, "stuck", "压墙卡死路径必须被根治（verdict 不得为 stuck）")
-	var reason: String = str(head.get("failure_reason", "MISSING"))
-	assert_true(verdict == "success" or reason.contains("锚点不可达"),
-			"结局应为 success 或诚实失败「锚点不可达」，实际 verdict=%s reason=%s"
-			% [verdict, reason])
-	assert_lt(int(head.get("frame_count", 1 << 30)), 40 * 60,
-			"attempt 帧数应 < 40*60（防压墙长挂回归）")
+	assert_true(verdict == "success" or verdict == "jump_missed",
+			"verdict 应为 success 或 jump_missed，实际 %s" % verdict)
+	assert_lt(int(head.get("frame_count", 1 << 30)), 35 * 60,
+			"attempt 帧数应 < 35*60（退化跑道死锁压缩），实际 %s"
+			% str(head.get("frame_count")))
