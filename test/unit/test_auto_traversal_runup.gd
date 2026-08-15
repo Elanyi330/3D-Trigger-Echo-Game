@@ -10,6 +10,9 @@ const TOL := 0.0001
 func test_target_yaw_anchors() -> void:
 	assert_almost_eq(AT.target_yaw(Vector3.ZERO, Vector3(0, 0, -1)), 0.0, TOL)
 	assert_almost_eq(AT.target_yaw(Vector3.ZERO, Vector3(1, 0, 0)), -PI / 2.0, TOL)
+	# 南向（R1 审查 m4）：atan2(-0.0, -1.0) 实跑 -PI（-0.0 符号跟随 y 参数，godot
+	# 4.7.1 实测）——按 ±PI 边界断言而非固定 PI
+	assert_almost_eq(absf(AT.target_yaw(Vector3.ZERO, Vector3(0, 0, 1))), PI, TOL)
 
 # 2. 近静止放行按路径声明（F9 核心语义）：hspeed ≤0.5 时 allow_near_still 决定放行
 func test_trigger_allowed_near_still() -> void:
