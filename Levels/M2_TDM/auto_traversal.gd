@@ -865,6 +865,9 @@ func _walk_tick(delta: float) -> void:
 	# move_and_slide 碰撞切向，非滑墙逻辑）把角色沿踢面滑出坡道西缘（WestTowerBox
 	# 楔死第二轮根因：x -20.85→-21.50 弹出 2.5m 宽坡道）；正对后斜切角归零、
 	# step-up 垂直抬升。
+	# 法向约定（2026-08-15 修复 6 符号修正）：Godot 碰撞法向=表面外法向朝玩家侧
+	# （实测压踢面帧 cn=(0,0.40,-0.92) 朝玩家侧、背离踢面）——pos − cn 恒在墙内，
+	# 转向对准踢面；pos + cn 会转向背离踢面（旧符号反）。
 	var _riser_face := false
 	if _player.is_on_wall() and _waypoint_surface_y(waypoint) - _feet_y() > 0.0 \
 			and _waypoint_surface_y(waypoint) - _feet_y() <= 0.62:
@@ -873,7 +876,7 @@ func _walk_tick(delta: float) -> void:
 			if absf(cn.y) < 0.5:
 				_riser_face = true
 				_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
-						if _steer_toward(_player.global_position + cn, delta) else Vector2.ZERO
+						if _steer_toward(_player.global_position - cn, delta) else Vector2.ZERO
 				break
 	if not _riser_face:
 		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
@@ -1122,6 +1125,8 @@ func _jump_tick(delta: float) -> void:
 			# 修复 5（2026-08-15）：可攀踢面正压转向（与 WALK 同口径；锚点面高差
 			# _waypoint_surface_y(_anchor) − _feet_y()）——斜向压入的切向滑移把角色
 			# 沿踢面滑出坡道西缘；正对后斜切角归零、step-up 垂直抬升
+			# 法向约定（2026-08-15 修复 6 符号修正）：碰撞法向朝玩家侧（背离踢面）
+			# ——pos − cn 恒在墙内、转向对准踢面（pos + cn 为旧符号反）
 			var _riser_face := false
 			if _player.is_on_wall() and _waypoint_surface_y(_anchor) - _feet_y() > 0.0 \
 					and _waypoint_surface_y(_anchor) - _feet_y() <= 0.62:
@@ -1131,7 +1136,7 @@ func _jump_tick(delta: float) -> void:
 						_riser_face = true
 						_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
 								_approach_throttle(_anchor))) \
-								if _steer_toward(_player.global_position + cn, delta) else Vector2.ZERO
+								if _steer_toward(_player.global_position - cn, delta) else Vector2.ZERO
 						break
 			if not _riser_face:
 				_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
