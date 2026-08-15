@@ -32,7 +32,7 @@ const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest �
 ## 遍历逻辑版本键（2026-08-15）：参与自动记录哈希——逻辑变更（链接触发/快照语义等）
 ## 自动作废旧记录重来（与 MovementController.MOVEMENT_REV 同铁律模式）。
 ## r1 = 首版（磁盘触发+最小转弯圆 bug 已修）；r2 起逻辑再变须 bump。
-const TRAVERSAL_REV := "at-r5:wall-follow+fall-replan"
+const TRAVERSAL_REV := "at-r6:anchor-wall-follow"
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
@@ -685,6 +685,64 @@ func _stuck_check(delta: float) -> bool:
 
 # ---- WALK ----
 
+## 滑墙模式推进（2026-08-15 F5，F6 抽共享供 WALK/TO_ANCHOR 复用）：
+## target = 方位基准（WALK 途经点 / TO_ANCHOR 锚点）。滑墙切向 = 到 target 的
+## 方向投影到墙面（减去墙法向分量；墙法向取滑动碰撞）。注意速度方向本身仍是
+## 入墙的愿望向（控制器逐帧重建速度，move_and_slide 不写回切向——F5 样本实测
+## 速度非零而位移冻结），直接用它只会继续干顶。投影 ≈0（target 正穿墙后）→
+## 固定侧向兜底（法向水平旋转 90°，确定性）。位移恢复 >0.3m 或 ≥2s → 退出。
+## 返回 true = 本帧滑墙接管（调用方设 move_axis 后 return）。
+func _wall_follow_step(target: Vector3, delta: float) -> bool:
+	_wall_follow_t += delta
+	var follow_moved := Vector2(_player.global_position.x - _wall_follow_origin.x,
+			_player.global_position.z - _wall_follow_origin.z).length()
+	if follow_moved > 0.3 or _wall_follow_t >= 2.0:
+		_wall_follow = false  # 位移恢复/超时 → 退出滑墙，回到正常追踪
+		_reset_stuck()
+		return false
+	var to_t := target - _player.global_position
+	to_t.y = 0.0
+	var wall_n := Vector3.ZERO
+	for ci in _player.get_slide_collision_count():
+		var cn := _player.get_slide_collision(ci).get_normal()
+		if absf(cn.y) < 0.5:
+			wall_n = cn
+			break
+	var tangent := to_t
+	if wall_n.length() > 0.01:
+		tangent -= wall_n * tangent.dot(wall_n)
+	tangent.y = 0.0
+	if tangent.length() < 0.1:
+		tangent = Vector3(wall_n.z, 0.0, -wall_n.x)
+	if tangent.length() > 0.01:
+		tangent = tangent.normalized()
+		var tangent_yaw := atan2(-tangent.x, -tangent.z)
+		_player.rotation.y = lerp_angle(_player.rotation.y, tangent_yaw,
+				clampf(TURN_RATE * delta, 0.0, 1.0))
+	return true
+
+
+## 压墙检测（滑墙前置，F5/F6 共享）：压墙期间（on_wall + 命令速度 ≥0.2——F6 阈值
+## 放宽：RimW_B 样本低速节流 ~0.45 贴塔坡道棱角低于 0.5 漏检）位移 ≥0.05m 即
+## 刷新窗口重新计时（=在滑动，非冻结干顶）；冻结（位移 <0.05m）才累计计时，
+## 0.5s 触发滑墙模式。
+func _wall_press_detect(cmd_speed: float, delta: float) -> void:
+	if _player.is_on_wall() and cmd_speed >= 0.2:
+		if Vector2(_player.global_position.x - _wall_press_origin.x,
+				_player.global_position.z - _wall_press_origin.z).length() >= 0.05:
+			_wall_press_t = 0.0
+			_wall_press_origin = _player.global_position
+		else:
+			_wall_press_t += delta
+	else:
+		_wall_press_t = 0.0
+		_wall_press_origin = _player.global_position
+	if _wall_press_t >= 0.5:
+		_wall_follow = true
+		_wall_follow_t = 0.0
+		_wall_follow_origin = _player.global_position
+
+
 ## 逐段行走（jump 段前停下进入 JUMP）：cmd.move_axis=(0,1) 前进；
 ## 途经点 ≤ WALK_ARRIVE_RADIUS 切换下一途经点；卡死 → verdict "stuck" → 传送 spawn
 func _walk_tick(delta: float) -> void:
@@ -704,61 +762,14 @@ func _walk_tick(delta: float) -> void:
 	# 行走段（含下坠段：反向穿越上跳链接 = 自由落体下边缘——navmesh 下行本
 	# 无需跳跃，起跳执行只会反跳回低处徒增卡死面）
 	var waypoint: Vector3 = seg["end"]
-	# 行走滑墙（2026-08-15 F5）：压墙干顶是 26 卡死样本的共同机制——纯方位追踪
-	# 压墙只会顶着墙原地磨（位移 ~0 但速度/命令非零）。人类绕墙行为的最小实现：
-	# 连续 0.5s 压墙（位移 <0.05m 且命令速度 ≥0.5 且 is_on_wall）→ 滑墙模式——
-	# 转向目标 = 到途经点方向投影到墙面（墙法向取自滑动碰撞；投影 ≈0 走固定侧向），
-	# 持续 ≤2s 或位移恢复 >0.3m 退出。
-	if _wall_follow:
-		_wall_follow_t += delta
-		var follow_moved := Vector2(_player.global_position.x - _wall_follow_origin.x,
-				_player.global_position.z - _wall_follow_origin.z).length()
-		if follow_moved > 0.3 or _wall_follow_t >= 2.0:
-			_wall_follow = false  # 位移恢复/超时 → 退出滑墙，回到正常追踪
-			_reset_stuck()
-		else:
-			# 滑墙切向 = 到途经点方向投影到墙面（减去墙法向分量）。注意速度方向
-			# 本身仍是入墙的愿望向（控制器逐帧重建速度，move_and_slide 不写回
-			# 切向——F5 样本实测速度非零而位移冻结），直接用它只会继续干顶。
-			# 投影 ≈0（途经点正穿墙后）→ 固定侧向兜底（法向水平旋转 90°，确定性）。
-			var to_wp := waypoint - _player.global_position
-			to_wp.y = 0.0
-			var wall_n := Vector3.ZERO
-			for ci in _player.get_slide_collision_count():
-				var cn := _player.get_slide_collision(ci).get_normal()
-				if absf(cn.y) < 0.5:
-					wall_n = cn
-					break
-			var tangent := to_wp
-			if wall_n.length() > 0.01:
-				tangent -= wall_n * tangent.dot(wall_n)
-			tangent.y = 0.0
-			if tangent.length() < 0.1:
-				tangent = Vector3(wall_n.z, 0.0, -wall_n.x)
-			if tangent.length() > 0.01:
-				tangent = tangent.normalized()
-				var tangent_yaw := atan2(-tangent.x, -tangent.z)
-				_player.rotation.y = lerp_angle(_player.rotation.y, tangent_yaw,
-						clampf(TURN_RATE * delta, 0.0, 1.0))
-			_cmd.move_axis = Vector2(0, _approach_throttle(waypoint))
-			return
-	# 压墙检测（滑墙前置）：压墙期间（on_wall + 命令速度 ≥0.5）位移 ≥0.05m 即
-	# 刷新窗口重新计时（=在滑动，非冻结干顶）；冻结（位移 <0.05m）才累计计时。
-	var cmd_speed := Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length()
-	if _player.is_on_wall() and cmd_speed >= 0.5:
-		if Vector2(_player.global_position.x - _wall_press_origin.x,
-				_player.global_position.z - _wall_press_origin.z).length() >= 0.05:
-			_wall_press_t = 0.0
-			_wall_press_origin = _player.global_position
-		else:
-			_wall_press_t += delta
-	else:
-		_wall_press_t = 0.0
-		_wall_press_origin = _player.global_position
-	if _wall_press_t >= 0.5:
-		_wall_follow = true
-		_wall_follow_t = 0.0
-		_wall_follow_origin = _player.global_position
+	# 行走滑墙（2026-08-15 F5/F6 共享 _wall_follow_step）：压墙干顶是 26 卡死
+	# 样本的共同机制——纯方位追踪压墙只会顶着墙原地磨（位移 ~0 但速度/命令非零）。
+	# 人类绕墙行为的最小实现：连续 0.5s 压墙 → 滑墙（到途经点方向投影到墙面，
+	# 持续 ≤2s 或位移恢复 >0.3m 退出）。
+	if _wall_follow and _wall_follow_step(waypoint, delta):
+		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint))
+		return
+	_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(), delta)
 	_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 			if _steer_toward(waypoint, delta) else Vector2.ZERO
 	# 行走坠落重规划（2026-08-15 F5）：掉下高面后旧路径失效——继续按旧路径方位
@@ -990,6 +1001,20 @@ func _jump_tick(delta: float) -> void:
 			# 实测：进入时仍在坡道末级，走向锚点途中跌落塔顶即已物理越过豁口）
 			if _jump_already_crossed(_jump_seg):
 				_skip_jump(_jump_seg)
+				return
+			# TO_ANCHOR 滑墙（2026-08-15 F6）：GateN_WingE「助跑锚点卡死」=
+			# 坠落压墙干顶（样本①同款）——与 WALK 相同机制接入共享滑墙。
+			if _wall_follow and _wall_follow_step(_anchor, delta):
+				_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
+						_approach_throttle(_anchor)))
+				return
+			_wall_press_detect(minf(_runup_throttle(),
+					_approach_throttle(_anchor)), delta)
+			# TO_ANCHOR 坠落（F6）：脚低于锚点表面 2m（坠落离锚）→ 走既有重试
+			# 路径（传送回锚点重跑，优于干顶卡死；3 次重试仍坠则记录）——不动
+			# 锚点重算（简单方案）。
+			if _feet_y() < _waypoint_surface_y(_anchor) - 2.0:
+				_jump_fail("jump_missed", "锚点坠落")
 				return
 			# 以起跳速度 v 为目标的节流接近锚点（设计文档「直线加速至 v」：
 			# 全速冲刺会在锚点留下 ~6.35m/s 惯性，起跳速度远超规划 v 导致飞过落点）
