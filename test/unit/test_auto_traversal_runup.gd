@@ -190,37 +190,23 @@ func test_vertical_link_crate_wn_success() -> void:
 	assert_ne(pf["WestClusterN_Box"]["link"], "", "垂直链接必须被使用")
 
 
-# 9. 垂直模式空中零输入锚（F12 白盒采样）：驱动期间轮询 autopilot._cmd.move_axis——
-#    采样到 jump_held 状态（读 autopilot._jump_phase == 2（_JumpPhase.AIR 枚举序：
-#    TO_ANCHOR=0/RUNUP=1/AIR=2）且 autopilot._vertical_jump）→ 断言该帧
-#    move_axis == Vector2.ZERO；整轮至少采到 1 帧满足。
-#    白盒守卫 _air_t > 0.0：触发帧 _trigger_jump 置 move_axis=(0,1)（spec 明确不改该
-#    行），首个 _air_tick 才改写为零——触发帧瞬态（_air_t==0.0）不算 AIR 稳态，排除之。
-func test_vertical_jump_air_zero_axis() -> void:
+# 9. 垂直模式惰性锚（2026-08-16 控制器裁决）：T-nav 重烘焙后箱区侵蚀使全部链接
+#    snap 水平距 ≥ 0.05（实测最小 TowerBox_W/E 0.732）——F12 检测恒不触发，垂直
+#    模式为未来 navmesh 变更的防御代码（RC-2 已在当前数据上由 F8/F9 + 新 navmesh
+#    根治，测试 8 即证）。锚定「当前 navmesh 无垂直链接」事实：装配 + setup 后
+#    白盒调 autopilot._snap_links()，逐链接断言 |from-to| 水平距 ≥ AT.VERTICAL_LINK_DIST。
+#    若未来重烘焙使链接重归同点（垂直语义回归），本锚必红提示重新启用 F12 验证。
+func test_vertical_mode_inert_on_current_navmesh() -> void:
 	var a := await _assemble()
 	var autopilot: AutoTraversal = a["autopilot"]
-	var record: AutoTraversalRecord = a["record"]
-	autopilot.setup(a["player"], record, Callable())
-	autopilot.set_target_faces(["WestClusterN_Box"])
-	autopilot.start()
-	var frames := 0
-	var max_frames := int(MAX_SECONDS * 60.0)
-	var zero_frames := 0
-	while frames < max_frames and not autopilot.done:
-		await wait_physics_frames(1)
-		frames += 1
-		if autopilot._jump_phase == 2 and autopilot._vertical_jump \
-				and autopilot._air_t > 0.0:
-			assert_eq(autopilot._cmd.move_axis, Vector2.ZERO,
-					"垂直模式 AIR 帧 move_axis 应为零（第 %d 帧采样）" % frames)
-			zero_frames += 1
-	print("RUNUP9 frames=", frames, " zero_air_frames=", zero_frames,
-			" done=", autopilot.done)
-	assert_true(autopilot.done, "应在 %.0fs 内完成" % MAX_SECONDS)
-	assert_gt(zero_frames, 0, "垂直模式 AIR 期间应至少采样到 1 帧零输入")
-	var pf: Dictionary = record.summary_dict()["per_face"]
-	assert_eq(pf.get("WestClusterN_Box", {}).get("verdict", ""), "success",
-			"采样目标本身应 success（保证采样帧来自真实垂直跳）")
+	autopilot.setup(a["player"], a["record"], Callable())
+	autopilot._snap_links()
+	assert_gt(autopilot._links.size(), 0, "应快照到链接")
+	for l0 in autopilot._links:
+		var l: Dictionary = l0
+		var h: float = Vector2(l["from"].x - l["to"].x, l["from"].z - l["to"].z).length()
+		assert_gte(h, AT.VERTICAL_LINK_DIST,
+				"链接 %s snap 水平距 %.3f 应 ≥ 0.05（F12 垂直模式惰性）" % [l["name"], h])
 
 
 # 10. 助跑卡死回归锚（F11）：EastSpurN（PavToSpur_E 助跑卡死样本）驱动 ≤60s →
@@ -236,6 +222,21 @@ func test_runup_no_wall_wedge_stuck() -> void:
 	autopilot.set_target_faces(["EastSpurN"])
 	autopilot.start()
 	var frames := await _drive(autopilot, record)
+	# 装配竞态加固（2026-08-16 控制器裁决）：2/4 次全文件运行出现 frames=0 的
+	# no_path（start() 同步规划时导航图未就绪的形态）——frames<120 且 no_path 时
+	# 清掉本次装配（防新旧玩家同点重叠互相推挤）重新装配重跑一次，第二次结果直接
+	# 采用（正常路径 498 帧 success，120 帧门槛不会误吞真实失败）。
+	if frames < 120 and record.summary_dict().get("per_face", {}) \
+			.get("EastSpurN", {}).get("verdict", "") == "no_path":
+		autopilot.free()
+		a["player"].free()
+		a = await _assemble()
+		autopilot = a["autopilot"]
+		record = a["record"]
+		autopilot.setup(a["player"], record, Callable())
+		autopilot.set_target_faces(["EastSpurN"])
+		autopilot.start()
+		frames = await _drive(autopilot, record)
 	var reason := "MISSING"
 	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
 	if adir != null:
