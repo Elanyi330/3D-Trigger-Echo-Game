@@ -5,7 +5,7 @@
 #      长墙顶/横脊墙顶——含 28 处跳跃链接的链式可达）
 #   ② 不可达面（伞顶/门梁/市集高棚）路径查询必失败（防穿墙）
 #   ③ 网格质量：多边形数 >0、顶点数 >0
-#   ④ 塔坡道台阶区导航梯度（2026-08-15 方案 A 门禁，见下）
+#   ④ 坡道台阶区导航梯度（2026-08-15 方案 A 门禁，T-nav-ext 扩至四坡道，见下）
 extends SceneTree
 
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
@@ -102,24 +102,29 @@ func _init() -> void:
 			print("FAIL 不应可达: %s（路径终点距目标 %.2fm）" % [t[0], path[path.size() - 1].distance_to(closest)])
 		else:
 			print("ok    %-14s 无路径可达（AI 到不了）" % t[0])
-	# ④ 塔坡道台阶区导航梯度（2026-08-15 方案 A 门禁）：沿两塔坡道中心线（x=∓19.75）
-	#   采样列 = 坡脚地面缝 z=z0（期望 0.4）+ 10 个台阶槽中点
-	#   z_i=z0+(z1-z0)*(i+0.5)/10（期望 0.4+0.25*(i+1)），每列双查容差 0.35：
+	# ④ 坡道台阶区导航梯度（2026-08-15 方案 A 门禁，T-nav-ext 扩至四坡道）：沿每条
+	#   坡道中心线 x=(x0+x1)/2 采样列 = 坡脚缝 z=z0（期望 0.4+y0）+ steps 个台阶槽中点
+	#   z_i=z0+(z1-z0)*(i+0.5)/steps（期望 0.4+y0+(y1-y0)*(i+1)/steps），每列双查容差 0.35：
 	#   A. 查询 y=期望：|导航 y − 期望| ≤ 0.35（目标高度处有面）；
 	#   B. 查询 y=期望+1.0（自上而下）：导航 y − 期望 ≤ 0.35（无悬空面压顶）。
-	#   实测旧缺陷 navmesh：坡脚上方挂倾斜多边形（西塔 z=8.2 差 +0.42，A 判失败）；
+	#   实测旧缺陷 navmesh：塔坡脚上方挂倾斜多边形（西塔 z=8.2 差 +0.42，A 判失败）；
 	#   槽区另有悬空面族（东塔 z≈-7.4 挂 1.40 vs 物理 0.32 → 差 +0.5，B 判失败——
-	#   单用 A 判会被邻近低位面掩蔽，实测必需 B 判）。斜坡替身后梯度差 ≤0.125。
+	#   单用 A 判会被邻近低位面掩蔽，实测必需 B 判）；祭坛坡道同款缺陷（面高差可达
+	#   1.11，RampE 弹出楔死根因）。斜坡替身后梯度差 ≤0.125。
 	var ramp_fail := 0
-	for s in BAKE.TOWER_RAMP_SLOPES:
+	var ramp_cols := 0
+	for s in BAKE.RAMP_SLOPES:
 		var x: float = (s["x0"] + s["x1"]) * 0.5
-		var cols := [{"z": s["z0"], "expected": 0.4}]
-		for i in 10:
+		var steps: int = s["steps"]
+		var foot_expected: float = 0.4 + s["y0"]
+		var cols := [{"z": s["z0"], "expected": foot_expected}]
+		for i in steps:
 			cols.append({
-				"z": s["z0"] + (s["z1"] - s["z0"]) * (float(i) + 0.5) / 10.0,
-				"expected": 0.4 + 0.25 * float(i + 1),
+				"z": s["z0"] + (s["z1"] - s["z0"]) * (float(i) + 0.5) / float(steps),
+				"expected": foot_expected + (s["y1"] - s["y0"]) * float(i + 1) / float(steps),
 			})
 		for c in cols:
+			ramp_cols += 1
 			var p_lo: Vector3 = NavigationServer3D.map_get_closest_point(map_rid, Vector3(x, c["expected"], c["z"]))
 			var p_hi: Vector3 = NavigationServer3D.map_get_closest_point(map_rid, Vector3(x, c["expected"] + 1.0, c["z"]))
 			var fail_a: bool = absf(p_lo.y - c["expected"]) > 0.35
@@ -127,13 +132,13 @@ func _init() -> void:
 			if fail_a or fail_b:
 				ramp_fail += 1
 				fails += 1
-				print("FAIL 塔坡道梯度 x=%.2f z=%+.2f 期望 %.2f：低查 y=%.2f 差 %+.2f%s；高查 y=%.2f 差 %+.2f%s" % [
+				print("FAIL 坡道梯度 x=%.2f z=%+.2f 期望 %.2f：低查 y=%.2f 差 %+.2f%s；高查 y=%.2f 差 %+.2f%s" % [
 					x, c["z"], c["expected"], p_lo.y, p_lo.y - c["expected"], "（超）" if fail_a else "",
 					p_hi.y, p_hi.y - c["expected"], "（超）" if fail_b else ""])
 	if ramp_fail == 0:
-		print("ok    塔坡道梯度 两塔 22 列 44 判定全过（坡脚地面 + 10 台阶槽 × 低/高双查，容差 0.35）")
+		print("ok    坡道梯度 四坡道 %d 列 %d 判定全过（坡脚缝 + 台阶槽 × 低/高双查，容差 0.35）" % [ramp_cols, ramp_cols * 2])
 	else:
-		print("塔坡道梯度失败列 %d/22" % ramp_fail)
+		print("坡道梯度失败列 %d/%d" % [ramp_fail, ramp_cols])
 	print("---")
 	print("navmesh 门禁: %s" % ("FAIL %d 项" % fails if fails > 0 else "全过"))
 	quit(1 if fails > 0 else 0)
