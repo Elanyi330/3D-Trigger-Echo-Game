@@ -25,6 +25,7 @@ const VERT_KEEP := 0.2             # 与前保留点导航高度差 ≥ 此值�
                                     # 丢级后直线切进楼梯侧面，step-up 无法面朝台阶触发）
 const STALL_TRIGGER_ALONG := 0.8   # 助跑撞墙停摆触发：距起跳点投影 ≤ 此值且贴墙 → 起跳
 const TURN_STOP_ANGLE := 1.4      # rad（≈80°）：转向差超过此值 → 原地转向（防满速甩尾）
+const RUNUP_TURN_GATE := 0.3   # rad（≈17°）：助跑转向门——转向差超此值原地转（F8 直线助跑）
 const WALL_PROBE_DIST := 0.6      # 助跑前向墙体探测距离：触墙前提前起跳（见 _runup_tick）
 const SESSION_TIMEOUT := 1800.0   # 单次自动运行上限（秒）——用户拍板 2026-08-14：≤30 分钟
 const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest 落到邻近面，probe_navmesh 同口径）
@@ -379,6 +380,30 @@ func _face_target_candidates(face: Dictionary) -> Array:
 	]
 
 
+## 目标航向 yaw（Godot 惯例：atan2(-dir.x, -dir.z)；F8 抽纯函数供 _steer_toward 复用与测试）
+static func target_yaw(from: Vector3, to: Vector3) -> float:
+	var dir := to - from
+	dir.y = 0.0
+	return atan2(-dir.x, -dir.z)
+
+
+## 触发门控纯谓词（F9）：速度门 + 方向锥 ±25° + 近静止按路径声明放行。
+## 与原 _try_trigger 差异：①方向锥 0.6 → 0.9 系数（±53°→±25°）②近静止（hspeed ≤0.5）
+## 原无条件放行 → 改按 allow_near_still 参数（停摆路径传 true，墙探/圆盘传 false——
+## 真实跳跃必须过速度门；F8 直线助跑保证速度门可达）。jump_v ≤ 0.4 原地跳恒放行。
+static func trigger_allowed(jump_v: float, hspeed: float, v_h: Vector2, td: Vector2,
+		gate_speed: float, require_heading: bool, allow_near_still: bool) -> bool:
+	if jump_v <= 0.4:
+		return true
+	if hspeed > 0.5 and hspeed < gate_speed:
+		return false
+	if hspeed <= 0.5:
+		return allow_near_still
+	if require_heading and td.length() > 0.01 and v_h.dot(td) < 0.9 * hspeed:
+		return false
+	return true
+
+
 ## 路径段分类：path 相邻点对与 links 端点（已 snap 的 from/to）首尾双向匹配 ≤1.0m → 跳跃段；
 ## 其余为行走段。返回 [{"kind": "walk"|"jump", "start": Vector3, "end": Vector3,
 ## "link": Dictionary（jump 段才有）}]，按 path 顺序。确定性：按 links 顺序取首个匹配。
@@ -642,10 +667,10 @@ func _steer_toward(target: Vector3, delta: float) -> bool:
 	dir.y = 0.0
 	if dir.length() <= 0.001:
 		return true
-	var target_yaw := atan2(-dir.x, -dir.z)
-	_player.rotation.y = lerp_angle(_player.rotation.y, target_yaw,
+	var goal_yaw := target_yaw(_player.global_position, target)
+	_player.rotation.y = lerp_angle(_player.rotation.y, goal_yaw,
 			clampf(TURN_RATE * delta, 0.0, 1.0))
-	return absf(angle_difference(_player.rotation.y, target_yaw)) <= TURN_STOP_ANGLE
+	return absf(angle_difference(_player.rotation.y, goal_yaw)) <= TURN_STOP_ANGLE
 
 
 ## 途经点到达判定：水平距 ≤ WALK_ARRIVE_RADIUS 且目标面不高于脚底 0.3 以上
@@ -1074,18 +1099,14 @@ func _jump_tick(delta: float) -> void:
 ## （投影 ≥ 0.6×|v|，约 ±53°）——小面助跑从侧面触发会把起跳速度正交化
 ## （实测 CrateToCluster_WN 向北飞出箱顶落回地面）；近静止时方向无意义跳过。
 ## _jump_v ≤ 0.4（近乎原地跳）恒放行。
-func _try_trigger(gate_speed: float, require_heading: bool) -> bool:
-	if _jump_v <= 0.4:
-		return true
+## F9 差异（2026-08-15）：方向锥 0.6 → 0.9（±53°→±25°）+ 近静止放行按
+## allow_near_still 路径声明（停摆 true / 墙探·圆盘 false）——逻辑本体在 static
+## trigger_allowed，本函数只读实例状态转发。
+func _try_trigger(gate_speed: float, require_heading: bool, allow_near_still: bool) -> bool:
 	var v_h := Vector2(_player.velocity.x, _player.velocity.z)
-	var hspeed := v_h.length()
-	if hspeed > 0.5 and hspeed < gate_speed:
-		return false
-	if require_heading and hspeed > 0.5:
-		var td := Vector2(_travel_dir.x, _travel_dir.z)
-		if td.length() > 0.01 and v_h.dot(td) < 0.6 * hspeed:
-			return false
-	return true
+	var td := Vector2(_travel_dir.x, _travel_dir.z)
+	return trigger_allowed(_jump_v, v_h.length(), v_h, td,
+			gate_speed, require_heading, allow_near_still)
 
 
 ## 助跑：直线朝 from_point 前进（move_axis 幅值缩放使目标速度 = 起跳速度 v——
@@ -1102,8 +1123,14 @@ func _runup_tick(delta: float) -> void:
 	if _runup_t > 8.0:
 		_recover_runup()
 		return
+	# F8 直线助跑：转向差 ≤ RUNUP_TURN_GATE 才前进（超差 → axis=0 原地转，TURN_RATE
+	# 4 rad/s 最坏 180° 转 0.78s）——消除纯追踪最小转弯圆轨道（R_min=v/ω 恒大于
+	# 0.6m 触发圆盘，v>2.4 时永不收敛的 30-43s 转圈根因）
 	_cmd.move_axis = Vector2(0, _runup_throttle()) \
-			if _steer_toward(_from_point, delta) else Vector2.ZERO
+			if absf(angle_difference(_player.rotation.y,
+					target_yaw(_player.global_position, _from_point))) <= RUNUP_TURN_GATE \
+			else Vector2.ZERO
+	_steer_toward(_from_point, delta)
 	var to_h := Vector3(_from_point.x - _player.global_position.x, 0.0,
 			_from_point.z - _player.global_position.z)
 	var along: float = to_h.dot(_travel_dir)  # 停摆触发判定用
@@ -1115,14 +1142,15 @@ func _runup_tick(delta: float) -> void:
 	# 通过 → 以当前速度立即起跳（RUN 档弹道，无漂移依赖）。
 	# 三路径统一门控（2026-08-15 F3 审查 3）：原速度门只盖圆盘一条路径——
 	# 墙探硬编码 0.9v（relaxed 口径漏）、停摆无门（任意速度贴墙即跳）；
-	# 现三路径共用 _try_trigger（速度门 + 方向锥，gate 随 relaxed 口径）。
-	if _try_trigger(gate_speed, true) and _wall_ahead():
+	# 现三路径共用 _try_trigger（速度门 + 方向锥，gate 随 relaxed 口径；
+	# F9 近静止按路径声明放行：停摆 true / 墙探·圆盘 false）。
+	if _try_trigger(gate_speed, true, false) and _wall_ahead():
 		_trigger_jump()
 		return
-	# 撞墙停摆兜底（探测未覆盖的贴墙情形）：近静止（≤0.5m/s）时 _try_trigger 放行
-	# ——贴墙起跳本就低速，REST 漂移是设计内
+	# 撞墙停摆兜底（探测未覆盖的贴墙情形）：近静止（≤0.5m/s）按停摆路径声明放行
+	# （F9 allow_near_still=true——贴墙起跳本就低速，REST 漂移是设计内）
 	if _player.is_on_wall() and along <= STALL_TRIGGER_ALONG and _runup_t >= 0.5 \
-			and _try_trigger(gate_speed, true):
+			and _try_trigger(gate_speed, true, true):
 		_trigger_jump()
 		return
 	# 触发条件（2026-08-14 修复轮改圆盘）：原沿线投影 ≤ trigger_distance 且横向
@@ -1134,7 +1162,7 @@ func _runup_tick(delta: float) -> void:
 	# 处理（起跳点贴障碍的链接如 Crate_WN：圆盘 0.6 环在墙探 0.6 射程之前
 	# 0.25m 抢先触发，起跳点漂移 → 落点漂移 → 下游相位破坏）
 	if to_h.length() <= 0.6 and height_ok and not _wall_ahead(1.0):
-		if _try_trigger(gate_speed, true):
+		if _try_trigger(gate_speed, true, false):
 			_trigger_jump()
 			return
 	elif _stuck_check(delta):
