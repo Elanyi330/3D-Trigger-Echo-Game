@@ -254,7 +254,9 @@ func _resort_pending() -> void:
 		_pending.append(s0["name"])
 
 
-## 当前玩家位置到目标面的导航路径几何长度（空路径/未知面 → INF 排最后）
+## 当前玩家位置到目标面的导航路径几何长度（空路径/未知面 → INF 排最后）。
+## （2026-08-15 F8-F13 修复轮）optimize=false 走廊忠实路径——optimize 拉直会切角穿墙
+## （WestTowerBox 基座压墙样本：走廊走坡道北端入口上塔，拉直后直穿坡道东侧立面）
 func _path_length_to(face_name: String) -> float:
 	var face: Dictionary = _faces_by_name.get(face_name, {})
 	if face.is_empty():
@@ -263,7 +265,7 @@ func _path_length_to(face_name: String) -> float:
 	var target_point := Vector3(c.x, float(face["top_y"]) + 0.4, c.y)
 	var closest := NavigationServer3D.map_get_closest_point(_map_rid, target_point)
 	var path: PackedVector3Array = NavigationServer3D.map_get_path(
-			_map_rid, _player.global_position, closest, true)
+			_map_rid, _player.global_position, closest, false)
 	if path.size() < 2:
 		return INF
 	var total := 0.0
@@ -341,6 +343,8 @@ func _next_target() -> void:
 ## 每个候选：先验 snap 距离 ≤ TARGET_SNAP_TOL（防 closest 落到邻近面）且
 ## 路径末端距 snap 点 ≤ NO_PATH_DIST → 采用；全不可达 → found=false + best_end
 ## （各候选路径末端距的最小值，供 no_path 失败原因）。
+## （2026-08-15 F8-F13 修复轮）optimize=false 走廊忠实路径——optimize 拉直会切角穿墙
+## （WestTowerBox 基座压墙样本：走廊走坡道北端入口上塔，拉直后直穿坡道东侧立面）
 func _plan_to_face(face: Dictionary) -> Dictionary:
 	var best_end := 999.0
 	var from := _player.global_position
@@ -349,7 +353,7 @@ func _plan_to_face(face: Dictionary) -> Dictionary:
 		if closest.distance_to(cand) > TARGET_SNAP_TOL:
 			continue
 		var path: PackedVector3Array = NavigationServer3D.map_get_path(
-				_map_rid, from, closest, true)
+				_map_rid, from, closest, false)
 		if path.size() < 2:
 			continue
 		var end_dist: float = path[path.size() - 1].distance_to(closest)
