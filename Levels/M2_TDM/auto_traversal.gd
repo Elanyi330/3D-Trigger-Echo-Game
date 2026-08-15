@@ -854,9 +854,30 @@ func _walk_tick(delta: float) -> void:
 	if _wall_follow and _wall_follow_step(waypoint, delta):
 		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint))
 		return
-	_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(), delta)
-	_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
-			if _steer_toward(waypoint, delta) else Vector2.ZERO
+	# 滑墙仅介入水平面途经点（面高−脚高 ≤ 0）：可攀台阶面（0 < 差 ≤ 0.62）的踢面
+	# 是要爬的台阶不是要绕的墙——压入直走交 step-up 爬升（2026-08-15 修复 4：
+	# WestTowerBox 台阶 1→2 楔死=斜向逼近时滑墙切向把 walker 沿踢面推出坡道西缘
+	# 全速顶西壁；T-nav 重烘焙后坡道成直路，此病理成为冒烟主失败）
+	if _waypoint_surface_y(waypoint) - _feet_y() <= 0.0:
+		_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(), delta)
+	# 修复 5（2026-08-15）：可攀踢面正压转向——on_wall 且 0 < 途经点面高−脚高 ≤ 0.62
+	# 时，转向对准碰撞反法向（正对踢面）而非途经点：斜向压入的切向滑移（纯物理
+	# move_and_slide 碰撞切向，非滑墙逻辑）把角色沿踢面滑出坡道西缘（WestTowerBox
+	# 楔死第二轮根因：x -20.85→-21.50 弹出 2.5m 宽坡道）；正对后斜切角归零、
+	# step-up 垂直抬升。
+	var _riser_face := false
+	if _player.is_on_wall() and _waypoint_surface_y(waypoint) - _feet_y() > 0.0 \
+			and _waypoint_surface_y(waypoint) - _feet_y() <= 0.62:
+		for ci in _player.get_slide_collision_count():
+			var cn := _player.get_slide_collision(ci).get_normal()
+			if absf(cn.y) < 0.5:
+				_riser_face = true
+				_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
+						if _steer_toward(_player.global_position + cn, delta) else Vector2.ZERO
+				break
+	if not _riser_face:
+		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
+				if _steer_toward(waypoint, delta) else Vector2.ZERO
 	if _arrived(waypoint):
 		_seg_idx += 1
 		_reset_stuck()
@@ -1103,8 +1124,12 @@ func _jump_tick(delta: float) -> void:
 					if _steer_toward(_anchor, delta) else Vector2.ZERO
 			# 压墙检测传实际施加的指令（F7-3）：先转向再取 _cmd 幅值——与 WALK
 			# 同口径；预测节流在转向帧假积累的洞
-			_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(),
-					delta)
+			# 滑墙仅介入水平面途经点（面高−脚高 ≤ 0）：可攀台阶面的踢面是要爬的
+			# 台阶不是要绕的墙——压入直走交 step-up 爬升（2026-08-15 修复 4，
+			# 与 WALK 同口径；锚点面高差口径 _waypoint_surface_y(_anchor)）
+			if _waypoint_surface_y(_anchor) - _feet_y() <= 0.0:
+				_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(),
+						delta)
 			if _arrived(_anchor):
 				_jump_phase = _JumpPhase.RUNUP
 				_runup_t = 0.0
