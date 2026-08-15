@@ -64,3 +64,25 @@
 **F6**：TO_ANCHOR 滑墙+坠落→重试、阈值 0.5→0.2；GateN_WingE 转 jump_missed（机制生效）；RimW_B 定位坡面基座棱角（is_on_wall=false 不触发——单面残余，机制文档化）。
 **F7（多路 finder 共识 Critical）**：press→follow 循环饿死卡死检测（锁存不清 press_t+超时重置卡死 → 冻结楔角无限循环挂到会话超时）——锁存清 press/超时退出喂卡死计时/`_reset_wall_state` 五调用点/TO_ANCHOR 实际指令语义/坠落检查前置+垂直退出/`_to_anchor_max_feet` 假阳性防护/r7。数据验证：stuck 3/105、max attempt 70.5s 无挂死、滑墙触发 87→22（循环假触发消除）。
 **终审 APPROVE_WITH_NOTES**：3 Minor（`_skip_jump`/`restart_session` 补 `_reset_wall_state`、注释精度）记下轮。
+
+## F8-F13 执行层修复轮 + 塔/祭坛坡道烘焙替身（2026-08-16 收官，用户拍板）
+
+**触发**：用户反馈「跳跃前莫名其妙转圈」+ 失败/卡顿分析 → 119 attempt 帧数据根因分析（RC-1 转圈=最小转弯圆 R_min=v/ω 实测吻合 v=5.45→r=1.07-1.64m；RC-2 漂移跳=±53° 锥+近静止放行 45° 失跳；RC-3 卡顿=轨道白转 30-43s/不可达锚点压墙 23s/楔死冻结 21s；RC-4 助跑楔墙无恢复）。设计：docs/superpowers/specs/2026-08-15-auto-traversal-runup-fixes-design.md；计划：docs/superpowers/plans/2026-08-15-auto-traversal-runup-fixes.md。
+
+**T-nav/T-nav-ext（用户拍板方案 A 烘焙替身）**：四坡道台阶区 navmesh 数据缺陷根治——台阶整高盒经「窄边放大 1.2」烘焙互相重叠（0.62/0.75 深 → 1.2 深，重叠 0.58/0.45m）埋掉台阶顶面 → 烘焙器产出斜跨 5m 悬空多边形（poly 637 顶点 y 0.4/1.4/0.4 实锤；西/东塔+两祭坛坡道四区同族）。修复=烘焙几何用真斜坡替身（游戏几何/碰撞/视觉/布局哈希全部不动，跳跃记录不重置）+ probe_navmesh ④ 梯度门禁（四坡道 40 列 80 判定，坡脚缝+槽中点×低/高双查）+ 祭坛坡道侧板（垂直无顶四边形封 phantom 侧入口；塔坡道加板会回退寻路径形故不加）。navmesh 1087→1113 多边形。**关键发现：旧坏 navmesh 逼路径绕行 rim 墙链使历史冒烟能过（运气路径）——修复后坡道成直路，暴露 walker 执行层新病理链**。
+
+**T1（F8+F9 + 修复链 1-9）**：RUNUP 直线化（转向门 0.3rad）+ 触发门控收紧（±25° 锥 cos0.9/近静止按路径声明：墙探 false/停摆 true/圆盘 false）+ optimize=false 走廊忠实路径（optimize 拉直切角穿墙是压墙根因）+ 滑墙可达性守卫（>0.72 面高差 replan）+ 滑墙手性锁存（每 episode 锁存，R1 M1 修复）+ 可攀面滑墙不介入（(0,0.62] 压入交 step-up）+ 踢面正压转向（碰撞法向朝玩家侧——pos−cn 恒在墙内）+ 可攀点前瞻转向（窗口前移到地面段：「当前可攀→视下一；当前水平且下一可攀→视再下一」）。WestTowerBox 冒烟 90s 挂死 → 6.6s 逐级 step-up success（踢面接触点离西缘 0.15m→1.35m）。
+
+**T2（F11+F12）**：RUNUP 压墙 0.5s → recover 回锚点（停摆先行不被抢）；垂直链接模式（<0.05 水平距→停摆唯一触发+空中零输入）落地但**当前 navmesh 恒惰性**（snap 水平距实测最小 0.732——RC-2 已被 F8/F9+新 navmesh 根治，F12 为防御层，测试 9 惰性锚守护未来重烘焙回归）。测试 10 导航竞态加固（R2 REJECT：重试路径从不真驱动——第二轮 summary 继承使 _build_queue 跳过 → 清临时目录修复，审查者探针实证）。
+
+**T3（F10+F-degen）**：锚点可达性预检（面高差 >0.72 → 重寻路一次 → 诚实失败「锚点不可达」；白盒锚测试 12——活体路径上惰性：原 23s 样本机制已被 fix 4 守卫拦截）；**F-degen 退化跑道圆盘近静止放行**——锚点 snap 坍缩到侵蚀导航岛（1m 箱顶锚点≈起跳点 0.02-0.19m）→ F8 转向门对亚 0.2m 目标永不收敛 → hspeed=0 被近静止拒放 → 8s recover 死循环（箱顶冻结 32.07s 仅靠 recover>3 强制跳有界）→ 放行后 0.53s 有界（同结果快 ~30 倍）。
+
+**T4（F13+rev r8）**：WALK 途经点 8s 进展超时（无进展→重寻路→耗尽 stuck「途经点 8s 无进展」）+ 到达推进计时重置门控位移 ≥0.2m（偏差 1：门控移到计时重置而非推进条件——直击设计文档「假到达清卡死计时」本体，正常轨迹零扰动：test 11 frames=579/test 13 frame_count=1933 与 T3 实测全等复原）+ 重寻路计数化 MAX_REPLANS=2（原一次性）。TRAVERSAL_REV r7→r8（铁律：实机记录自动清空重建）。
+
+**审查链**：R-nav APPROVE / R1 APPROVE_WITH_NOTES（M1 Major 锁存生命周期已修+5 Minor）/ R2 REJECT（测试 10 重试空转 Major 已修+3 Minor）/ R3 APPROVE（3 Minor 记录）/ R4 APPROVE（3 Minor 记录）。
+
+**最终验证（2026-08-16）**：GUT **403/403**（45 scripts/35160 asserts）；probe_navmesh ①-④ 全过（四坡道梯度门禁）；probe_v3_walk **79/79**；probe_jump_edges 全过；布局哈希不变（跳跃记录不重置）。
+
+**遗留（记下轮）**：①R4 Minor 1——非超时重寻路成功路径未重置 _wp_t（一行级；冗余超时重寻路最坏多烧一次计数，有界）②测试 13 的 Crate_WS 上箱 4 次起跳+压墙 5s（~13s，M4 链执行范畴）③单目标 spawn→WestTowerBox 坡道西立面楔死（navmesh 替身坡面侧面可穿越 vs 物理阶梯封死，数据级怪癖，F13 有界兜底）④坡脚残余悬空桥面 ≤0.35（④ 门禁容差内、walker 到达门 0.3 边界）⑤RimN4 类高边坠落反向跳（重跑数据复评）⑥no_path 数据缺口（Belt/Corner 箱链接）留 M4。
+
+**用户实机验证指引**：TRAVERSAL_REV r8 → 实机启动自动清空重建遍历记录（铁律预期）；P 启动重跑 30 分钟 → `python3 tools/analyze_auto_traversal.py` 三源对照——预期 stuck 类大幅减少、attempt 时长压缩、转圈时长显著下降（原 30-43s 白转 → 秒级直线助跑）。
