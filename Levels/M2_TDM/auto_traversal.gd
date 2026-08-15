@@ -791,6 +791,9 @@ func _wall_press_detect(cmd_speed: float, delta: float) -> void:
 		_wall_press_origin = _player.global_position
 	if _wall_press_t >= 0.5:
 		_wall_follow = true
+		_wall_follow_dir = Vector3.ZERO  # R1 审查 M1：每 episode 重新锁存手性——清旧墙
+		# 方向（4 处直接清退点不清零时，二次锁存携带旧墙切向：首帧锁存条件永不成立，
+		# 投影 <0.1 帧回退旧墙方向 → 墙角换向干顶）
 		_wall_follow_t = 0.0
 		_wall_follow_origin = _player.global_position
 		_wall_press_t = 0.0
@@ -857,7 +860,8 @@ func _walk_tick(delta: float) -> void:
 	# 滑墙仅介入水平面途经点（面高−脚高 ≤ 0）：可攀台阶面（0 < 差 ≤ 0.62）的踢面
 	# 是要爬的台阶不是要绕的墙——压入直走交 step-up 爬升（2026-08-15 修复 4：
 	# WestTowerBox 台阶 1→2 楔死=斜向逼近时滑墙切向把 walker 沿踢面推出坡道西缘
-	# 全速顶西壁；T-nav 重烘焙后坡道成直路，此病理成为冒烟主失败）
+	# 全速顶西壁；T-nav 重烘焙后坡道成直路，此病理成为冒烟主失败）。已锁存的滑墙
+	# 在可攀区间仍可接管 ≤2s（0.3m 位移/2s 超时退出兜底），新锁存才受 ≤0 门控。
 	if _waypoint_surface_y(waypoint) - _feet_y() <= 0.0:
 		_wall_press_detect(Vector2(_cmd.move_axis.x, _cmd.move_axis.y).length(), delta)
 	# 修复 5（2026-08-15）：可攀踢面正压转向——on_wall 且 0 < 途经点面高−脚高 ≤ 0.62
@@ -868,13 +872,13 @@ func _walk_tick(delta: float) -> void:
 	# 法向约定（2026-08-15 修复 6 符号修正）：Godot 碰撞法向=表面外法向朝玩家侧
 	# （实测压踢面帧 cn=(0,0.40,-0.92) 朝玩家侧、背离踢面）——pos − cn 恒在墙内，
 	# 转向对准踢面；pos + cn 会转向背离踢面（旧符号反）。
-	var _riser_face := false
+	var riser_face := false
 	if _player.is_on_wall() and _waypoint_surface_y(waypoint) - _feet_y() > 0.0 \
 			and _waypoint_surface_y(waypoint) - _feet_y() <= 0.62:
 		for ci in _player.get_slide_collision_count():
 			var cn := _player.get_slide_collision(ci).get_normal()
 			if absf(cn.y) < 0.5:
-				_riser_face = true
+				riser_face = true
 				_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 						if _steer_toward(_player.global_position - cn, delta) else Vector2.ZERO
 				break
@@ -897,7 +901,7 @@ func _walk_tick(delta: float) -> void:
 			steer_target = _segments[_seg_idx + 2]["end"]
 		else:
 			steer_target = _segments[_seg_idx + 1]["end"]
-	if not _riser_face:
+	if not riser_face:
 		_cmd.move_axis = Vector2(0, _approach_throttle(waypoint)) \
 				if _steer_toward(steer_target, delta) else Vector2.ZERO
 	if _arrived(waypoint):
@@ -1146,18 +1150,18 @@ func _jump_tick(delta: float) -> void:
 			# 沿踢面滑出坡道西缘；正对后斜切角归零、step-up 垂直抬升
 			# 法向约定（2026-08-15 修复 6 符号修正）：碰撞法向朝玩家侧（背离踢面）
 			# ——pos − cn 恒在墙内、转向对准踢面（pos + cn 为旧符号反）
-			var _riser_face := false
+			var riser_face := false
 			if _player.is_on_wall() and _waypoint_surface_y(_anchor) - _feet_y() > 0.0 \
 					and _waypoint_surface_y(_anchor) - _feet_y() <= 0.62:
 				for ci in _player.get_slide_collision_count():
 					var cn := _player.get_slide_collision(ci).get_normal()
 					if absf(cn.y) < 0.5:
-						_riser_face = true
+						riser_face = true
 						_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
 								_approach_throttle(_anchor))) \
 								if _steer_toward(_player.global_position - cn, delta) else Vector2.ZERO
 						break
-			if not _riser_face:
+			if not riser_face:
 				_cmd.move_axis = Vector2(0, minf(_runup_throttle(),
 						_approach_throttle(_anchor))) \
 						if _steer_toward(_anchor, delta) else Vector2.ZERO
