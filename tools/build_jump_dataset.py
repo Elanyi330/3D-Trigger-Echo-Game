@@ -28,6 +28,8 @@ CATCH_BAND = 0.5
 FEET_OFFSET = 0.915
 MAX_FRAMES = 120  # 扫描上限（JumpSolver 同值：2s > 同高全程 47 帧）
 
+ROT_EPS = 0.05  # 180° 旋转面配对中心容差（面表几何驱动；导出值 snappedf 0.001）
+
 CORPUS_DIR = os.path.expanduser(
     "~/Library/Application Support/Godot/app_userdata/Trigger Echo/jump_training")
 EDGES_JSON = "/tmp/jump_edges.json"
@@ -116,6 +118,58 @@ def bbox_rect(pts):
             "w": r3(max(xs) - min(xs)), "h": r3(max(zs) - min(zs))}
 
 
+# 配对几何容差（尺寸差/顶高差为 0 才算合格配对；0.002 覆盖 0.001 舍入尾差）
+PAIR_GEO_TOL = 0.002
+
+
+def build_rot_map(faces):
+    """180° 旋转面配对（面表几何驱动，非字符串替换）：
+    rot(center) = (-x, -z)。候选 = 中心距离 ≤ ROT_EPS 的面；候选内按
+    (尺寸差, top_y 差, 中心距) 字典序取最优——处理嵌套共心面歧义
+    （原点簇 Ground/AltarPlatform/CorridorSlab/Pedestal 四面共心、
+    EastTower/EastTowerBox 等塔身/塔上箱共心：naive 最近中心会被同心的
+    大面抢占，导致配对非对合。尺寸优先即可消歧）。
+    合格候选须尺寸差与 top_y 差 ≤ PAIR_GEO_TOL（180° 旋转对称是设计硬
+    约束，配对面几何必须一致——防静默错配）。
+    违例情形：无候选 / 并列歧义 / 几何不一致 / 对合失败（rot(rot(f))≠f）。
+    返回 (rot_map, violations)；violations 元素 = (面名, 配对或候选, 细节)。
+    """
+    rot_map = {}
+    violations = []
+    for f in faces:
+        rx, rz = -f["center"]["x"], -f["center"]["z"]
+        cands = []
+        for g in faces:
+            d = ((g["center"]["x"] - rx) ** 2
+                 + (g["center"]["z"] - rz) ** 2) ** 0.5
+            if d <= ROT_EPS:
+                sd = (abs(g["size"]["x"] - f["size"]["x"])
+                      + abs(g["size"]["z"] - f["size"]["z"]))
+                td = abs(g["top_y"] - f["top_y"])
+                cands.append((sd, td, d, g["name"]))
+        if not cands:
+            violations.append((f["name"], None, "无旋转配对候选"))
+            continue
+        cands.sort()
+        if len(cands) > 1 and cands[0][:3] == cands[1][:3]:
+            violations.append(
+                (f["name"], [c[3] for c in cands if c[:3] == cands[0][:3]],
+                 "并列歧义"))
+            continue
+        sd, td, d, best = cands[0]
+        if sd > PAIR_GEO_TOL or td > PAIR_GEO_TOL:
+            violations.append(
+                (f["name"], best, "几何不一致 sizeΔ=%.3f top_yΔ=%.3f d=%.3f"
+                 % (sd, td, d)))
+            continue
+        rot_map[f["name"]] = best
+    # 对合校验（防映射冲突）
+    for f, g in rot_map.items():
+        if rot_map.get(g) != f:
+            violations.append((f, g, "对合失败 rot(rot(f))≠f"))
+    return rot_map, violations
+
+
 def load_corpus():
     with open(os.path.join(CORPUS_DIR, "manifest.json")) as fh:
         manifest = json.load(fh)
@@ -150,6 +204,20 @@ def main():
             "老图数据不得进入新数据集——重建 /tmp/jump_edges.json 或重置语料。\n"
             % (manifest["map_hash"], geo["current_map_hash"]))
         sys.exit(1)
+
+    # ── 180° 旋转面配对 + 对称性门禁（fail-safe）──
+    # 违例即跳过全部增强（数据集照常产出、exit 0），但警告必须醒目。
+    rot_map, rot_violations = build_rot_map(geo["faces"])
+    if rot_violations:
+        sys.stderr.write(
+            "\n"
+            "=" * 72 + "\n"
+            "!!! 对称性门禁 FAIL：180° 旋转面配对违例 %d 条 —— 跳过全部增强\n"
+            "    数据集照常产出（无 augmented 数据），exit 0。违例明细：\n"
+            % len(rot_violations))
+        for v in rot_violations:
+            sys.stderr.write("    %s\n" % (v,))
+        sys.stderr.write("=" * 72 + "\n\n")
 
     # ── 语料逐 episode 解析 ──
     corpus_groups = {}   # (from,to) -> 聚合桶
@@ -233,6 +301,52 @@ def main():
         if (s, e) in geom_pairs:
             matched_humans[(s, e)] = human_dict(s, e, g)
 
+    # ── 180° 旋转增强（只填空缺；实数据优先；防增强链）──
+    # 源 = 真实 human 边 (s,e)（matched_humans 在增强前只含真实数据）。
+    # 其旋转对 (rot(s), rot(e))：必须在 geom_pairs 中、且无真实 human、
+    # 且非自旋（rot 对 == 自身时该边必有真实数据，已被前一条排除）——
+    # 才生成增强副本。增强副本的 human 字段照常参与 skill 判定
+    # （chain_n/catch_depth 等全部复制，判定逻辑不改）。
+    # 标量（takeoff_speed 分位/takeoff_feet_y/contact_feet_y/catch_depth/
+    # flight_ms/n/chain_n）为旋转不变量，原样复制；
+    # takeoff_rect/landing_rect 旋转：新最小角 = 旧最大角取负
+    # {"x": -(x+w), "z": -(z+h), "w": w, "h": h}。
+    augmented = []  # (s, e, rs, re_)
+    if not rot_violations:
+        for (s, e) in sorted(matched_humans):
+            rs, re_ = rot_map.get(s), rot_map.get(e)
+            if rs is None or re_ is None:
+                continue
+            if (rs, re_) == (s, e):
+                continue  # 自旋边（既有真实数据，无需复制）
+            if (rs, re_) not in geom_pairs:
+                continue
+            if (rs, re_) in matched_humans:
+                continue  # 旋转对已有真实数据——实数据优先
+            src = matched_humans[(s, e)]
+            tr = src["takeoff_rect"]
+            lr = src["landing_rect"]
+            matched_humans[(rs, re_)] = {
+                "from": rs, "to": re_,
+                "n": src["n"], "chain_n": src["chain_n"],
+                "takeoff_speed": dict(src["takeoff_speed"]),
+                "takeoff_feet_y": src["takeoff_feet_y"],
+                "contact_feet_y": src["contact_feet_y"],
+                "catch_depth": dict(src["catch_depth"]),
+                "flight_ms": src["flight_ms"],
+                "takeoff_rect": {"x": r3(-(tr["x"] + tr["w"])),
+                                "z": r3(-(tr["z"] + tr["h"])),
+                                "w": tr["w"], "h": tr["h"]},
+                "landing_rect": {"x": r3(-(lr["x"] + lr["w"])),
+                                "z": r3(-(lr["z"] + lr["h"])),
+                                "w": lr["w"], "h": lr["h"]},
+                "augmented": True,
+                "source_edge": {"from": s, "to": e},
+            }
+            augmented.append((s, e, rs, re_))
+    augmented.sort()
+    real_edges_matched = len(matched_humans) - len(augmented)
+
     # ── 边合并（按 (from_face,to_face) 字典序）──
     edges = []
     for g in sorted(geom_groups, key=lambda x: (x["from_face"], x["to_face"])):
@@ -307,7 +421,8 @@ def main():
         "catch_depth_p90": r3(quantile(catch_depths, 90)),
         "episodes": len(kept_episodes),
         "groups": len(corpus_groups),
-        "edges_matched": sum(1 for e in edges if e["human"] is not None),
+        # 只计真实 human 匹配（增强副本不计入——保持既有口径；增强数见 meta）
+        "edges_matched": real_edges_matched,
     }
 
     meta = {
@@ -318,6 +433,13 @@ def main():
         "calibrated": calibrated,
         "generated_by": "tools/build_jump_dataset.py",
         "source": "user://jump_training",
+        # 180° 旋转增强汇总（字典序，按源边 (from,to) 排序）：
+        # 每项 = 源边 + 增强边身份（源边在 edge.human.source_edge 亦有记录）
+        "augmented_edges": len(augmented),
+        "augmented": [
+            {"from": s, "to": e, "aug_from": rs, "aug_to": re_}
+            for (s, e, rs, re_) in augmented
+        ],
     }
 
     out = {
@@ -325,6 +447,9 @@ def main():
         "edges": edges,
         "link_audit": link_audit,
         "unlinked_human_edges": unlinked,
+        # 面表内嵌（自包含原则：分析工具/M4 只消费本 JSON，不依赖 /tmp 中转；
+        # 直接嵌入 geo["faces"]，键口径与导出侧一致）
+        "faces": geo["faces"],
     }
 
     with open(OUT_JSON, "w") as fh:
@@ -352,10 +477,11 @@ def main():
         n = e["human"]["n"] if e["human"] else 0
         chain = ("(chain%d)" % e["human"]["chain_n"]) if (
             e["human"] and e["human"]["chain_n"] > 0) else ""
-        print("%-24s %-24s %+6.2f %7.3f %7.2f %-10s %4d %s%s" % (
+        aug = "(aug)" if (e["human"] and e["human"].get("augmented")) else ""
+        print("%-24s %-24s %+6.2f %7.3f %7.2f %-10s %4d %s%s%s" % (
             e["from_face"], e["to_face"], e["delta_h"], e["dist_zone"],
             e["physics"]["v_req"], e["physics"]["verdict"], n,
-            "skill" if e["skill"] else "", chain))
+            "skill" if e["skill"] else "", chain, aug))
     print("\nlink_audit 异常链接:")
     anomalies = [a for a in link_audit
                  if a["verdict"] in ("suspicious_link", "infeasible")]
@@ -363,6 +489,15 @@ def main():
         print("  %-22s %s→%s  dist_link=%.3f  %s" % (
             a["link"], a["from_face"] or "?", a["to_face"] or "?",
             a["dist_link"], a["verdict"]))
+    if not rot_violations:
+        print("\n对称性门禁 PASS: %d 面 180° 旋转配对无违例，对合校验通过"
+              % len(rot_map))
+    else:
+        print("\n对称性门禁 FAIL: 违例 %d 条（明细见上方 stderr），已跳过全部增强"
+              % len(rot_violations))
+    print("旋转增强: %d 条（源边 → 增强边）:" % len(augmented))
+    for (s, e, rs, re_) in augmented:
+        print("  %-24s → %-24s ==> %-24s → %s" % (s, e, rs, re_))
     print("输出: %s" % OUT_JSON)
 
 

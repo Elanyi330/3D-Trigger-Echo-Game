@@ -3,17 +3,80 @@
   "map_hash": "f935ccd7c32c7cd4bdd47e8b9f6ef858b8f4220bd3f85606e810743eeb6bcef0",
   "movement_rev": "unknown(嵌入 map_hash 计算)",
   "map_name": "回声祭坛v3",
-  "corpus_episodes": 262,
+  "corpus_episodes": 361,
   "calibrated": {
-   "peak_rise_p99": 1.668,
-   "peak_rise_p50": 0.849,
-   "catch_depth_p90": 0.106,
-   "episodes": 260,
-   "groups": 121,
-   "edges_matched": 28
+   "peak_rise_p99": 1.689,
+   "peak_rise_p50": 0.999,
+   "catch_depth_p90": 0.103,
+   "episodes": 359,
+   "groups": 155,
+   "edges_matched": 34
   },
   "generated_by": "tools/build_jump_dataset.py",
-  "source": "user://jump_training"
+  "source": "user://jump_training",
+  "augmented_edges": 10,
+  "augmented": [
+   {
+    "from": "EastClusterS_Box",
+    "to": "EastClusterS_Panel",
+    "aug_from": "WestClusterN_Box",
+    "aug_to": "WestClusterN_Panel"
+   },
+   {
+    "from": "EastTowerRampStep10",
+    "to": "EastWall_M",
+    "aug_from": "WestTowerRampStep10",
+    "aug_to": "WestWall_M"
+   },
+   {
+    "from": "Ground",
+    "to": "EastClusterS_Box",
+    "aug_from": "Ground",
+    "aug_to": "WestClusterN_Box"
+   },
+   {
+    "from": "Ground",
+    "to": "WestClusterS_Box",
+    "aug_from": "Ground",
+    "aug_to": "EastClusterN_Box"
+   },
+   {
+    "from": "RimW_B",
+    "to": "GateS_WingE",
+    "aug_from": "RimE_T",
+    "aug_to": "GateN_WingE"
+   },
+   {
+    "from": "WestClusterS_Panel",
+    "to": "WestWall_M",
+    "aug_from": "EastClusterN_Panel",
+    "aug_to": "EastWall_M"
+   },
+   {
+    "from": "WestPavilion",
+    "to": "WestClusterS_Panel",
+    "aug_from": "EastPavilion",
+    "aug_to": "EastClusterN_Panel"
+   },
+   {
+    "from": "WestTower",
+    "to": "WestTowerBox",
+    "aug_from": "EastTower",
+    "aug_to": "EastTowerBox"
+   },
+   {
+    "from": "WestTower",
+    "to": "WestWall_M",
+    "aug_from": "EastTower",
+    "aug_to": "EastWall_M"
+   },
+   {
+    "from": "WestWall_N",
+    "to": "WestClusterN_Panel",
+    "aug_from": "EastWall_S",
+    "aug_to": "EastClusterS_Panel"
+   }
+  ]
  },
  "edges": [
   {
@@ -181,7 +244,41 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "EastClusterN_Panel",
+    "to": "EastWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.284,
+     "p10": 5.284,
+     "p90": 5.284
+    },
+    "takeoff_feet_y": 2.326,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 650,
+    "takeoff_rect": {
+     "x": 19.092,
+     "z": 4.975,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 22.495,
+     "z": 4.516,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "WestClusterS_Panel",
+     "to": "WestWall_M"
+    }
+   },
    "physics": {
     "v_req": 4.773,
     "verdict": "easy"
@@ -347,7 +444,36 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "EastClusterS_Panel",
+    "to": "RimE_B",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.202,
+     "p10": 5.202,
+     "p90": 5.202
+    },
+    "takeoff_feet_y": 2.303,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 650,
+    "takeoff_rect": {
+     "x": 17.314,
+     "z": -10.609,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 14.309,
+     "z": -9.061,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
    "physics": {
     "v_req": 4.229,
     "verdict": "easy"
@@ -383,7 +509,41 @@
      "z": 0.4
     }
    },
-   "human": null,
+   "human": {
+    "from": "EastPavilion",
+    "to": "EastClusterN_Panel",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.46,
+     "p10": 5.427,
+     "p90": 5.46
+    },
+    "takeoff_feet_y": 1.326,
+    "contact_feet_y": 2.197,
+    "catch_depth": {
+     "p50": 0.012,
+     "p90": 0.012
+    },
+    "flight_ms": 617,
+    "takeoff_rect": {
+     "x": 18.719,
+     "z": 8.623,
+     "w": 0.438,
+     "h": 0.018
+    },
+    "landing_rect": {
+     "x": 18.456,
+     "z": 5.272,
+     "w": 0.898,
+     "h": 0.045
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "WestPavilion",
+     "to": "WestClusterS_Panel"
+    }
+   },
    "physics": {
     "v_req": 5.071,
     "verdict": "easy"
@@ -422,25 +582,25 @@
    "human": {
     "from": "EastPavilion",
     "to": "EastSpurN",
-    "n": 3,
-    "chain_n": 2,
+    "n": 4,
+    "chain_n": 3,
     "takeoff_speed": {
-     "p50": 5.218,
+     "p50": 5.407,
      "p10": 5.114,
-     "p90": 5.407
+     "p90": 6.038
     },
     "takeoff_feet_y": 1.327,
-    "contact_feet_y": 2.901,
+    "contact_feet_y": 2.912,
     "catch_depth": {
      "p50": 0.099,
      "p90": 0.102
     },
     "flight_ms": 383,
     "takeoff_rect": {
-     "x": 17.702,
+     "x": 17.637,
      "z": 8.983,
-     "w": 0.145,
-     "h": 0.22
+     "w": 0.21,
+     "h": 0.424
     },
     "landing_rect": {
      "x": 15.986,
@@ -522,13 +682,49 @@
      "z": 0.8
     }
    },
-   "human": null,
+   "human": {
+    "from": "EastTower",
+    "to": "EastTowerBox",
+    "n": 4,
+    "chain_n": 1,
+    "takeoff_speed": {
+     "p50": 0.0,
+     "p10": 0.0,
+     "p90": 1.587
+    },
+    "takeoff_feet_y": 2.637,
+    "contact_feet_y": 3.401,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": 0.899
+    },
+    "flight_ms": 633,
+    "takeoff_rect": {
+     "x": 18.373,
+     "z": -1.889,
+     "w": 0.575,
+     "h": 3.189
+    },
+    "landing_rect": {
+     "x": 18.432,
+     "z": -0.901,
+     "w": 0.406,
+     "h": 1.047
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "WestTower",
+     "to": "WestTowerBox"
+    }
+   },
    "physics": {
     "v_req": 0.0,
     "verdict": "easy"
    },
-   "skill": false,
-   "skill_reasons": []
+   "skill": true,
+   "skill_reasons": [
+    "抓边深度超带"
+   ]
   },
   {
    "from_face": "EastTower",
@@ -558,7 +754,41 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "EastTower",
+    "to": "EastWall_M",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.631,
+     "p10": 4.293,
+     "p90": 5.631
+    },
+    "takeoff_feet_y": 2.627,
+    "contact_feet_y": 3.002,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 717,
+    "takeoff_rect": {
+     "x": 19.374,
+     "z": -1.124,
+     "w": 0.425,
+     "h": 0.741
+    },
+    "landing_rect": {
+     "x": 22.466,
+     "z": -1.282,
+     "w": 0.749,
+     "h": 1.044
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "WestTower",
+     "to": "WestWall_M"
+    }
+   },
    "physics": {
     "v_req": 4.497,
     "verdict": "easy"
@@ -597,31 +827,31 @@
    "human": {
     "from": "EastTower",
     "to": "RimE_T",
-    "n": 2,
+    "n": 3,
     "chain_n": 0,
     "takeoff_speed": {
      "p50": 5.421,
      "p10": 4.764,
-     "p90": 5.421
+     "p90": 5.863
     },
     "takeoff_feet_y": 2.627,
     "contact_feet_y": 3.001,
     "catch_depth": {
-     "p50": 0.035,
+     "p50": -0.001,
      "p90": 0.035
     },
     "flight_ms": 717,
     "takeoff_rect": {
      "x": 17.201,
      "z": -0.362,
-     "w": 0.0,
+     "w": 0.593,
      "h": 1.661
     },
     "landing_rect": {
-     "x": 14.28,
+     "x": 13.991,
      "z": 1.813,
-     "w": 0.003,
-     "h": 0.569
+     "w": 0.292,
+     "h": 0.908
     }
    },
    "physics": {
@@ -789,7 +1019,41 @@
      "z": 0.4
     }
    },
-   "human": null,
+   "human": {
+    "from": "EastWall_S",
+    "to": "EastClusterS_Panel",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 5.253,
+     "p10": 4.982,
+     "p90": 5.253
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 2.201,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 867,
+    "takeoff_rect": {
+     "x": 22.513,
+     "z": -12.743,
+     "w": 0.039,
+     "h": 2.234
+    },
+    "landing_rect": {
+     "x": 18.038,
+     "z": -11.094,
+     "w": 0.55,
+     "h": 0.151
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "WestWall_N",
+     "to": "WestClusterN_Panel"
+    }
+   },
    "physics": {
     "v_req": 3.818,
     "verdict": "easy"
@@ -890,7 +1154,36 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "GateN_Lintel",
+    "to": "BeltN_CanopyW",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.406,
+     "p10": 4.406,
+     "p90": 4.406
+    },
+    "takeoff_feet_y": 5.026,
+    "contact_feet_y": 4.901,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -3.639,
+     "z": 13.54,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -3.791,
+     "z": 10.231,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
    "physics": {
     "v_req": 1.968,
     "verdict": "easy"
@@ -929,31 +1222,31 @@
    "human": {
     "from": "GateN_WingE",
     "to": "GateN_Lintel",
-    "n": 2,
+    "n": 3,
     "chain_n": 0,
     "takeoff_speed": {
      "p50": 5.454,
      "p10": 4.503,
-     "p90": 5.454
+     "p90": 6.277
     },
-    "takeoff_feet_y": 3.127,
+    "takeoff_feet_y": 3.126,
     "contact_feet_y": 4.794,
     "catch_depth": {
-     "p50": 0.145,
+     "p50": 0.106,
      "p90": 0.145
     },
-    "flight_ms": 567,
+    "flight_ms": 483,
     "takeoff_rect": {
      "x": 6.012,
-     "z": 13.979,
-     "w": 1.632,
-     "h": 0.117
+     "z": 13.934,
+     "w": 1.86,
+     "h": 0.162
     },
     "landing_rect": {
-     "x": 5.813,
-     "z": 13.976,
-     "w": 0.04,
-     "h": 0.183
+     "x": 5.811,
+     "z": 13.847,
+     "w": 0.042,
+     "h": 0.312
     }
    },
    "physics": {
@@ -993,13 +1286,44 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "GateN_WingW",
+    "to": "GateN_Lintel",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.284,
+     "p10": 6.284,
+     "p90": 6.284
+    },
+    "takeoff_feet_y": 3.126,
+    "contact_feet_y": 4.815,
+    "catch_depth": {
+     "p50": 0.085,
+     "p90": 0.085
+    },
+    "flight_ms": 450,
+    "takeoff_rect": {
+     "x": -7.022,
+     "z": 13.911,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -5.787,
+     "z": 13.97,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
    "physics": {
     "v_req": 11.0,
     "verdict": "infeasible"
    },
-   "skill": false,
-   "skill_reasons": []
+   "skill": true,
+   "skill_reasons": [
+    "物理边缘但人类实证"
+   ]
   },
   {
    "from_face": "GateS_Lintel",
@@ -1032,12 +1356,12 @@
    "human": {
     "from": "GateS_Lintel",
     "to": "BeltS_CanopyW",
-    "n": 1,
+    "n": 2,
     "chain_n": 1,
     "takeoff_speed": {
-     "p50": 5.456,
+     "p50": 6.121,
      "p10": 5.456,
-     "p90": 5.456
+     "p90": 6.121
     },
     "takeoff_feet_y": 5.026,
     "contact_feet_y": 4.901,
@@ -1049,14 +1373,14 @@
     "takeoff_rect": {
      "x": -1.155,
      "z": -14.479,
-     "w": 0.0,
-     "h": 0.0
+     "w": 1.561,
+     "h": 1.099
     },
     "landing_rect": {
      "x": 3.115,
      "z": -14.663,
-     "w": 0.0,
-     "h": 0.0
+     "w": 0.95,
+     "h": 4.231
     }
    },
    "physics": {
@@ -1099,31 +1423,31 @@
    "human": {
     "from": "GateS_WingE",
     "to": "GateS_Lintel",
-    "n": 2,
-    "chain_n": 0,
+    "n": 6,
+    "chain_n": 1,
     "takeoff_speed": {
-     "p50": 5.457,
+     "p50": 6.087,
      "p10": 4.507,
-     "p90": 5.457
+     "p90": 6.348
     },
     "takeoff_feet_y": 3.127,
-    "contact_feet_y": 4.788,
+    "contact_feet_y": 4.797,
     "catch_depth": {
-     "p50": 0.133,
+     "p50": 0.112,
      "p90": 0.133
     },
-    "flight_ms": 550,
+    "flight_ms": 467,
     "takeoff_rect": {
      "x": -7.809,
-     "z": -14.102,
-     "w": 0.733,
-     "h": 0.185
+     "z": -14.306,
+     "w": 1.558,
+     "h": 0.389
     },
     "landing_rect": {
      "x": -5.841,
-     "z": -14.153,
-     "w": 0.023,
-     "h": 0.165
+     "z": -14.204,
+     "w": 0.06,
+     "h": 0.216
     }
    },
    "physics": {
@@ -1163,13 +1487,44 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "GateS_WingW",
+    "to": "GateS_Lintel",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.117,
+     "p10": 6.117,
+     "p90": 6.117
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 4.804,
+    "catch_depth": {
+     "p50": 0.096,
+     "p90": 0.096
+    },
+    "flight_ms": 450,
+    "takeoff_rect": {
+     "x": 6.233,
+     "z": -14.072,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": 5.802,
+     "z": -14.113,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
    "physics": {
     "v_req": 11.0,
     "verdict": "infeasible"
    },
-   "skill": false,
-   "skill_reasons": []
+   "skill": true,
+   "skill_reasons": [
+    "物理边缘但人类实证"
+   ]
   },
   {
    "from_face": "Ground",
@@ -1199,7 +1554,41 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "Ground",
+    "to": "EastClusterN_Box",
+    "n": 2,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.012,
+     "p10": 2.892,
+     "p90": 4.012
+    },
+    "takeoff_feet_y": 0.127,
+    "contact_feet_y": 0.901,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 633,
+    "takeoff_rect": {
+     "x": 16.028,
+     "z": 4.851,
+     "w": 0.267,
+     "h": 0.477
+    },
+    "landing_rect": {
+     "x": 15.001,
+     "z": 4.629,
+     "w": 0.0,
+     "h": 0.301
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "Ground",
+     "to": "WestClusterS_Box"
+    }
+   },
    "physics": {
     "v_req": 0.0,
     "verdict": "easy"
@@ -1303,13 +1692,50 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "Ground",
+    "to": "WestClusterN_Box",
+    "n": 1,
+    "chain_n": 1,
+    "takeoff_speed": {
+     "p50": 4.201,
+     "p10": 4.201,
+     "p90": 4.201
+    },
+    "takeoff_feet_y": 0.127,
+    "contact_feet_y": 0.001,
+    "catch_depth": {
+     "p50": 0.899,
+     "p90": 0.899
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -13.758,
+     "z": 10.96,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -16.499,
+     "z": 10.984,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "Ground",
+     "to": "EastClusterS_Box"
+    }
+   },
    "physics": {
     "v_req": 0.0,
     "verdict": "easy"
    },
-   "skill": false,
-   "skill_reasons": []
+   "skill": true,
+   "skill_reasons": [
+    "链式跳跃（多跳合成）",
+    "抓边深度超带"
+   ]
   },
   {
    "from_face": "Ground",
@@ -1342,11 +1768,11 @@
    "human": {
     "from": "Ground",
     "to": "WestClusterS_Box",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
      "p50": 4.012,
-     "p10": 4.012,
+     "p10": 2.892,
      "p90": 4.012
     },
     "takeoff_feet_y": 0.127,
@@ -1357,16 +1783,16 @@
     },
     "flight_ms": 633,
     "takeoff_rect": {
-     "x": -16.028,
-     "z": -4.851,
-     "w": 0.0,
-     "h": 0.0
+     "x": -16.295,
+     "z": -5.328,
+     "w": 0.267,
+     "h": 0.477
     },
     "landing_rect": {
      "x": -15.001,
-     "z": -4.629,
+     "z": -4.93,
      "w": 0.0,
-     "h": 0.0
+     "h": 0.301
     }
    },
    "physics": {
@@ -1512,7 +1938,41 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "RimE_T",
+    "to": "GateN_WingE",
+    "n": 6,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.113,
+     "p10": 5.403,
+     "p90": 6.217
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": 0.033
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": 13.621,
+     "z": 9.164,
+     "w": 0.552,
+     "h": 0.501
+    },
+    "landing_rect": {
+     "x": 12.811,
+     "z": 13.318,
+     "w": 0.645,
+     "h": 0.979
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "RimW_B",
+     "to": "GateS_WingE"
+    }
+   },
    "physics": {
     "v_req": 5.33,
     "verdict": "tight"
@@ -1551,31 +2011,31 @@
    "human": {
     "from": "RimE_T",
     "to": "RimE_B",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 6.189,
+     "p50": 6.223,
      "p10": 6.189,
-     "p90": 6.189
+     "p90": 6.223
     },
-    "takeoff_feet_y": 3.057,
+    "takeoff_feet_y": 3.126,
     "contact_feet_y": 2.97,
     "catch_depth": {
-     "p50": 0.03,
-     "p90": 0.03
+     "p50": 0.082,
+     "p90": 0.082
     },
-    "flight_ms": 767,
+    "flight_ms": 783,
     "takeoff_rect": {
      "x": 13.847,
      "z": 1.643,
-     "w": 0.0,
-     "h": 0.0
+     "w": 0.178,
+     "h": 1.477
     },
     "landing_rect": {
      "x": 13.328,
      "z": -3.074,
-     "w": 0.0,
-     "h": 0.0
+     "w": 1.061,
+     "h": 1.351
     }
    },
    "physics": {
@@ -1616,31 +2076,31 @@
    "human": {
     "from": "RimN1",
     "to": "RimN2",
-    "n": 2,
-    "chain_n": 0,
+    "n": 4,
+    "chain_n": 1,
     "takeoff_speed": {
-     "p50": 6.211,
+     "p50": 5.953,
      "p10": 5.451,
      "p90": 6.211
     },
     "takeoff_feet_y": 3.126,
     "contact_feet_y": 3.001,
     "catch_depth": {
-     "p50": -0.001,
-     "p90": -0.001
+     "p50": 0.0,
+     "p90": 0.065
     },
     "flight_ms": 783,
     "takeoff_rect": {
      "x": -10.985,
-     "z": 9.398,
-     "w": 0.981,
-     "h": 0.129
+     "z": 8.909,
+     "w": 2.105,
+     "h": 0.618
     },
     "landing_rect": {
      "x": -6.181,
-     "z": 9.296,
-     "w": 0.446,
-     "h": 0.182
+     "z": 8.752,
+     "w": 1.154,
+     "h": 0.933
     }
    },
    "physics": {
@@ -1717,12 +2177,12 @@
    "human": {
     "from": "RimS1",
     "to": "RimS2",
-    "n": 3,
+    "n": 4,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 5.457,
+     "p50": 6.333,
      "p10": 5.445,
-     "p90": 6.333
+     "p90": 6.338
     },
     "takeoff_feet_y": 3.126,
     "contact_feet_y": 3.0,
@@ -1734,7 +2194,7 @@
     "takeoff_rect": {
      "x": -9.954,
      "z": -9.514,
-     "w": 0.772,
+     "w": 0.879,
      "h": 0.211
     },
     "landing_rect": {
@@ -1782,12 +2242,12 @@
    "human": {
     "from": "RimS3",
     "to": "RimS4",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 5.461,
+     "p50": 6.287,
      "p10": 5.461,
-     "p90": 5.461
+     "p90": 6.287
     },
     "takeoff_feet_y": 3.126,
     "contact_feet_y": 3.001,
@@ -1797,16 +2257,16 @@
     },
     "flight_ms": 783,
     "takeoff_rect": {
-     "x": 5.462,
+     "x": 5.07,
      "z": -9.048,
-     "w": 0.0,
-     "h": 0.0
+     "w": 0.392,
+     "h": 0.15
     },
     "landing_rect": {
      "x": 9.736,
-     "z": -9.23,
-     "w": 0.0,
-     "h": 0.0
+     "z": -9.473,
+     "w": 0.225,
+     "h": 0.243
     }
    },
    "physics": {
@@ -1847,14 +2307,14 @@
    "human": {
     "from": "RimW_B",
     "to": "GateS_WingE",
-    "n": 3,
+    "n": 6,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 5.828,
-     "p10": 5.434,
-     "p90": 6.113
+     "p50": 6.113,
+     "p10": 5.403,
+     "p90": 6.217
     },
-    "takeoff_feet_y": 3.126,
+    "takeoff_feet_y": 3.127,
     "contact_feet_y": 3.001,
     "catch_depth": {
      "p50": -0.001,
@@ -1862,16 +2322,16 @@
     },
     "flight_ms": 783,
     "takeoff_rect": {
-     "x": -14.088,
-     "z": -9.433,
-     "w": 0.467,
-     "h": 0.269
+     "x": -14.173,
+     "z": -9.665,
+     "w": 0.552,
+     "h": 0.501
     },
     "landing_rect": {
-     "x": -13.3,
-     "z": -13.981,
-     "w": 0.404,
-     "h": 0.663
+     "x": -13.456,
+     "z": -14.297,
+     "w": 0.645,
+     "h": 0.979
     }
    },
    "physics": {
@@ -1981,7 +2441,41 @@
      "z": 0.4
     }
    },
-   "human": null,
+   "human": {
+    "from": "WestClusterN_Box",
+    "to": "WestClusterN_Panel",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 2.888,
+     "p10": 2.888,
+     "p90": 2.888
+    },
+    "takeoff_feet_y": 1.027,
+    "contact_feet_y": 2.12,
+    "catch_depth": {
+     "p50": 0.08,
+     "p90": 0.08
+    },
+    "flight_ms": 550,
+    "takeoff_rect": {
+     "x": -15.141,
+     "z": 11.013,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -16.728,
+     "z": 10.979,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "EastClusterS_Box",
+     "to": "EastClusterS_Panel"
+    }
+   },
    "physics": {
     "v_req": 3.846,
     "verdict": "easy"
@@ -2017,7 +2511,36 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "WestClusterN_Panel",
+    "to": "RimW_T",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.832,
+     "p10": 4.832,
+     "p90": 4.832
+    },
+    "takeoff_feet_y": 2.327,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 650,
+    "takeoff_rect": {
+     "x": -17.04,
+     "z": 10.903,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -14.155,
+     "z": 9.662,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
    "physics": {
     "v_req": 4.229,
     "verdict": "easy"
@@ -2056,12 +2579,12 @@
    "human": {
     "from": "WestClusterS_Box",
     "to": "WestClusterS_Panel",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 3.532,
+     "p50": 4.407,
      "p10": 3.532,
-     "p90": 3.532
+     "p90": 4.407
     },
     "takeoff_feet_y": 1.027,
     "contact_feet_y": 2.201,
@@ -2071,16 +2594,16 @@
     },
     "flight_ms": 533,
     "takeoff_rect": {
-     "x": -15.335,
-     "z": -4.654,
-     "w": 0.0,
-     "h": 0.0
+     "x": -15.469,
+     "z": -4.929,
+     "w": 0.134,
+     "h": 0.275
     },
     "landing_rect": {
-     "x": -17.214,
-     "z": -4.797,
-     "w": 0.0,
-     "h": 0.0
+     "x": -17.819,
+     "z": -4.933,
+     "w": 0.605,
+     "h": 0.136
     }
    },
    "physics": {
@@ -2121,12 +2644,12 @@
    "human": {
     "from": "WestClusterS_Panel",
     "to": "RimW_B",
-    "n": 4,
+    "n": 5,
     "chain_n": 0,
     "takeoff_speed": {
      "p50": 5.084,
      "p10": 4.847,
-     "p90": 5.333
+     "p90": 5.636
     },
     "takeoff_feet_y": 2.327,
     "contact_feet_y": 3.001,
@@ -2138,14 +2661,14 @@
     "takeoff_rect": {
      "x": -17.497,
      "z": -5.065,
-     "w": 0.396,
-     "h": 0.175
+     "w": 0.398,
+     "h": 0.279
     },
     "landing_rect": {
      "x": -14.17,
      "z": -5.444,
-     "w": 0.265,
-     "h": 0.756
+     "w": 0.51,
+     "h": 1.086
     }
    },
    "physics": {
@@ -2316,11 +2839,11 @@
    "human": {
     "from": "WestPavilion",
     "to": "WestSpurS",
-    "n": 3,
-    "chain_n": 1,
+    "n": 5,
+    "chain_n": 3,
     "takeoff_speed": {
-     "p50": 5.99,
-     "p10": 5.748,
+     "p50": 5.815,
+     "p10": 5.344,
      "p90": 6.182
     },
     "takeoff_feet_y": 1.326,
@@ -2329,17 +2852,17 @@
      "p50": 0.081,
      "p90": 0.092
     },
-    "flight_ms": 400,
+    "flight_ms": 383,
     "takeoff_rect": {
-     "x": -17.971,
+     "x": -17.98,
      "z": -9.61,
-     "w": 0.156,
-     "h": 0.447
+     "w": 0.201,
+     "h": 0.71
     },
     "landing_rect": {
-     "x": -16.695,
+     "x": -16.759,
      "z": -7.797,
-     "w": 0.239,
+     "w": 0.303,
      "h": 0.036
     }
    },
@@ -2347,8 +2870,10 @@
     "v_req": 2.935,
     "verdict": "easy"
    },
-   "skill": false,
-   "skill_reasons": []
+   "skill": true,
+   "skill_reasons": [
+    "链式跳跃（多跳合成）"
+   ]
   },
   {
    "from_face": "WestTower",
@@ -2381,15 +2906,15 @@
    "human": {
     "from": "WestTower",
     "to": "RimW_B",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
      "p50": 4.919,
-     "p10": 4.919,
+     "p10": 4.89,
      "p90": 4.919
     },
     "takeoff_feet_y": 2.627,
-    "contact_feet_y": 3.003,
+    "contact_feet_y": 3.004,
     "catch_depth": {
      "p50": -0.003,
      "p90": -0.003
@@ -2399,13 +2924,13 @@
      "x": -17.201,
      "z": -1.299,
      "w": 0.0,
-     "h": 0.0
+     "h": 0.234
     },
     "landing_rect": {
-     "x": -14.457,
+     "x": -14.466,
      "z": -2.988,
-     "w": 0.0,
-     "h": 0.0
+     "w": 0.009,
+     "h": 0.12
     }
    },
    "physics": {
@@ -2482,39 +3007,41 @@
    "human": {
     "from": "WestTower",
     "to": "WestTowerBox",
-    "n": 2,
-    "chain_n": 0,
+    "n": 4,
+    "chain_n": 1,
     "takeoff_speed": {
      "p50": 0.0,
      "p10": 0.0,
-     "p90": 0.0
+     "p90": 1.587
     },
     "takeoff_feet_y": 2.637,
     "contact_feet_y": 3.401,
     "catch_depth": {
      "p50": -0.001,
-     "p90": -0.001
+     "p90": 0.899
     },
     "flight_ms": 633,
     "takeoff_rect": {
-     "x": -18.52,
+     "x": -18.948,
      "z": -1.3,
-     "w": 0.147,
-     "h": 2.201
+     "w": 0.575,
+     "h": 3.189
     },
     "landing_rect": {
-     "x": -18.47,
-     "z": 0.249,
-     "w": 0.038,
-     "h": 0.124
+     "x": -18.838,
+     "z": -0.146,
+     "w": 0.406,
+     "h": 1.047
     }
    },
    "physics": {
     "v_req": 0.0,
     "verdict": "easy"
    },
-   "skill": false,
-   "skill_reasons": []
+   "skill": true,
+   "skill_reasons": [
+    "抓边深度超带"
+   ]
   },
   {
    "from_face": "WestTower",
@@ -2547,31 +3074,31 @@
    "human": {
     "from": "WestTower",
     "to": "WestWall_M",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 4.293,
+     "p50": 5.631,
      "p10": 4.293,
-     "p90": 4.293
+     "p90": 5.631
     },
     "takeoff_feet_y": 2.627,
     "contact_feet_y": 3.002,
     "catch_depth": {
-     "p50": -0.002,
-     "p90": -0.002
+     "p50": -0.001,
+     "p90": -0.001
     },
     "flight_ms": 717,
     "takeoff_rect": {
      "x": -19.799,
      "z": 0.383,
-     "w": 0.0,
-     "h": 0.0
+     "w": 0.425,
+     "h": 0.741
     },
     "landing_rect": {
-     "x": -22.466,
-     "z": 1.282,
-     "w": 0.0,
-     "h": 0.0
+     "x": -23.215,
+     "z": 0.238,
+     "w": 0.749,
+     "h": 1.044
     }
    },
    "physics": {
@@ -2609,7 +3136,41 @@
      "z": 1.0
     }
    },
-   "human": null,
+   "human": {
+    "from": "WestTowerRampStep10",
+    "to": "WestWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 4.329,
+     "p10": 4.329,
+     "p90": 4.329
+    },
+    "takeoff_feet_y": 2.627,
+    "contact_feet_y": 3.001,
+    "catch_depth": {
+     "p50": -0.001,
+     "p90": -0.001
+    },
+    "flight_ms": 700,
+    "takeoff_rect": {
+     "x": -20.403,
+     "z": 2.501,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -23.334,
+     "z": 1.77,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "augmented": true,
+    "source_edge": {
+     "from": "EastTowerRampStep10",
+     "to": "EastWall_M"
+    }
+   },
    "physics": {
     "v_req": 2.809,
     "verdict": "easy"
@@ -2648,31 +3209,31 @@
    "human": {
     "from": "WestWall_M",
     "to": "WestWall_N",
-    "n": 2,
+    "n": 3,
     "chain_n": 0,
     "takeoff_speed": {
      "p50": 6.216,
      "p10": 5.443,
-     "p90": 6.216
+     "p90": 6.35
     },
     "takeoff_feet_y": 3.126,
     "contact_feet_y": 3.001,
     "catch_depth": {
      "p50": -0.001,
-     "p90": -0.001
+     "p90": 0.029
     },
     "flight_ms": 783,
     "takeoff_rect": {
-     "x": -23.146,
-     "z": 4.024,
-     "w": 0.297,
-     "h": 0.505
+     "x": -23.192,
+     "z": 2.897,
+     "w": 0.343,
+     "h": 1.632
     },
     "landing_rect": {
      "x": -23.082,
-     "z": 8.792,
-     "w": 0.188,
-     "h": 0.1
+     "z": 7.827,
+     "w": 0.206,
+     "h": 1.065
     }
    },
    "physics": {
@@ -2713,12 +3274,12 @@
    "human": {
     "from": "WestWall_N",
     "to": "WestClusterN_Panel",
-    "n": 1,
+    "n": 2,
     "chain_n": 0,
     "takeoff_speed": {
-     "p50": 4.982,
+     "p50": 5.253,
      "p10": 4.982,
-     "p90": 4.982
+     "p90": 5.253
     },
     "takeoff_feet_y": 3.127,
     "contact_feet_y": 2.201,
@@ -2728,16 +3289,16 @@
     },
     "flight_ms": 867,
     "takeoff_rect": {
-     "x": -22.513,
-     "z": 12.743,
-     "w": 0.0,
-     "h": 0.0
+     "x": -22.552,
+     "z": 10.509,
+     "w": 0.039,
+     "h": 2.234
     },
     "landing_rect": {
      "x": -18.588,
      "z": 10.943,
-     "w": 0.0,
-     "h": 0.0
+     "w": 0.55,
+     "h": 0.151
     }
    },
    "physics": {
@@ -2775,7 +3336,36 @@
      "z": 0.8
     }
    },
-   "human": null,
+   "human": {
+    "from": "WestWall_S",
+    "to": "WestWall_M",
+    "n": 1,
+    "chain_n": 0,
+    "takeoff_speed": {
+     "p50": 6.334,
+     "p10": 6.334,
+     "p90": 6.334
+    },
+    "takeoff_feet_y": 3.127,
+    "contact_feet_y": 2.996,
+    "catch_depth": {
+     "p50": 0.004,
+     "p90": 0.004
+    },
+    "flight_ms": 783,
+    "takeoff_rect": {
+     "x": -23.347,
+     "z": -8.182,
+     "w": 0.0,
+     "h": 0.0
+    },
+    "landing_rect": {
+     "x": -23.567,
+     "z": -3.224,
+     "w": 0.0,
+     "h": 0.0
+    }
+   },
    "physics": {
     "v_req": 3.0,
     "verdict": "easy"
@@ -3220,24 +3810,29 @@
  ],
  "unlinked_human_edges": [
   {
+   "from": "EastTower",
+   "to": "Ground",
+   "n": 19
+  },
+  {
    "from": "Ground",
    "to": "AltarPlatform",
    "n": 19
   },
   {
-   "from": "EastTower",
-   "to": "Ground",
-   "n": 17
-  },
-  {
    "from": "WestTower",
    "to": "Ground",
-   "n": 15
+   "n": 17
   },
   {
    "from": "CorridorSlab",
    "to": "Ground",
    "n": 11
+  },
+  {
+   "from": "Ground",
+   "to": "BeltS_PavE",
+   "n": 10
   },
   {
    "from": "AltarPlatform",
@@ -3247,12 +3842,12 @@
   {
    "from": "Ground",
    "to": "WestTower",
-   "n": 7
+   "n": 9
   },
   {
    "from": "Ground",
    "to": "WestPavilion",
-   "n": 6
+   "n": 8
   },
   {
    "from": "Ground",
@@ -3261,12 +3856,17 @@
   },
   {
    "from": "Ground",
-   "to": "BeltN_PavW",
+   "to": "EastTower",
+   "n": 5
+  },
+  {
+   "from": "BeltS_PavE",
+   "to": "Ground",
    "n": 4
   },
   {
    "from": "Ground",
-   "to": "BeltS_PavE",
+   "to": "BeltN_PavW",
    "n": 4
   },
   {
@@ -3276,13 +3876,23 @@
   },
   {
    "from": "Ground",
-   "to": "EastTower",
+   "to": "RampWStep8",
    "n": 4
   },
   {
    "from": "Ground",
-   "to": "RampWStep8",
+   "to": "WestTowerRampStep10",
    "n": 4
+  },
+  {
+   "from": "BeltS_PavE",
+   "to": "RimS2",
+   "n": 3
+  },
+  {
+   "from": "Ground",
+   "to": "BeltN_PavE",
+   "n": 3
   },
   {
    "from": "Ground",
@@ -3291,16 +3901,41 @@
   },
   {
    "from": "Ground",
-   "to": "RampWStep6",
+   "to": "CornerNW_Pav",
    "n": 3
   },
   {
    "from": "Ground",
-   "to": "WestTowerRampStep10",
+   "to": "EastPavilion",
    "n": 3
   },
   {
+   "from": "Ground",
+   "to": "RampWStep6",
+   "n": 3
+  },
+  {
+   "from": "RimN4",
+   "to": "GateN_WingE",
+   "n": 3
+  },
+  {
+   "from": "BeltN_PavE",
+   "to": "Ground",
+   "n": 2
+  },
+  {
    "from": "BeltN_PavW",
+   "to": "Ground",
+   "n": 2
+  },
+  {
+   "from": "BeltS_CanopyW",
+   "to": "BeltS_CanopyE",
+   "n": 2
+  },
+  {
+   "from": "CampN_Screen_S",
    "to": "Ground",
    "n": 2
   },
@@ -3320,18 +3955,13 @@
    "n": 2
   },
   {
-   "from": "Ground",
-   "to": "BeltN_PavE",
+   "from": "GateN_Lintel",
+   "to": "CampN_Screen_S",
    "n": 2
   },
   {
    "from": "Ground",
-   "to": "CornerNW_Pav",
-   "n": 2
-  },
-  {
-   "from": "Ground",
-   "to": "EastPavilion",
+   "to": "CornerSW_Pav",
    "n": 2
   },
   {
@@ -3370,8 +4000,43 @@
    "n": 2
   },
   {
+   "from": "RimE_B",
+   "to": "RimE_T",
+   "n": 2
+  },
+  {
+   "from": "RimN2",
+   "to": "RimN4",
+   "n": 2
+  },
+  {
    "from": "RimN4",
-   "to": "GateN_WingE",
+   "to": "RimN3",
+   "n": 2
+  },
+  {
+   "from": "RimS2",
+   "to": "RimS3",
+   "n": 2
+  },
+  {
+   "from": "RimS4",
+   "to": "RimS3",
+   "n": 2
+  },
+  {
+   "from": "RimW_B",
+   "to": "RimW_T",
+   "n": 2
+  },
+  {
+   "from": "RimW_T",
+   "to": "Ground",
+   "n": 2
+  },
+  {
+   "from": "WestTower",
+   "to": "RimW_T",
    "n": 2
   },
   {
@@ -3385,8 +4050,13 @@
    "n": 2
   },
   {
-   "from": "BeltN_PavE",
+   "from": "BackS_LOS_E",
    "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "BeltN_CanopyW",
+   "to": "GateN_Lintel",
    "n": 1
   },
   {
@@ -3396,17 +4066,17 @@
   },
   {
    "from": "BeltS_CanopyE",
+   "to": "AltarPlatform",
+   "n": 1
+  },
+  {
+   "from": "BeltS_CanopyE",
+   "to": "CorridorSlab",
+   "n": 1
+  },
+  {
+   "from": "BeltS_CanopyE",
    "to": "GateS_Lintel",
-   "n": 1
-  },
-  {
-   "from": "BeltS_CanopyW",
-   "to": "BeltS_CanopyE",
-   "n": 1
-  },
-  {
-   "from": "BeltS_PavE",
-   "to": "Ground",
    "n": 1
   },
   {
@@ -3420,8 +4090,8 @@
    "n": 1
   },
   {
-   "from": "CampN_Screen_S",
-   "to": "Ground",
+   "from": "BeltS_PavW",
+   "to": "RimS3",
    "n": 1
   },
   {
@@ -3432,6 +4102,11 @@
   {
    "from": "CampS_Truck",
    "to": "CampS_Screen_N",
+   "n": 1
+  },
+  {
+   "from": "CornerNW_Box1",
+   "to": "Ground",
    "n": 1
   },
   {
@@ -3486,12 +4161,12 @@
   },
   {
    "from": "GateN_Lintel",
-   "to": "CampN_Screen_S",
+   "to": "Ground",
    "n": 1
   },
   {
-   "from": "GateN_Lintel",
-   "to": "Ground",
+   "from": "GateS_Lintel",
+   "to": "BeltS_CanopyE",
    "n": 1
   },
   {
@@ -3505,18 +4180,38 @@
    "n": 1
   },
   {
+   "from": "GateS_Lintel",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "GateS_WingE",
+   "to": "Ground",
+   "n": 1
+  },
+  {
+   "from": "GateS_WingW",
+   "to": "BackS_LOS_E",
+   "n": 1
+  },
+  {
    "from": "Ground",
    "to": "BeltN_PavStepW",
    "n": 1
   },
   {
    "from": "Ground",
-   "to": "CornerSW_Pav",
+   "to": "CornerNW_Box1",
    "n": 1
   },
   {
    "from": "Ground",
    "to": "EastClusterN_Panel",
+   "n": 1
+  },
+  {
+   "from": "Ground",
+   "to": "EastClusterS_Panel",
    "n": 1
   },
   {
@@ -3565,18 +4260,48 @@
    "n": 1
   },
   {
+   "from": "RampWStep1",
+   "to": "RampWStep8",
+   "n": 1
+  },
+  {
    "from": "RampWStep8",
    "to": "Ground",
    "n": 1
   },
   {
+   "from": "RimE_T",
+   "to": "EastTower",
+   "n": 1
+  },
+  {
+   "from": "RimN1",
+   "to": "GateN_WingW",
+   "n": 1
+  },
+  {
+   "from": "RimN2",
+   "to": "BeltN_CanopyW",
+   "n": 1
+  },
+  {
    "from": "RimN2",
    "to": "Ground",
    "n": 1
   },
   {
    "from": "RimN2",
-   "to": "RimN4",
+   "to": "RimN1",
+   "n": 1
+  },
+  {
+   "from": "RimN3",
+   "to": "RimN1",
+   "n": 1
+  },
+  {
+   "from": "RimN3",
+   "to": "RimN2",
    "n": 1
   },
   {
@@ -3596,12 +4321,22 @@
   },
   {
    "from": "RimS2",
+   "to": "GateS_WingE",
+   "n": 1
+  },
+  {
+   "from": "RimS2",
    "to": "Ground",
    "n": 1
   },
   {
    "from": "RimS2",
-   "to": "RimS3",
+   "to": "RimW_B",
+   "n": 1
+  },
+  {
+   "from": "RimS3",
+   "to": "GateS_WingW",
    "n": 1
   },
   {
@@ -3610,23 +4345,13 @@
    "n": 1
   },
   {
-   "from": "RimS4",
-   "to": "RimS3",
-   "n": 1
-  },
-  {
    "from": "RimW_B",
    "to": "Ground",
-   "n": 1
-  },
-  {
-   "from": "RimW_B",
-   "to": "RimW_T",
    "n": 1
   },
   {
    "from": "RimW_T",
-   "to": "Ground",
+   "to": "WestTower",
    "n": 1
   },
   {
@@ -3661,17 +4386,17 @@
   },
   {
    "from": "WestTower",
-   "to": "RimW_T",
-   "n": 1
-  },
-  {
-   "from": "WestTower",
    "to": "WestTowerRailW",
    "n": 1
   },
   {
    "from": "WestTower",
    "to": "WestTowerRampStep10",
+   "n": 1
+  },
+  {
+   "from": "WestTowerBox",
+   "to": "Ground",
    "n": 1
   },
   {
@@ -3683,6 +4408,1933 @@
    "from": "WestTowerRampStep4",
    "to": "Ground",
    "n": 1
+  },
+  {
+   "from": "WestWall_M",
+   "to": "WestWall_S",
+   "n": 1
+  }
+ ],
+ "faces": [
+  {
+   "center": {
+    "x": 0.0,
+    "z": 0.0
+   },
+   "name": "Ground",
+   "size": {
+    "x": 60.0,
+    "z": 58.0
+   },
+   "top_y": 0.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 0.0
+   },
+   "name": "CorridorSlab",
+   "size": {
+    "x": 7.0,
+    "z": 7.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -18.5,
+    "z": 0.0
+   },
+   "name": "WestTower",
+   "size": {
+    "x": 4.0,
+    "z": 4.0
+   },
+   "top_y": 2.5
+  },
+  {
+   "center": {
+    "x": 18.5,
+    "z": 0.0
+   },
+   "name": "EastTower",
+   "size": {
+    "x": 4.0,
+    "z": 4.0
+   },
+   "top_y": 2.5
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 0.0
+   },
+   "name": "AltarPlatform",
+   "size": {
+    "x": 14.0,
+    "z": 10.0
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": 3.5,
+    "z": 10.9
+   },
+   "name": "BeltN_PavE",
+   "size": {
+    "x": 2.0,
+    "z": 1.8
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": -3.5,
+    "z": 10.9
+   },
+   "name": "BeltN_PavW",
+   "size": {
+    "x": 2.0,
+    "z": 1.8
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": -3.5,
+    "z": -10.9
+   },
+   "name": "BeltS_PavE",
+   "size": {
+    "x": 2.0,
+    "z": 1.8
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": 3.5,
+    "z": -10.9
+   },
+   "name": "BeltS_PavW",
+   "size": {
+    "x": 2.0,
+    "z": 1.8
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": 18.5,
+    "z": 10.0
+   },
+   "name": "EastPavilion",
+   "size": {
+    "x": 2.5,
+    "z": 2.5
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": -18.5,
+    "z": -10.0
+   },
+   "name": "WestPavilion",
+   "size": {
+    "x": 2.5,
+    "z": 2.5
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": -26.0,
+    "z": 21.5
+   },
+   "name": "CornerNW_Pav",
+   "size": {
+    "x": 2.5,
+    "z": 2.5
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": 26.0,
+    "z": 21.5
+   },
+   "name": "CornerNE_Pav",
+   "size": {
+    "x": 2.5,
+    "z": 2.5
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": 26.0,
+    "z": -21.5
+   },
+   "name": "CornerSE_Pav",
+   "size": {
+    "x": 2.5,
+    "z": 2.5
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": -26.0,
+    "z": -21.5
+   },
+   "name": "CornerSW_Pav",
+   "size": {
+    "x": 2.5,
+    "z": 2.5
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 29.5
+   },
+   "name": "WallNorth",
+   "size": {
+    "x": 60.0,
+    "z": 1.0
+   },
+   "top_y": 4.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": -29.5
+   },
+   "name": "WallSouth",
+   "size": {
+    "x": 60.0,
+    "z": 1.0
+   },
+   "top_y": 4.0
+  },
+  {
+   "center": {
+    "x": -30.5,
+    "z": 0.0
+   },
+   "name": "WallWest",
+   "size": {
+    "x": 1.0,
+    "z": 58.0
+   },
+   "top_y": 4.0
+  },
+  {
+   "center": {
+    "x": 30.5,
+    "z": 0.0
+   },
+   "name": "WallEast",
+   "size": {
+    "x": 1.0,
+    "z": 58.0
+   },
+   "top_y": 4.0
+  },
+  {
+   "center": {
+    "x": -0.9,
+    "z": -2.2
+   },
+   "name": "AltarSlabA",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": 2.2,
+    "z": -1.5
+   },
+   "name": "AltarSlabB",
+   "size": {
+    "x": 0.4,
+    "z": 3.0
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": 0.9,
+    "z": 2.2
+   },
+   "name": "AltarSlabA2",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": -2.2,
+    "z": 1.5
+   },
+   "name": "AltarSlabB2",
+   "size": {
+    "x": 0.4,
+    "z": 3.0
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": -11.25,
+    "z": 9.5
+   },
+   "name": "RimN1",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -2.25,
+    "z": 9.5
+   },
+   "name": "RimN2",
+   "size": {
+    "x": 8.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 5.5,
+    "z": 9.5
+   },
+   "name": "RimN3",
+   "size": {
+    "x": 2.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 11.25,
+    "z": 9.5
+   },
+   "name": "RimN4",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -11.25,
+    "z": -9.5
+   },
+   "name": "RimS1",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -5.5,
+    "z": -9.5
+   },
+   "name": "RimS2",
+   "size": {
+    "x": 2.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 2.25,
+    "z": -9.5
+   },
+   "name": "RimS3",
+   "size": {
+    "x": 8.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 11.25,
+    "z": -9.5
+   },
+   "name": "RimS4",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 14.0,
+    "z": 6.0
+   },
+   "name": "RimE_T",
+   "size": {
+    "x": 1.0,
+    "z": 8.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 14.0,
+    "z": -6.0
+   },
+   "name": "RimE_B",
+   "size": {
+    "x": 1.0,
+    "z": 8.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -14.0,
+    "z": 6.0
+   },
+   "name": "RimW_T",
+   "size": {
+    "x": 1.0,
+    "z": 8.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -14.0,
+    "z": -6.0
+   },
+   "name": "RimW_B",
+   "size": {
+    "x": 1.0,
+    "z": 8.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 0.0
+   },
+   "name": "Pedestal",
+   "size": {
+    "x": 4.0,
+    "z": 4.0
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": 3.05,
+    "z": 3.05
+   },
+   "name": "Pillar_NE",
+   "size": {
+    "x": 0.5,
+    "z": 0.5
+   },
+   "top_y": 7.1
+  },
+  {
+   "center": {
+    "x": -3.05,
+    "z": 3.05
+   },
+   "name": "Pillar_NW",
+   "size": {
+    "x": 0.5,
+    "z": 0.5
+   },
+   "top_y": 7.1
+  },
+  {
+   "center": {
+    "x": 3.05,
+    "z": -3.05
+   },
+   "name": "Pillar_SE",
+   "size": {
+    "x": 0.5,
+    "z": 0.5
+   },
+   "top_y": 7.1
+  },
+  {
+   "center": {
+    "x": -3.05,
+    "z": -3.05
+   },
+   "name": "Pillar_SW",
+   "size": {
+    "x": 0.5,
+    "z": 0.5
+   },
+   "top_y": 7.1
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 2.75
+   },
+   "name": "UmbrellaN",
+   "size": {
+    "x": 8.0,
+    "z": 2.5
+   },
+   "top_y": 7.5
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": -2.75
+   },
+   "name": "UmbrellaS",
+   "size": {
+    "x": 8.0,
+    "z": 2.5
+   },
+   "top_y": 7.5
+  },
+  {
+   "center": {
+    "x": -2.75,
+    "z": 0.0
+   },
+   "name": "UmbrellaW",
+   "size": {
+    "x": 2.5,
+    "z": 3.0
+   },
+   "top_y": 7.5
+  },
+  {
+   "center": {
+    "x": 2.75,
+    "z": 0.0
+   },
+   "name": "UmbrellaE",
+   "size": {
+    "x": 2.5,
+    "z": 3.0
+   },
+   "top_y": 7.5
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": -3.125
+   },
+   "name": "RampEStep1",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": -2.375
+   },
+   "name": "RampEStep2",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": -1.625
+   },
+   "name": "RampEStep3",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 1.5
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": -0.875
+   },
+   "name": "RampEStep4",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 1.8
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": -0.125
+   },
+   "name": "RampEStep5",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 2.1
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": 0.625
+   },
+   "name": "RampEStep6",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 2.4
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": 1.375
+   },
+   "name": "RampEStep7",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": 5.1,
+    "z": 2.125
+   },
+   "name": "RampEStep8",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": 3.125
+   },
+   "name": "RampWStep1",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": 2.375
+   },
+   "name": "RampWStep2",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 1.2
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": 1.625
+   },
+   "name": "RampWStep3",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 1.5
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": 0.875
+   },
+   "name": "RampWStep4",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 1.8
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": 0.125
+   },
+   "name": "RampWStep5",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 2.1
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": -0.625
+   },
+   "name": "RampWStep6",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 2.4
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": -1.375
+   },
+   "name": "RampWStep7",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 2.7
+  },
+  {
+   "center": {
+    "x": -5.1,
+    "z": -2.125
+   },
+   "name": "RampWStep8",
+   "size": {
+    "x": 3.0,
+    "z": 0.75
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 23.0,
+    "z": -11.0
+   },
+   "name": "EastWall_S",
+   "size": {
+    "x": 1.0,
+    "z": 6.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 23.0,
+    "z": 0.0
+   },
+   "name": "EastWall_M",
+   "size": {
+    "x": 1.0,
+    "z": 11.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 23.0,
+    "z": 11.0
+   },
+   "name": "EastWall_N",
+   "size": {
+    "x": 1.0,
+    "z": 6.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -23.0,
+    "z": -11.0
+   },
+   "name": "WestWall_S",
+   "size": {
+    "x": 1.0,
+    "z": 6.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -23.0,
+    "z": 0.0
+   },
+   "name": "WestWall_M",
+   "size": {
+    "x": 1.0,
+    "z": 11.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -23.0,
+    "z": 11.0
+   },
+   "name": "WestWall_N",
+   "size": {
+    "x": 1.0,
+    "z": 6.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -18.5,
+    "z": 0.0
+   },
+   "name": "WestTowerBox",
+   "size": {
+    "x": 0.8,
+    "z": 0.8
+   },
+   "top_y": 3.4
+  },
+  {
+   "center": {
+    "x": 18.5,
+    "z": 0.0
+   },
+   "name": "EastTowerBox",
+   "size": {
+    "x": 0.8,
+    "z": 0.8
+   },
+   "top_y": 3.4
+  },
+  {
+   "center": {
+    "x": 18.5,
+    "z": 5.0
+   },
+   "name": "EastClusterN_Panel",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": 15.0,
+    "z": 5.0
+   },
+   "name": "EastClusterN_Box",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 18.5,
+    "z": -11.0
+   },
+   "name": "EastClusterS_Panel",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": 15.0,
+    "z": -11.0
+   },
+   "name": "EastClusterS_Box",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": -18.5,
+    "z": 11.0
+   },
+   "name": "WestClusterN_Panel",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": -15.0,
+    "z": 11.0
+   },
+   "name": "WestClusterN_Box",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": -18.5,
+    "z": -5.0
+   },
+   "name": "WestClusterS_Panel",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": -15.0,
+    "z": -5.0
+   },
+   "name": "WestClusterS_Box",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 18.5,
+    "z": 12.0
+   },
+   "name": "EastPavilionStep",
+   "size": {
+    "x": 1.5,
+    "z": 1.5
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": -18.5,
+    "z": -12.0
+   },
+   "name": "WestPavilionStep",
+   "size": {
+    "x": 1.5,
+    "z": 1.5
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": 16.0,
+    "z": 7.1
+   },
+   "name": "EastSpurN",
+   "size": {
+    "x": 3.0,
+    "z": 0.8
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 15.5,
+    "z": -7.1
+   },
+   "name": "EastSpurS",
+   "size": {
+    "x": 2.0,
+    "z": 0.8
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -16.0,
+    "z": -7.1
+   },
+   "name": "WestSpurS",
+   "size": {
+    "x": 3.0,
+    "z": 0.8
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -15.5,
+    "z": 7.1
+   },
+   "name": "WestSpurN",
+   "size": {
+    "x": 2.0,
+    "z": 0.8
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 7.89
+   },
+   "name": "WestTowerRampStep1",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 0.25
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 7.27
+   },
+   "name": "WestTowerRampStep2",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 0.5
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 6.65
+   },
+   "name": "WestTowerRampStep3",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 0.75
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 6.03
+   },
+   "name": "WestTowerRampStep4",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.0
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 5.41
+   },
+   "name": "WestTowerRampStep5",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.25
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 4.79
+   },
+   "name": "WestTowerRampStep6",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.5
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 4.17
+   },
+   "name": "WestTowerRampStep7",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.75
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 3.55
+   },
+   "name": "WestTowerRampStep8",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 2.0
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 2.93
+   },
+   "name": "WestTowerRampStep9",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 2.25
+  },
+  {
+   "center": {
+    "x": -19.75,
+    "z": 2.31
+   },
+   "name": "WestTowerRampStep10",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 2.5
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -7.89
+   },
+   "name": "EastTowerRampStep1",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 0.25
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -7.27
+   },
+   "name": "EastTowerRampStep2",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 0.5
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -6.65
+   },
+   "name": "EastTowerRampStep3",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 0.75
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -6.03
+   },
+   "name": "EastTowerRampStep4",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.0
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -5.41
+   },
+   "name": "EastTowerRampStep5",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.25
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -4.79
+   },
+   "name": "EastTowerRampStep6",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.5
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -4.17
+   },
+   "name": "EastTowerRampStep7",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 1.75
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -3.55
+   },
+   "name": "EastTowerRampStep8",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 2.0
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -2.93
+   },
+   "name": "EastTowerRampStep9",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 2.25
+  },
+  {
+   "center": {
+    "x": 19.75,
+    "z": -2.31
+   },
+   "name": "EastTowerRampStep10",
+   "size": {
+    "x": 2.5,
+    "z": 0.62
+   },
+   "top_y": 2.5
+  },
+  {
+   "center": {
+    "x": -3.125,
+    "z": 15.25
+   },
+   "name": "GateN_PillarW",
+   "size": {
+    "x": 3.75,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 3.125,
+    "z": 15.25
+   },
+   "name": "GateN_PillarE",
+   "size": {
+    "x": 3.75,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 14.5
+   },
+   "name": "GateN_Lintel",
+   "size": {
+    "x": 11.0,
+    "z": 3.5
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": -9.5,
+    "z": 14.0
+   },
+   "name": "GateN_WingW",
+   "size": {
+    "x": 9.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 9.5,
+    "z": 14.0
+   },
+   "name": "GateN_WingE",
+   "size": {
+    "x": 9.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 3.5,
+    "z": 12.175
+   },
+   "name": "BeltN_PavStepE",
+   "size": {
+    "x": 1.5,
+    "z": 0.75
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": -3.5,
+    "z": 12.175
+   },
+   "name": "BeltN_PavStepW",
+   "size": {
+    "x": 1.5,
+    "z": 0.75
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": 0.5,
+    "z": 12.5
+   },
+   "name": "BeltN_Box1",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": -0.5,
+    "z": 12.5
+   },
+   "name": "BeltN_Box2",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": -3.0,
+    "z": 10.75
+   },
+   "name": "BeltN_CanopyW",
+   "size": {
+    "x": 4.0,
+    "z": 2.5
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": 3.0,
+    "z": 10.75
+   },
+   "name": "BeltN_CanopyE",
+   "size": {
+    "x": 4.0,
+    "z": 2.5
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": 3.125,
+    "z": -15.25
+   },
+   "name": "GateS_PillarW",
+   "size": {
+    "x": 3.75,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -3.125,
+    "z": -15.25
+   },
+   "name": "GateS_PillarE",
+   "size": {
+    "x": 3.75,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": -14.5
+   },
+   "name": "GateS_Lintel",
+   "size": {
+    "x": 11.0,
+    "z": 3.5
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": 9.5,
+    "z": -14.0
+   },
+   "name": "GateS_WingW",
+   "size": {
+    "x": 9.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -9.5,
+    "z": -14.0
+   },
+   "name": "GateS_WingE",
+   "size": {
+    "x": 9.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -3.5,
+    "z": -12.175
+   },
+   "name": "BeltS_PavStepE",
+   "size": {
+    "x": 1.5,
+    "z": 0.75
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": 3.5,
+    "z": -12.175
+   },
+   "name": "BeltS_PavStepW",
+   "size": {
+    "x": 1.5,
+    "z": 0.75
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": -0.5,
+    "z": -12.5
+   },
+   "name": "BeltS_Box1",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 0.5,
+    "z": -12.5
+   },
+   "name": "BeltS_Box2",
+   "size": {
+    "x": 1.0,
+    "z": 1.0
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 3.0,
+    "z": -10.75
+   },
+   "name": "BeltS_CanopyW",
+   "size": {
+    "x": 4.0,
+    "z": 2.5
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": -3.0,
+    "z": -10.75
+   },
+   "name": "BeltS_CanopyE",
+   "size": {
+    "x": 4.0,
+    "z": 2.5
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": 10.0,
+    "z": 17.75
+   },
+   "name": "BackN_LOS_E",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": -10.0,
+    "z": 17.75
+   },
+   "name": "BackN_LOS_W",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 28.5
+   },
+   "name": "CampN_WallN",
+   "size": {
+    "x": 12.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -3.75,
+    "z": 24.5
+   },
+   "name": "CampN_WallS_W",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 3.75,
+    "z": 24.5
+   },
+   "name": "CampN_WallS_E",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -6.5,
+    "z": 24.75
+   },
+   "name": "CampN_WallW_S",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -6.5,
+    "z": 28.25
+   },
+   "name": "CampN_WallW_N",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 6.5,
+    "z": 24.75
+   },
+   "name": "CampN_WallE_S",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 6.5,
+    "z": 28.25
+   },
+   "name": "CampN_WallE_N",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": 26.5
+   },
+   "name": "CampN_Roof",
+   "size": {
+    "x": 15.0,
+    "z": 6.0
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": 1.0,
+    "z": 21.75
+   },
+   "name": "CampN_Screen_S",
+   "size": {
+    "x": 4.0,
+    "z": 0.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -9.5,
+    "z": 27.0
+   },
+   "name": "CampN_Screen_W",
+   "size": {
+    "x": 0.5,
+    "z": 4.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 9.5,
+    "z": 27.0
+   },
+   "name": "CampN_Screen_E",
+   "size": {
+    "x": 0.5,
+    "z": 4.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 4.5,
+    "z": 21.5
+   },
+   "name": "CampN_Truck",
+   "size": {
+    "x": 3.0,
+    "z": 1.0
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": -10.0,
+    "z": -17.75
+   },
+   "name": "BackS_LOS_W",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": 10.0,
+    "z": -17.75
+   },
+   "name": "BackS_LOS_E",
+   "size": {
+    "x": 3.0,
+    "z": 0.4
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": -28.5
+   },
+   "name": "CampS_WallS",
+   "size": {
+    "x": 12.0,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 3.75,
+    "z": -24.5
+   },
+   "name": "CampS_WallN_E",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -3.75,
+    "z": -24.5
+   },
+   "name": "CampS_WallN_W",
+   "size": {
+    "x": 4.5,
+    "z": 1.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 6.5,
+    "z": -24.75
+   },
+   "name": "CampS_WallE_N",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 6.5,
+    "z": -28.25
+   },
+   "name": "CampS_WallE_S",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -6.5,
+    "z": -24.75
+   },
+   "name": "CampS_WallW_N",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -6.5,
+    "z": -28.25
+   },
+   "name": "CampS_WallW_S",
+   "size": {
+    "x": 1.0,
+    "z": 1.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 0.0,
+    "z": -26.5
+   },
+   "name": "CampS_Roof",
+   "size": {
+    "x": 15.0,
+    "z": 6.0
+   },
+   "top_y": 4.9
+  },
+  {
+   "center": {
+    "x": -1.0,
+    "z": -21.75
+   },
+   "name": "CampS_Screen_N",
+   "size": {
+    "x": 4.0,
+    "z": 0.5
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": 9.5,
+    "z": -27.0
+   },
+   "name": "CampS_Screen_E",
+   "size": {
+    "x": 0.5,
+    "z": 4.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -9.5,
+    "z": -27.0
+   },
+   "name": "CampS_Screen_W",
+   "size": {
+    "x": 0.5,
+    "z": 4.0
+   },
+   "top_y": 3.0
+  },
+  {
+   "center": {
+    "x": -4.5,
+    "z": -21.5
+   },
+   "name": "CampS_Truck",
+   "size": {
+    "x": 3.0,
+    "z": 1.0
+   },
+   "top_y": 2.2
+  },
+  {
+   "center": {
+    "x": -26.0,
+    "z": 23.5
+   },
+   "name": "CornerNW_PavStep",
+   "size": {
+    "x": 1.5,
+    "z": 1.5
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": -24.15,
+    "z": 19.65
+   },
+   "name": "CornerNW_Box1",
+   "size": {
+    "x": 1.2,
+    "z": 1.2
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 26.0,
+    "z": 23.5
+   },
+   "name": "CornerNE_PavStep",
+   "size": {
+    "x": 1.5,
+    "z": 1.5
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": 24.15,
+    "z": 19.65
+   },
+   "name": "CornerNE_Box1",
+   "size": {
+    "x": 1.2,
+    "z": 1.2
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": 26.0,
+    "z": -23.5
+   },
+   "name": "CornerSE_PavStep",
+   "size": {
+    "x": 1.5,
+    "z": 1.5
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": 24.15,
+    "z": -19.65
+   },
+   "name": "CornerSE_Box1",
+   "size": {
+    "x": 1.2,
+    "z": 1.2
+   },
+   "top_y": 0.9
+  },
+  {
+   "center": {
+    "x": -26.0,
+    "z": -23.5
+   },
+   "name": "CornerSW_PavStep",
+   "size": {
+    "x": 1.5,
+    "z": 1.5
+   },
+   "top_y": 0.6
+  },
+  {
+   "center": {
+    "x": -24.15,
+    "z": -19.65
+   },
+   "name": "CornerSW_Box1",
+   "size": {
+    "x": 1.2,
+    "z": 1.2
+   },
+   "top_y": 0.9
   }
  ]
 }
