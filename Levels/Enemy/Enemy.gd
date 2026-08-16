@@ -68,13 +68,26 @@ func _ready() -> void:
 	health = max_health
 	# 注意：出生保护由生成方显式设置（L_M2 spawn 时 spawn_protection = SPAWN_PROTECTION）——
 	# 不在 _ready 默认开启：既有测试与训练场场景的 Enemy 直建实例不受影响。
-	# (2026-08-16 M3.1 T0)：bot 在 Bots 层（4），仅与世界几何（Objects 层 1）碰撞——
-	# bot 间互不碰撞；躯干碰撞形状移入 Enemy.tscn scene 声明（@onready _col_cached
-	# 在树进入时查找，代码内 _ready 创建会错过缓存窗口）。胶囊 r0.31/h1.69 @ (0, 0.845, 0)：
-	# 底=原点（脚底贴地，落定 y=0 与原静态桩站位一致）、顶=1.69（颈界与头 hitbox 1.70 无缝）。
+	# (2026-08-16 M3.1 T0)：bot 在 Bots 层（4），碰撞掩码 3 = 世界几何 Objects(1) + 玩家身体
+	# Player(2)：bot 撞墙撞玩家（移动 bot 穿人会视觉错误）；bot 间互不碰撞（层 4 不在掩码内，
+	# 防路径拥堵）——玩家撞 bot 方向由玩家掩码 7 覆盖。
 	collision_layer = BOT_LAYER
-	collision_mask = 1
+	collision_mask = 3
 	command_override = MovementCommand.new()  # (2026-08-16 M3.1 T0)：恒设——无 Brain 时站桩，防读玩家真实输入
+	# (2026-08-16 M3.1 T0 修复轮 2)：生产消费方走 Enemy.new()（L_M2/L_Main 直建脚本，非 tscn），
+	# 无懒创建兜底则无躯干碰撞体 → 穿地板坠落/不可命中/不挡路。懒创建与 tscn 同参：
+	# 胶囊 r0.31/h1.69 @ (0, 0.845, 0)——底=原点（脚底贴地，落定 y=0 与原静态桩站位一致）、
+	# 顶=1.69（颈界与头 hitbox 1.70 无缝）；tscn 路径已有 "Body" 子节点则不重复创建。
+	# _col_cached 缓存窗口无碍：_try_step_up 对 null 有首次使用再扫兜底（MovementController.gd）。
+	if _find_collision_shape() == null:
+		var body_shape := CollisionShape3D.new()
+		body_shape.name = "Body"
+		var caps := CapsuleShape3D.new()
+		caps.radius = 0.31
+		caps.height = 1.69
+		body_shape.shape = caps
+		body_shape.position = Vector3(0, 0.845, 0)
+		add_child(body_shape)
 	add_to_group("torso")
 	# 头部 hitbox（独立 body，group "head"，转发伤害到本体 → hitscan 爆头 ×4；贴合 1.83m 角色头部）
 	var head := HeadHitbox.new()

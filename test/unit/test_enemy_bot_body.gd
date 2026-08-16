@@ -29,11 +29,13 @@ func _make_floor() -> StaticBody3D:
 	return _make_box(Vector3(40, 1, 40), Vector3(0, -0.5, 0))
 
 
-# 测试辅助：真实 Enemy.tscn 实例（入树 + 定位；_ready 在 add_child 时同步执行）
+# 测试辅助：真实 Enemy.tscn 实例（定位先于入树——入树后再设 global_position 会让形状
+# 以原点陈旧变换注册进物理空间一帧，附近玩家 move_and_slide 会被去穿透推开（2026-08-16 实测）；
+# 未入树时须用 position 而非 global_position（后者触发引擎 !is_inside_tree 报错，GUT 计为失败））
 func _spawn_enemy(at: Vector3) -> Enemy:
 	var e: Enemy = load("res://Levels/Enemy/Enemy.tscn").instantiate()
+	e.position = at
 	add_child_autofree(e)
-	e.global_position = at
 	return e
 
 
@@ -79,14 +81,19 @@ func test_player_blocked_by_bot() -> void:
 	cmd.move_axis = Vector2(0, 1)  # 前进（rotation.y=0 → -Z）
 	player.command_override = cmd
 	# 与简报口径的偏差：简报断言阈值"bot z+0.3"未计入双方胶囊半径——实际接触点 =
-	# bot.z + 玩家半径 0.5 + bot 半径 0.31 = bot.z + 0.81（RED 实测玩家停于 -1.19）。
-	# 按接触几何取阈值 bot.z + 0.85（接触 + 0.04 裕量）：被挡停住不触发；若掩码缺
-	# Bots 层玩家 60 帧走 ~6.3m（z ≈ -6.3）远越阈值——判别力不变（偏差记录于任务报告）。
-	for i in 60:
-		await wait_physics_frames(1)
-		assert_lt(player.global_position.z, bot.global_position.z + 0.85,
-				"第 %d 帧：玩家被 bot 挡路，z 未越过接触前沿 bot.z+0.85（玩家 %.3f / bot %.3f）"
-				% [i, player.global_position.z, bot.global_position.z])
+	# bot.z + 玩家半径 0.5 + bot 半径 0.31 = bot.z + 0.81（接触前沿）。
+	# 断言形式为终态双界（非逐帧）：逐帧 assert_lt 在接近阶段必然失败（玩家合法地
+	# 从 +Z 走向接触点，途中 z 恒大于阈值——此前被"入树后再定位"的陈旧形状去穿透
+	# 瞬移掩盖，2026-08-16 修复后暴露，改为终态断言，判别力不变）：
+	#   上界 bot.z+0.85：被挡停在接触点 -1.19 < -1.15（无掩码时玩家 60 帧走 ~6.3m 亦过界，
+	#     但下界拦截）；下界 bot.z-0.5：未穿过 bot（无掩码时 z≈-6.3 越过此界 → 失败）。
+	await wait_physics_frames(60)
+	assert_lt(player.global_position.z, bot.global_position.z + 0.85,
+			"玩家被 bot 挡路：停在接触前沿（玩家 %.3f / bot %.3f）"
+			% [player.global_position.z, bot.global_position.z])
+	assert_gt(player.global_position.z, bot.global_position.z - 0.5,
+			"玩家未穿过 bot（玩家 %.3f / bot %.3f）"
+			% [player.global_position.z, bot.global_position.z])
 
 
 # ── T0-5：武器命中掩码 5 命中 Bots 层 bot（RED 锚 = bot 在层 4）──
@@ -117,3 +124,40 @@ func test_dead_bot_velocity_zeroed() -> void:
 	e.set("velocity", Vector3(5, 0, 0))  # 直接赋残余速度（模拟死亡前移动中）
 	e.take_damage(999)
 	assert_eq(e.get("velocity"), Vector3.ZERO, "死亡帧清零速度（改造前 StaticBody3D 无 velocity 属性）")
+
+
+# ── T0-7（修复轮 2）：Enemy.new() 路径懒创建躯干碰撞体——不穿地坠落 ──
+func test_enemy_new_path_has_body_and_rests() -> void:
+	# 回归锚：生产消费方（L_M2/L_Main）走 Enemy.new()（非 tscn），无懒创建兜底则
+	# 无躯干碰撞体 → 穿地板坠落（审查实测 y=-36.87）、不可命中、不挡路
+	_make_floor()
+	var e := Enemy.new()
+	e.position = Vector3(0, 1, 0)  # 先定位再入树（防陈旧形状注册，见 _spawn_enemy 注释）
+	add_child_autofree(e)
+	await wait_physics_frames(60)
+	var col: CollisionShape3D = null
+	for c in e.get_children():
+		if c is CollisionShape3D:
+			col = c
+			break
+	assert_not_null(col, "Enemy.new() 路径应懒创建躯干碰撞体（与 tscn 同参）")
+	assert_lt(e.global_position.y, 0.2, "不再穿地坠落（实际 y %.3f）" % e.global_position.y)
+	assert_true(e.is_on_floor(), "落定站在地面上")
+
+
+# ── T0-8（修复轮 2）：bot 碰撞掩码含 Player 层——移动 bot 不穿玩家身体 ──
+func test_bot_blocked_by_player_body() -> void:
+	# 回归锚：bot collision_mask=3（1|2）后，bot 撞玩家身体被挡——胶囊半径和
+	# 0.5+0.31=0.81（接触前沿）；掩码缺 Player 层则 bot 穿过静止玩家
+	_make_floor()
+	var player: MovementController = load("res://Player/Player.tscn").instantiate()
+	player.position = Vector3(0, 1.5, 0)
+	add_child_autofree(player)
+	var bot := Enemy.new()
+	bot.position = Vector3(0, 0.5, 3)  # 默认 yaw 0 面向 -Z = 玩家方向；先定位再入树
+	add_child_autofree(bot)
+	await wait_physics_frames(30)  # 双方落定
+	bot.command_override.move_axis = Vector2(0, 1)  # 前进（-Z，朝玩家）
+	await wait_physics_frames(60)
+	assert_lt(bot.global_position.z, 2.0, "bot 确实向玩家移动（防空转假绿，实际 z %.3f）" % bot.global_position.z)
+	assert_gt(bot.global_position.z, 0.8, "bot 被玩家身体挡住：z 停在接触前沿 0.81 以北（实际 %.3f）" % bot.global_position.z)

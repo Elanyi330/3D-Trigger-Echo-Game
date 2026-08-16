@@ -14,7 +14,7 @@
 #   - 伤害结算：直接调用目标 take_damage（Target.gd 已实现）；melee_hit(target, damage)
 #     信号供反馈消费（spec §9.5 推荐信号，M1 暂无 HUD 消费，预留）
 # 全局约束（计划 §4）：数值唯一来源 WeaponResource（weapon_*.tres，禁止硬编码散值）；
-#   命中判定只对 Objects 层（物理扫掠 mask=1）；纯离线。
+#   命中判定对 Objects|Bots 层（物理扫掠 mask=5，2026-08-16 M3.1 T0 扩展）；纯离线。
 class_name MeleeController
 extends Node3D
 

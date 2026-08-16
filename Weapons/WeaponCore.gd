@@ -2,7 +2,7 @@
 # M1 任务1：射击核心（hitscan + 后坐力 + 换弹）
 #
 # 接口签名按计划 §5 任务1 逐字照抄；数值唯一来源 WeaponResource（weapon_*.tres，禁止硬编码散值，企划书 §4.2.5）。
-# 全局约束（计划 §4）：hitscan 射线 collision_mask=1（仅 Objects 层）；纯离线。
+# 全局约束（计划 §4）：hitscan 射线 collision_mask=5（Objects|Bots 层，2026-08-16 M3.1 T0 扩展）；纯离线。
 # 参考：docs/superpowers/reference/m1-src/weapon_proto.gd（check_hitscan_collision 射线思路）
 class_name WeaponCore
 extends Node3D
