@@ -324,6 +324,32 @@ func test_anchor_unreachable_fallback() -> void:
 	autopilot._begin_attempt("CrateToCluster_WS")
 	# call1：预检触发 → 重寻路成功（状态机落回 WALK，新 segments 从箱底路径出发）
 	autopilot._enter_jump(seg)
+	if autopilot._segments.is_empty():
+		# 装配竞态加固（同测试 10 口径，2026-08-16 控制器裁决 + R2 审查 Major 1）：
+		# call1 重寻路空段 = 导航图未就绪（_plan_to_face 空路径）→ 清临时目录重新
+		# 装配完整重跑第二轮；断言只跑在最终状态上（防竞态帧计入失败）。
+		print("RUNUP12 retry: round1 replan empty segments")
+		autopilot.free()
+		a["player"].free()
+		_clean_tmp()
+		a = await _assemble()
+		autopilot = a["autopilot"]
+		record = a["record"]
+		autopilot.setup(a["player"], record, Callable())
+		autopilot.set_target_faces(["WestClusterS_Panel"])
+		autopilot._snap_links()
+		link = {}
+		for l0 in autopilot._links:
+			var l: Dictionary = l0
+			if l["name"] == "CrateToCluster_WS":
+				link = l
+		assert_false(link.is_empty(), "第二轮应找到 CrateToCluster_WS 链接")
+		autopilot._player.global_position = Vector3(-15.5, 0.915, -4.5)
+		autopilot._player.velocity = Vector3.ZERO
+		seg = {"kind": "jump", "start": link["from"], "end": link["to"], "link": link}
+		autopilot._target_name = "WestClusterS_Panel"
+		autopilot._begin_attempt("CrateToCluster_WS")
+		autopilot._enter_jump(seg)
 	assert_true(autopilot._attempt_active, "call1 重寻路后 attempt 不应收尾")
 	assert_true(autopilot._anchor_fallback_done,
 			"call1 预检必须置 _anchor_fallback_done（一次性守卫）")
@@ -506,5 +532,5 @@ func test_replan_bounded() -> void:
 #     AT.TRAVERSAL_REV == "at-r8:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress"
 func test_traversal_rev_r8() -> void:
 	assert_eq(AT.TRAVERSAL_REV,
-			"at-r8:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress",
-			"TRAVERSAL_REV 必须为 r8（版本键参与记录哈希，bump 作废旧记录）")
+			"at-r9:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress+degen0.6",
+			"TRAVERSAL_REV 必须为 r9（F-degen 阈值 0.6；版本键参与记录哈希，bump 作废旧记录）")

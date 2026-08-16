@@ -39,7 +39,8 @@ const TARGET_SNAP_TOL := 0.8      # 目标点 snap 先验容差（防 closest �
 ## 自动作废旧记录重来（与 MovementController.MOVEMENT_REV 同铁律模式）。
 ## r1 = 首版（磁盘触发+最小转弯圆 bug 已修）；r2 起逻辑再变须 bump。
 ## r8 = F8-F13 六项执行层修复（直线助跑/触发锥/锚点预检/压墙恢复/垂直跳/行走进展）。
-const TRAVERSAL_REV := "at-r8:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress"
+## r9 = F-degen 阈值 0.3→0.6（北簇 112s 漏判修复，触发语义变更）。
+const TRAVERSAL_REV := "at-r9:straight-runup+trigger-cone+anchor-precheck+wall-recover+vertical-jump+walk-progress+degen0.6"
 
 signal attempt_finished(face: String, verdict: String)
 signal progress_changed(visited: int, total: int, success: int, fail: int)
