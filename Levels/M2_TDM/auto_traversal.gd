@@ -1184,6 +1184,12 @@ func _human_p50(from_f: String, to_f: String) -> float:
 		return 0.0
 	var human: Variant = e.get("human")
 	if human is Dictionary:
+		# 2026-08-16 控制器裁决：遍历器=验证工具，参数消费只认真实实测数据——旋转增强
+		# 数据（augmented:true）是训练/分析推断值，进执行引擎会漂移已验证行为（GUT 3
+		# 稳定+1 间歇失败实证：Crate_WN 增强 p50 4.201 改变西塔下游轨迹致 stuck）；
+		# M4 运行时是否消费增强参数（含置信折扣）另立设计文档。
+		if human.get("augmented") == true:
+			return 0.0
 		var ts: Variant = human.get("takeoff_speed")
 		if ts is Dictionary and ts.has("p50"):
 			return float(ts["p50"])

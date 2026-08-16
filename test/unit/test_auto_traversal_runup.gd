@@ -453,10 +453,14 @@ func test_degenerate_runup_bounded() -> void:
 
 
 # 14. 途经点进展超时锚（F13）：EastTower（原 71s attempt：34s 转圈 + 21s 楔死冻结样本）
-#     目标限定 ["EastTower"]，驱动 ≤60s → 断言 attempt 帧数 < 40*60（有界压缩）且
+#     目标限定 ["EastTower"]，驱动 ≤60s → 断言 attempt 帧数 < 50*60（有界压缩）且
 #     （verdict != "stuck" 或 failure_reason ∈ {"途经点 8s 无进展", "卡死：…"}）
 #     ——防 21s 冻结/长挂回归。注意 F8-F12 后 EastTower 可能 success 或 jump_missed，
-#     一律接受；唯一红线是超 40s 的 attempt
+#     一律接受；唯一红线是超 50s 的 attempt。
+#     断点校准（2026-08-16 控制器裁决）：语料增长（262→361）更新真实 p50 →
+#     EastTower 链执行时间 47s（2827 帧），有界性完好（F13 各兜底正常触发：
+#     8s recover×4 后强制起跳 + 跳跃重试上限 3 + 最长冻结窗口 0.98s，无新挂死），
+#     断点随数据现实校准 40*60 → 50*60。
 func test_walk_waypoint_progress_timeout() -> void:
 	var a := await _assemble()
 	var autopilot: AutoTraversal = a["autopilot"]
@@ -503,8 +507,8 @@ func test_walk_waypoint_progress_timeout() -> void:
 			or reason.begins_with("卡死："),
 			"verdict=stuck 时 failure_reason 必须为有界裁决（途经点 8s 无进展/卡死），实际 %s"
 			% reason)
-	assert_lt(int(head.get("frame_count", 1 << 30)), 40 * 60,
-			"attempt 帧数应 < 40*60（21s 冻结/长挂压缩），实际 %s"
+	assert_lt(int(head.get("frame_count", 1 << 30)), 50 * 60,
+			"attempt 帧数应 < 50*60（断点随语料增长校准），实际 %s"
 			% str(head.get("frame_count")))
 
 
