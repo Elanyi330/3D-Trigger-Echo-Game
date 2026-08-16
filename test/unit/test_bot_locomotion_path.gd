@@ -132,6 +132,31 @@ func test_approach_lookahead() -> void:
 	assert_gt(out.y, 0.0, "前瞻转向：仍含前进分量（实际 y %.3f）" % out.y)
 
 
+# ── T2-9：approach_point 非零 yaw 右手系投影（2026-08-17 M3.1 T3 修复轮 2 钉死）──
+# T1 实测锚：yaw=π/2 → 本地前 = −basis.z = −X（yaw=0 → −Z）；由此本地前 =
+# (−sin yaw, −cos yaw)，本地右 = basis.x = (cos yaw, −sin yaw)（yaw=π/2 → −Z）。
+# 旧公式 fw=(sin yaw, −cos yaw) 仅在 yaw=0 成立——T3 RUNUP 转向暴露反跑后修正。
+func test_approach_yaw_pi2_point_negx() -> void:
+	var out: Vector2 = BotLocomotion.approach_point(
+			Vector3.ZERO, PI / 2.0, Vector3(-5, 0, 0), Vector3(-5, 0, 0))
+	assert_almost_eq(out.x, 0.0, 1e-4, "yaw=π/2、基准点 −X 在正前方：右分量 0（实际 %.4f）" % out.x)
+	assert_almost_eq(out.y, 1.0, 1e-4, "yaw=π/2、基准点 −X 在正前方：前分量 1（实际 %.4f）" % out.y)
+
+
+func test_approach_yaw_pi_point_posz() -> void:
+	var out: Vector2 = BotLocomotion.approach_point(
+			Vector3.ZERO, PI, Vector3(0, 0, 5), Vector3(0, 0, 5))
+	assert_almost_eq(out.x, 0.0, 1e-4, "yaw=π、基准点 +Z 在正前方：右分量 0（实际 %.4f）" % out.x)
+	assert_almost_eq(out.y, 1.0, 1e-4, "yaw=π、基准点 +Z 在正前方：前分量 1（实际 %.4f）" % out.y)
+
+
+func test_approach_yaw_pi2_point_negz() -> void:
+	var out: Vector2 = BotLocomotion.approach_point(
+			Vector3.ZERO, PI / 2.0, Vector3(0, 0, -5), Vector3(0, 0, -5))
+	assert_almost_eq(out.x, 1.0, 1e-4, "yaw=π/2、基准点 −Z 在正右方：右分量 1（实际 %.4f）" % out.x)
+	assert_almost_eq(out.y, 0.0, 1e-4, "yaw=π/2、基准点 −Z 在正右方：前分量 0（实际 %.4f）" % out.y)
+
+
 # ── T2-6：高度门边界——升程 0.72 内 true / 0.73 false ──
 # T2 建门口径：navmesh 双锚。T3 修复轮 1（2026-08-17）：锚基准改「已消费途经点」
 # ——签名参数化 prev_y/point_y（路径点对路径点，同为 navmesh 空间，面缝瞬态消除），

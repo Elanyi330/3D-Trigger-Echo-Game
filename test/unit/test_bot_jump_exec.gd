@@ -169,23 +169,24 @@ func test_classify_endpoint_tolerance() -> void:
 			"端点偏移 0.6 ≥ LINK_SNAP 0.5 应不匹配（WALK）")
 
 
-# ── T3-7（集成，修复轮 1 + 2）：南营 → 西簇板顶——真实跳跃一次成功 ──
+# ── T3-7（集成，修复轮 1-3）：西坡道顶 → 回廊——水平跳（dh=0）一次成功（60Hz 生产口径）──
 # 修复轮 1（2026-08-17）重写：原「坡道底→塔顶」路径无任何跳跃——审查实证坡道
-# 顶与塔顶 navmesh 在 x≈−18.9 邻接直通，bot 纯步行到达（假绿，velocity.y 峰值
-# 恒 0）。审查指定南营→西塔顶链（PavToSpur_W + TowerToRim_W），修复轮 2 实测
-# 该链第一跳 PavToSpur_W 物理不可达：dh 1.8，bot 胶囊底球 r=0.31（玩家 0.5，
-# 抓边带随半径收缩）→ 需升程 1.49 vs 跳跃峰值 1.5133，余量 0.02——触发半径
-# 0.8 内任何起跳时机落点脚高 2.55-2.67 < 2.69 带口，多次实证全部蹭面坠地
-# （jump_failed 诚实发射，y 门捕获）。西长墙顶链第二跳起跳点距第一跳落点 0.67
-# （< JUMP_ARRIVE），触发时速度带 90° 转向残差，落点 x ±0.5 漂移贴墙边后步行
-# 坠边（GUT 上下文实证失败）。
-# 终选：南营→西簇板顶（WestClusterS_Panel 面中心）——单跳 PavToCluster_W
-# （dh 1.0，抓边带充裕），GUT 上下文实测 3/3 次全绿。断言：①arrived ②距目标
-# 水平距 < 1.0 ③驱动期间 body.velocity.y 峰值 > 3（真实起跳证明，纯步行假绿
-# 防护）④jump_failed 零次。到达/失败即提前退出。
+# 顶与塔顶 navmesh 在 x≈−18.9 邻接直通，bot 纯步行到达（假绿）。修复轮 2 的南营→
+# 西塔顶链第一跳 PavToSpur_W（dh 1.8）对 bot 物理不可达（胶囊底球 r=0.31 抓边带
+# 需升程 1.49 vs 峰值 1.5133 余量 0.02，多次实证蹭面坠地）。
+# 修复轮 3（2026-08-17，审查复核）：①驱动循环改每物理帧 tick（生产 60Hz 口径——
+# 原 wait_physics_frames(2)=30Hz 的成功不可移植，审查实证差异）。②链接选型：审查
+# 建议的 LongWallGap/RampTopToCorridor 中选 RampTopToCorridor_W（dh=0 / dist=1.0 /
+# v_req=1.2）——dh=0 水平跳无刀锋起飞窗，且落点回廊顶 7×7 开阔面吸收触发方向
+# 残差（实证对比：RampToLongWall_E 落点长墙顶 1m 窄条，GUT 上下文落点漂移贴边
+# 步行坠边失败；LongWallGap 自南营无路由——回廊 navmesh 直通零跳）。起点取
+# 西坡道顶近塔点（原 brief "自行确认近塔点" 授权——南营路由到回廊无跳跃链接，
+# 无法满足 vy>3 反假绿）。60Hz 下连跑 3/3 稳定（arrived 68 帧、maxvy 7.54、jf 零次）。
+# 断言：①arrived ②距目标水平距 < 1.0 ③驱动期间 body.velocity.y 峰值 > 3
+# （真实起跳证明，纯步行假绿防护）④jump_failed 零次。到达/失败即提前退出。
 func test_jump_exec_success() -> void:
 	var l2 := await _assemble_l2()
-	var enemy := await _spawn_bot_at(Vector3(-4.0, 0, -25.5))  # 南营出生点
+	var enemy := await _spawn_bot_at(Vector3(-4.5, 3.0, -2.5))  # 西坡道顶近塔点
 	var map_rid: RID = l2.get_world_3d().navigation_map
 	var loco := BotLocomotion.new()
 	add_child_autofree(loco)
@@ -195,23 +196,23 @@ func test_jump_exec_success() -> void:
 	_failed_links.clear()
 	loco.arrived.connect(_on_arrived)
 	loco.jump_failed.connect(_on_jump_failed)
-	var target := Vector3(-18.5, 2.2, -5.0)  # WestClusterS_Panel 面中心（top_y=2.2，单跳目标）
+	var target := Vector3(-2.5, 3.0, -2.0)  # 回廊西南角（RampTopToCorridor_W 落点）
 	loco.set_target(target)
 	# 路径应含跳跃段（链接链覆盖自检——防路由漂移假绿）
 	var has_jump := false
 	for s0 in loco._segments:
 		if s0["type"] == "JUMP":
 			has_jump = true
-	assert_true(has_jump, "南营→簇板顶路径应含跳跃段（实际 %s）" % str(loco._segments))
+	assert_true(has_jump, "坡道顶→回廊路径应含跳跃段（实际 %s）" % str(loco._segments))
 	var frames := 0
 	var max_vy := 0.0
 	while frames < 900 and _arrived_count == 0 and _jump_failed_count == 0:
-		loco.tick(1.0 / 60.0)
+		loco.tick(1.0 / 60.0)  # 生产口径：每物理帧 tick（60Hz）
 		max_vy = maxf(max_vy, enemy.velocity.y)
-		await wait_physics_frames(2)
-		frames += 2
+		await wait_physics_frames(1)
+		frames += 1
 	assert_gt(_arrived_count, 0,
-			"≤900 物理帧内应跳跃到达簇板顶（实际 %d 帧未到达，bot 位置 %s，失败 %s，段 %s）"
+			"≤900 物理帧内应跳跃到达回廊（实际 %d 帧未到达，bot 位置 %s，失败 %s，段 %s）"
 			% [frames, enemy.global_position, str(_failed_links), str(loco._segments)])
 	assert_eq(_jump_failed_count, 0,
 			"跳跃一次成功：jump_failed 零次（实际 %s）" % str(_failed_links))
@@ -250,9 +251,9 @@ func test_jump_failed_emits() -> void:
 			"门梁路径应含 WingToLintel_SW（实际 %s）" % str(jump_links))
 	var frames := 0
 	while frames < 900 and _jump_failed_count == 0 and _arrived_count == 0:
-		loco.tick(1.0 / 60.0)
-		await wait_physics_frames(2)
-		frames += 2
+		loco.tick(1.0 / 60.0)  # 生产口径：每物理帧 tick（60Hz，修复轮 3 与测试 7 同源）
+		await wait_physics_frames(1)
+		frames += 1
 	assert_gt(_jump_failed_count, 0,
 			"门缺陷修复后 bot 可达 WingToLintel（v_req 11.0 > SPEED_CAP）——jump_failed 应确定性发射"
 			+ "（%d 帧未发射：bot %s，段 %s，信号 %s）"

@@ -30,11 +30,6 @@ const TRIGGER_CONE := 0.9         # 方向锥 cos 系数（±25°，遍历器 F9
 const JUMP_TIMEOUT := 2.5         # s：起跳→落地判定超时
 const JUMP_ARRIVE := 0.8          # m：助跑到达起跳点判定半径（水平距）
 const LAND_TOLERANCE := 1.5       # m：落地判定容差（距段终点水平距）
-const LAND_Y_TOL := 1.2           # m：落地判定竖向容差（修复轮 2）——落点 y 低于段 to
-	                              #   （navmesh y = 物理面 +0.3~0.4）超过此值即失败：跌落
-	                              #   缝隙的「假成功」（水平距 < LAND_TOLERANCE 但落在下方
-	                              #   地面）→ 诚实失败走 jump_failed，防静默卡死（诊断实证：
-	                              #   未起跳坠落落点 xz 0.95 < 1.5 被误判成功 → 地面贴墙卡死）
 const LINK_SNAP := 0.5            # m：路径点对与链接端点匹配容差（双向距离）
 const ATOMIC_SNAP := 0.15         # m：简化时链接端点原子对识别容差（注册点 vs closest 对齐差 ≤0.1，L_M2 F4 自检口径）
 const TRIGGER_TIMEOUT := 1.0      # s：TRIGGER 未触发退回 RUNUP 重对准（语义规格值）
@@ -47,12 +42,6 @@ const RUNUP_ENTRY := 3.0          # m：跳跃段提前交接半径（修复轮 
 	                              #   RUNUP 用 approach_point 直向转向（T2 世界方向投影，
 	                              #   无最小转弯圆、无原地转速度衰减——遍历器 F8 病理是
 	                              #   机体相对转向的产物，直向投影不存在）
-const RUNUP_ANCHOR := 1.5         # m：助跑锚点距起跳点（沿段方向反侧；遍历器 RUNUP_LEN 锚
-	                              #   同源）——修复轮 2：助跑先对准锚点（段方向线上、起跳点
-	                              #   后方），距起跳点 ≤ 此值时切直指起跳点，使触发时速度方向
-	                              #   收敛到段方向（诊断实证：无锚直追在触发点以南 0.11 进入
-	                              #   触发，速度转向滞后 14°，落点偏南 0.31 蹭面坠地；1.0 锚
-	                              #   收敛不充分，落点偏东 0.79）
 
 var body: CharacterBody3D         # Enemy（读 global_position / rotation.y）
 var map_rid: RID                  # 导航地图 RID（L_M2 get_world_3d().navigation_map）
@@ -444,10 +433,12 @@ func _tick_jump(delta: float) -> void:
 ## RUNUP：朝段起点直线助跑——approach_point 直向转向（T2 世界方向投影，无最小
 ## 转弯圆，见 RUNUP_ENTRY 注释；修复轮 2 改自原地转版本：原地转 ~0.79s 速度衰减
 ## 至 0 + 追摆 stop-go，近限速门无跑道重建 → 未起跳即走出边缘坠落，诊断日志
-## 实证 hspeed 峰值 5.93 距门 5.82 差一 tick）。先对准助跑锚点（段方向线上、
-## 起跳点后方 RUNUP_ANCHOR），距起跳点 ≤ RUNUP_ANCHOR 后直指起跳点——触发时
-## 速度方向收敛到段方向（无锚直追触发时速度仍带转向滞后，落点偏南蹭面坠地，
-## 诊断实证）；水平距 < JUMP_ARRIVE → TRIGGER。助跑中跌落 → AIR 按跳跃成败判定。
+## 实证 hspeed 峰值 5.93 距门 5.82 差一 tick）。修复轮 3（2026-08-17）：移除
+## 助跑锚点（RUNUP_ANCHOR 版本）——锚点 = 起跳点沿段方向反侧 1.5m 处，在窄面
+## 起跳点（塔坡道 2.5m 宽条、贴边链接）上落在面外 → bot 直指锚点跑出面缘坠落
+## （60Hz 实证 RampToLongWall_E 锚点 (18.36,-2.8) 越坡道西面 0.14 → 跑出坠地）。
+## 直指起跳点的方向滞后由宽裕链接（dh≤0.8 抓边带余量 ≫ 滞后落点偏移）吸收；
+## 水平距 < JUMP_ARRIVE → TRIGGER。助跑中跌落 → AIR 按跳跃成败判定。
 func _tick_runup(_delta: float) -> void:
 	var seg: Dictionary = _jump_state["seg"]
 	var from: Vector3 = seg["from"]
@@ -464,11 +455,8 @@ func _tick_runup(_delta: float) -> void:
 		_jump_state["phase"] = "TRIGGER"
 		_jump_state["t"] = 0.0
 		return
-	var steer := from
-	if d_from > RUNUP_ANCHOR:
-		steer = from - _seg_dir(seg) * RUNUP_ANCHOR  # 对准锚点（段方向线后方）
 	command.move_axis = approach_point(
-			body.global_position, body.rotation.y, steer, steer)
+			body.global_position, body.rotation.y, from, from)
 
 
 ## TRIGGER：沿段方向前进；hspeed ≥ 触发速度门且 速度方向·段方向 ≥ TRIGGER_CONE
@@ -578,14 +566,17 @@ func _on_jump_failed(link_name: String) -> void:
 
 
 ## 落点成败（2026-08-17 M3.1 T3）：距段 to 点水平距 < LAND_TOLERANCE 且竖向
-## 落差不超 LAND_Y_TOL（修复轮 2：纯水平判定在跌落缝隙时假成功——落点 xz 近
-## 段终点但 y 低一个链接落差 → 静默卡死）；或数据集边存在时落点 x/z 在
+## 落差不超高度门（修复轮 2 加竖向门；修复轮 3 改 navmesh 空间锚——落地锚 =
+## 落点 map_get_closest_point 的 navmesh y，与 seg.to（同为 navmesh 空间）比较，
+## 与高度门同源口径：烘焙偏移 0.3~0.4 天然抵消，dh≤0.8 的跌落缝隙余量 0.8+ >
+## HEIGHT_GATE 0.72 干净分离——旧口径 to.y（navmesh）− 身体 y（物理）混合空间，
+## 1.2 容差对 0.8+偏移 0.3~0.4 太贴刀锋）；或数据集边存在时落点 x/z 在
 ## landing_zone（center±size/2，膨胀 0.5）内且竖向同样达标。
 func _landed_ok(seg: Dictionary) -> bool:
 	var p := body.global_position
 	var to: Vector3 = seg["to"]
-	if to.y - p.y > LAND_Y_TOL:
-		return false  # 落点低于目标面超过容差 → 失败（跌落缝隙）
+	if to.y - NavigationServer3D.map_get_closest_point(map_rid, p).y > HEIGHT_GATE:
+		return false  # 落点低于目标面超过高度门 → 失败（跌落缝隙）
 	if Vector2(to.x - p.x, to.z - p.z).length() < LAND_TOLERANCE:
 		return true
 	var edge: Variant = _ensure_dataset().get(str(seg["link_name"]))
