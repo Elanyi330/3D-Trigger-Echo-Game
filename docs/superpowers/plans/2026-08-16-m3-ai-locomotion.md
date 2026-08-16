@@ -54,7 +54,7 @@
 const BOT_LAYER := 4        # 1<<2：layer_3 "Bots"
 #   _ready 中：
 collision_layer = BOT_LAYER
-collision_mask = 1          # 仅世界几何（Objects）；bot 间互不碰撞
+collision_mask = 3          # 1|2：世界几何+玩家身体（bot 撞墙撞玩家不穿人；bot 间互不碰撞防拥堵）
 command_override = MovementCommand.new()   # 恒设：无 Brain 时站桩，防读玩家真实输入
 #   HeadHitbox._ready 中：collision_layer = 4（原 1）
 #   _die() 中新增：velocity = Vector3.ZERO   # 死亡帧清零速度（CharacterBody3D 不再是无重力静态体）
@@ -63,12 +63,21 @@ command_override = MovementCommand.new()   # 恒设：无 Brain 时站桩，防�
 ### 语义规格
 
 1. **Enemy.tscn**：根节点 type `StaticBody3D` → `CharacterBody3D`；新增子节点
-   `CollisionShape3D`（CapsuleShape3D：radius 0.31 / height 1.54 / position (0, 0.92, 0)）
-   ——形状必须 scene 声明（MovementController 的 `@onready _col_cached` 在树进入时查找，
-   代码内 _ready 创建会错过缓存窗口，既有 F2a 注释已说明缓存安全前提）。
+   `CollisionShape3D`（CapsuleShape3D：radius 0.31 / height 1.69 / position (0, 0.845, 0)）
+   ——修复轮 1 裁决值：底=0 贴地消沉地、顶=1.69 与原命中顶界一致（头 hitbox 1.70 颈缝无缝）。
+   形状 scene 声明（MovementController 的 `@onready _col_cached` 在树进入时查找，既有 F2a
+   注释已说明缓存安全前提）。
+   **⚠️ 消费方陷阱（修复轮 2 裁决记录，T1-T5 必读）**：生产代码全走 `Enemy.new()`
+   （L_M2 友军/敌军、L_Main 训练靶），tscn 零引用——形状只放 tscn 会导致 new() 路径无
+   碰撞体穿地坠落（审查实测 y=-36.87）。**强制要求**：`Enemy.gd _ready` 必须含懒创建
+   兜底——`_find_collision_shape()` 为 null 时按 tscn 同参数代码创建；已取证
+   MovementController.gd:254 对 `_col_cached` null 有首次使用再扫兜底，懒创建不影响 step-up。
+   T1-T5 凡新建消费 Enemy 的路径一律优先 `Enemy.new()` 并信赖此兜底。
 2. **Enemy.gd**：`extends MovementController`（class_name 全局可见）。_ready 顺序：
-   `super._ready()`（物理查询缓存）→ 碰撞层/掩码/command_override → 视觉 tint/标签/
-   HeadHitbox/随机武器（既有逻辑不动，仅删除 body_shape 创建块）。
+   `super._ready()`（物理查询缓存）→ 碰撞层/掩码/command_override → **懒创建兜底（见 1）**
+   → 视觉 tint/标签/HeadHitbox/随机武器（既有逻辑不动，仅删除 body_shape 创建块）。
+   碰撞掩码 **3**（1|2：世界几何 + 玩家身体——bot 撞墙撞玩家不穿人，bot 间互不碰撞防拥堵，
+   修复轮 2 裁决；接口块第 57 行注释同步改 3）。
 3. **玩家侧**：`Player/MovementController.tscn` 的 collision_mask 3 → **7**（1 Objects | 2 Player | 4 Bots）
    ——玩家身体撞 bot 被挡（现状语义保持：敌人挡路）。
 4. **武器命中侧**（bot 换层后 hitscan/近战/爆炸必须仍命中）：mask 1 → **5**（1|4），注释同步：
@@ -103,8 +112,9 @@ command_override = MovementCommand.new()   # 恒设：无 Brain 时站桩，防�
    （command_override 恒设 ZERO 站桩——RED：改造前无 command_override 概念，此断言绿；
    真正 RED 锚 = 测试 1/2）。
 4. `test_player_blocked_by_bot`：Player.tscn + 地面 + bot 站 (0,0,-2) → 玩家 move_axis=(0,1)
-   60 帧 → 断言玩家 z 未越过 bot 位置 +0.3（碰撞阻挡；改造前 StaticBody 挡路同语义，
-   掩码 7 保回归）。
+   60 帧 → 断言玩家 z 未越过 bot 位置 +0.85（碰撞阻挡；接触距 = 双方胶囊半径和
+   0.5+0.31 = 0.81，阈值 +0.04 裕量——修复轮 2 裁决修正，勿照抄早期 0.3 值；改造前
+   StaticBody 挡路同语义，掩码 7 保回归）。
 5. `test_hitscan_mask_hits_bot`：bot 站地面 → `PhysicsRayQueryParameters3D` 自上方
    `collision_mask = 5` → 断言命中 bot 的 CollisionShape3D（RED：改造前 bot 在层 1，
    mask 5 不含 1 时漏——注意 RED 阶段 mask=5 恰命中旧层 1 bot？**RED 锚取 bot 在层 4**
