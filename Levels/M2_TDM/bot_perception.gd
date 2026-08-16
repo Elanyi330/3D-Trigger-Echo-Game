@@ -4,6 +4,11 @@
 # Enemy（≤9 个零成本）+ player_target，过滤敌对阵营（is_hostile）与死亡目标，
 # 逐目标三级裁剪（视距 → 视锥 → 视线射线）后发 hostile_visible；上周期可见本周期
 # 不可见 → hostile_lost（T8 LKP 消费）。
+# M3.2 T7（2026-08-17）：听觉节扩展——噪音事件队列（_heard_events）+ TTL 衰减
+# （枪声/爆炸 3s、脚步 1.5s）+ 阵营过滤（同阵营源跳过）+ 距离判定
+# （heard_at：耳位 body+EYE_OFFSET 到声源 ≤ radius）通过则发 heard_event
+# （消费出队，每事件仅上报一次）。事件经 _push_noise_event 注入（噪音总线接线
+# 与测试共用），时间戳用感知内部 _elapsed 单调累计（不用 Time.get_ticks——测试可控）。
 # 视线射线：主射线（眼→目标胸口）+ SEGMENT_SAMPLES 中间点射线（1/3、2/3 分位点
 # 横向散布半身宽后射向目标胸口——细缝窄于身体宽度不应透过视线，防穿缝假阳性）；
 # 掩码 5（Objects|Bots，武器命中同口径）；exclude 观察者与目标自身碰撞 RID（射线
@@ -18,6 +23,7 @@ extends Node
 
 signal hostile_visible(target: Node, pos: Vector3)   # 视线内敌对出现（节流周期上报）
 signal hostile_lost(target: Node)                    # 目标离开视线（不可见计时起）
+signal heard_event(kind: String, pos: Vector3)       # 敌对噪音被听到（距离 ≤ radius；M3.3 决策层消费）
 
 const CONE_HALF_ANGLE := deg_to_rad(60.0)  # 半视锥角（全锥 120°）
 const VIEW_RANGE := 40.0                   # 视距（m）
@@ -27,6 +33,9 @@ const EYE_OFFSET := Vector3(0, 1.65, 0)    # 眼睛高度（bot 头 hitbox 1.70 
 const CHEST_OFFSET := Vector3(0, 1.2, 0)   # 目标胸部参考点
 const LOS_MASK := 5                        # 视线射线掩码：Objects(1)|Bots(4)，武器命中同口径
 const SAMPLE_SPREAD := 0.3                 # m：中间采样点横向散布（≈身体半径，细缝窄于身体不透过）
+const GUNSHOT_TTL := 3.0                   # s：枪声事件衰减
+const FOOTSTEP_TTL := 1.5                  # s：脚步事件衰减
+const EXPLOSION_TTL := 3.0                 # s：爆炸事件衰减（同枪声口径）
 
 var body: CharacterBody3D        # 宿主 Enemy
 var faction: String              # "enemy" | "friendly"（Enemy.get_faction 口径）
@@ -34,6 +43,8 @@ var player_target: Node3D        # 玩家节点（torso 组外显式目标）
 
 var _throttle_t := 0.0
 var _visible: Dictionary = {}    # target -> true（可见集合，T8 LKP / T10 黑板读取）
+var _elapsed := 0.0              # 感知内部单调时钟（delta 求和，tick 首行累计——测试可控）
+var _heard_events: Array = []    # 噪音事件队列 [{pos, radius, t, kind, source}]
 
 
 func setup(b: CharacterBody3D, f: String, player: Node3D) -> void:
@@ -42,15 +53,55 @@ func setup(b: CharacterBody3D, f: String, player: Node3D) -> void:
 	player_target = player
 
 
-## 每物理帧调用（Enemy._physics_process 或 Brain）；内部节流——< THROTTLE 直接 return。
+## 每物理帧调用（Enemy._physics_process 或 Brain）；_elapsed 首行单调累计
+## （视觉节流与听觉 TTL 同源时钟，不用 Time.get_ticks——测试可控）。
+## 视觉节流——< THROTTLE 跳过扫描；听觉节每帧处理（TTL 剔除 + 阵营过滤 + 距离判定）。
 func tick(delta: float) -> void:
+	_elapsed += delta
 	if body == null:
 		return
 	_throttle_t += delta
-	if _throttle_t < THROTTLE:
-		return
-	_throttle_t = 0.0
-	_scan()
+	if _throttle_t >= THROTTLE:
+		_throttle_t = 0.0
+		_scan()
+	_hearing_tick()
+
+
+## 噪音事件注入（噪音总线接线与测试共用）：追加 {pos, radius, t=_elapsed, kind, source}。
+## source 默认 ""=无阵营不过滤（测试直调口径）；噪音总线注入玩家事件时传 "friendly"——
+## 敌 bot（faction="enemy"）听到 friendly 源事件，同阵营源在听觉节跳过。
+func _push_noise_event(kind: String, pos: Vector3, radius: float, source: String = "") -> void:
+	_heard_events.append({"pos": pos, "radius": radius, "t": _elapsed, "kind": kind,
+			"source": source})
+
+
+## 纯距离判定：耳位到声源距离 ≤ radius（无视线口径——CS 听力穿墙）。
+static func heard_at(ear: Vector3, event_pos: Vector3, radius: float) -> bool:
+	return ear.distance_to(event_pos) <= radius
+
+
+## 听觉节（每物理帧，视线节之后）：TTL 剔除（枪声/爆炸 3s、脚步 1.5s）→
+## 同阵营源跳过（不发信号，条目留存至 TTL 到期剔除）→ heard_at 距离判定
+## （耳位 body+EYE_OFFSET）通过 → heard_event 发射并消费出队（每事件仅上报一次）；
+## 距离外条目留存至 TTL 到期剔除。
+func _hearing_tick() -> void:
+	var kept: Array = []
+	for ev in _heard_events:
+		var ttl: float = GUNSHOT_TTL
+		if ev["kind"] == "footstep":
+			ttl = FOOTSTEP_TTL
+		elif ev["kind"] == "explosion":
+			ttl = EXPLOSION_TTL
+		if _elapsed - ev["t"] > ttl:
+			continue  # 过期剔除
+		if ev["source"] != "" and String(ev["source"]) == faction:
+			kept.append(ev)  # 同阵营源忽略（不发信号；TTL 到期自然剔除）
+			continue
+		if heard_at(body.global_position + EYE_OFFSET, ev["pos"], ev["radius"]):
+			heard_event.emit(ev["kind"], ev["pos"])
+			continue  # 已上报消费：每事件一次
+		kept.append(ev)
+	_heard_events = kept
 
 
 ## 节流周期扫描：枚举目标 → 单目标裁剪 → 发信号 + 维护 _visible 集合。

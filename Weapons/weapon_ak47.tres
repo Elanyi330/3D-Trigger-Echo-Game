@@ -27,3 +27,4 @@ move_spread_multiplier = 3.0
 crouch_spread_multiplier = 0.7
 ads_multiplier = 1.5
 ads_spread_multiplier = 0.5
+noise_radius = 45.0

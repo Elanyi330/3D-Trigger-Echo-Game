@@ -19,3 +19,4 @@ blast_los_probe_height = 1.0
 blast_penetration_max = 3.0
 blast_los_sample_step = 0.25
 ads_multiplier = 1.0
+noise_radius = 50.0

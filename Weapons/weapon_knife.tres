@@ -28,3 +28,4 @@ melee_heavy_hit_delay = 0.5
 melee_combo_window = 0.8
 melee_stab_range = 1.6
 melee_vertical_range = 1.5
+noise_radius = 2.0

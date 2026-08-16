@@ -71,3 +71,6 @@ enum RecoilPattern { SET_PATTERN, RANDOM }
 # 与 LOS 采样步长（m，沿爆心→目标胸口线段点采样累计墙厚；越厚挡越多、越薄挡越少——用户拍板方案 A）。
 @export var blast_penetration_max: float = 3.0
 @export var blast_los_sample_step: float = 0.25
+# M3.2 T7（2026-08-17）：开火噪音半径（m）——声源被敌对 AI 感知听到的最大距离；
+# 数值唯一来源 .tres（AK 45/Glock 30/刀 2/M67 50），0=静默（不产生噪音事件）。
+@export var noise_radius: float = 0.0
