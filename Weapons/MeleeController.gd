@@ -136,7 +136,7 @@ func _candidate_targets() -> Array[Node]:
 
 
 func _query_physics_targets() -> Array[Node]:
-	# 集成自动收集：球体扫掠（半径 melee_range，mask=1 仅 Objects 层）→ 取 take_damage 目标
+	# 集成自动收集：球体扫掠（半径 melee_range，mask=5 = Objects|Bots 层）→ 取 take_damage 目标
 	var space := get_world_3d().direct_space_state
 	if space == null or _resource == null:
 		return []
@@ -145,7 +145,7 @@ func _query_physics_targets() -> Array[Node]:
 	var params := PhysicsShapeQueryParameters3D.new()
 	params.shape = shape
 	params.transform = Transform3D(Basis(), _origin_pos())
-	params.collision_mask = 1
+	params.collision_mask = 5  # Objects|Bots 层（2026-08-16 M3.1 T0：bot 换层 4 后近战仍命中）
 	var found: Array[Node] = []
 	for hit in space.intersect_shape(params, 32):
 		var collider: Node = hit["collider"]

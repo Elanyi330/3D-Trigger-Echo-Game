@@ -2,7 +2,8 @@
 # M1 任务4：Grenade 投掷物（抛物线 + 爆炸衰减）
 #
 # 接口签名按计划 §5 任务4 逐字照抄；数值唯一来源 WeaponResource（weapon_*.tres，禁止硬编码散值，企划书 §4.2.5）。
-# 全局约束（计划 §4）：爆炸范围伤害无部位倍率；命中判定对 Objects 层（collision_mask=1）；纯离线。
+# 全局约束（计划 §4）：爆炸范围伤害无部位倍率；命中判定对 Objects|Bots 层（collision_mask=5，
+# 2026-08-16 M3.1 T0）；纯离线。
 # 弹道为重力抛体（RigidBody3D 物理积分；碰撞反弹自然具备，企划书 §4.2.3⑦ 弹道可反弹——M1 简化不特判）。
 # 参考：docs/superpowers/reference/m1-src/Weapon_State_Machine/bullet.gd
 #   （RigidBody3D 弹道 + has_method 目标结算 + 生命周期结束释放）
@@ -74,9 +75,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _ready() -> void:
-	# 物理弹道：球体碰撞体；本体 Player 层(2)、仅与 Objects 层(1) 碰撞（全局约束 §4）
+	# 物理弹道：球体碰撞体；本体 Player 层(2)、与 Objects|Bots 层(5) 碰撞（2026-08-16 M3.1 T0：
+	# bot 换层 4 后投掷物碰撞仍命中）
 	collision_layer = 2
-	collision_mask = 1
+	collision_mask = 5
 	continuous_cd = true  # M2 修复轮2（2026-08-13）：CCD 连续碰撞——15m/s+平台下坠≈0.25m/帧 > 球径 0.2m，
 	# 离散检测漏检薄板（平台板 0.4-0.6m/地面）→ 概率穿地。CCD 扫掠根治（代价仅投掷物，可忽略）。
 	var shape := CollisionShape3D.new()
@@ -99,7 +101,7 @@ func _apply_blast_damage() -> void:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = sphere
 	query.transform = global_transform
-	query.collision_mask = 1  # 仅 Objects 层（全局约束 §4）
+	query.collision_mask = 5  # Objects|Bots 层（2026-08-16 M3.1 T0：bot 换层 4 后爆炸仍命中）
 	var hits := get_world_3d().direct_space_state.intersect_shape(query)
 	var seen := {}  # 已结算的 collider_id
 	for hit in hits:
@@ -146,7 +148,7 @@ func _penetration_mult(target: Node) -> float:
 		var p: Vector3 = global_position + dir * (k * step / dist)
 		var pq := PhysicsPointQueryParameters3D.new()
 		pq.position = p
-		pq.collision_mask = 1
+		pq.collision_mask = 5  # Objects|Bots 层（2026-08-16 M3.1 T0：bot 换层 4 后穿透采样同口径）
 		pq.exclude = exclude
 		if not space.intersect_point(pq).is_empty():
 			inside += 1

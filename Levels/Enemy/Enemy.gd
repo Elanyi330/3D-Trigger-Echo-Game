@@ -1,14 +1,18 @@
 # Levels/Enemy/Enemy.gd
-# M1.5：训练/对战敌人（静态桩，无 AI——M3 才做寻路/感知/对枪）。
+# M1.5：训练/对战敌人（M3.1 T0 起为 MovementController 驱动的物理角色；无 Brain 时
+# command_override 恒 ZERO 站桩——M3 才做寻路/感知/对枪）。
 # 视觉：Soldier_Echo 方块角色（仅换色区分敌我，企划书角色规范）。
 # 部位判定：躯干 capsule（group "torso"）+ 独立头部 hitbox（group "head"，转发伤害到本体）
 #   ——hitscan 爆头 ×4（WeaponCore 部位 Group 判定）；手雷 AoE 双命中为已知可接受边界。
 # 接口：take_damage(dmg)（WeaponManager/Grenade/Melee 约定）+ died 信号 + 头顶血条。
 class_name Enemy
-extends StaticBody3D
+extends MovementController
 
 signal died
 
+# (2026-08-16 M3.1 T0)：Bots 物理层（project.godot layer_3）——bot 本体与头部 hitbox
+# 移入层 4（1<<2）：武器命中掩码 5（Objects|Bots）继续命中；玩家碰撞掩码 7 挡住 bot。
+const BOT_LAYER := 4        # 1<<2：layer_3 "Bots"
 const FALL_TIME := 0.3   # 倒地时长（s）
 const FADE_TIME := 0.5   # 淡出时长（s）
 const SPAWN_PROTECTION := 2.0  # 出生保护（2026-08-13 用户拍板）：刚复活 2s 无敌 + 全身白闪
@@ -60,20 +64,17 @@ static func is_friendly_fire(shooter_faction: String, target: Node) -> bool:
 
 
 func _ready() -> void:
+	super._ready()  # (2026-08-16 M3.1 T0)：MovementController 物理查询缓存（step-up 探针参数）
 	health = max_health
 	# 注意：出生保护由生成方显式设置（L_M2 spawn 时 spawn_protection = SPAWN_PROTECTION）——
 	# 不在 _ready 默认开启：既有测试与训练场场景的 Enemy 直建实例不受影响。
-	collision_layer = 1  # Objects 层（hitscan/近战/爆炸 mask=1 命中）
-	collision_mask = 0
+	# (2026-08-16 M3.1 T0)：bot 在 Bots 层（4），仅与世界几何（Objects 层 1）碰撞——
+	# bot 间互不碰撞；躯干碰撞形状移入 Enemy.tscn scene 声明（@onready _col_cached
+	# 在树进入时查找，代码内 _ready 创建会错过缓存窗口）。
+	collision_layer = BOT_LAYER
+	collision_mask = 1
+	command_override = MovementCommand.new()  # (2026-08-16 M3.1 T0)：恒设——无 Brain 时站桩，防读玩家真实输入
 	add_to_group("torso")
-	# 躯干碰撞（胶囊，对齐 1.83m CS 身高角色：覆盖腿+躯干至颈，CS 比例）
-	var body_shape := CollisionShape3D.new()
-	var caps := CapsuleShape3D.new()
-	caps.radius = 0.31
-	caps.height = 1.54
-	body_shape.shape = caps
-	body_shape.position = Vector3(0, 0.92, 0)
-	add_child(body_shape)
 	# 头部 hitbox（独立 body，group "head"，转发伤害到本体 → hitscan 爆头 ×4；贴合 1.83m 角色头部）
 	var head := HeadHitbox.new()
 	head.enemy = self
@@ -149,6 +150,7 @@ func take_damage(dmg: float) -> void:
 
 func _die() -> void:
 	dead = true
+	velocity = Vector3.ZERO  # (2026-08-16 M3.1 T0)：死亡帧清零速度，防 CharacterBody3D 尸体被残余速度推离倒地点
 	_fall_remaining = FALL_TIME
 	_fade_remaining = FALL_TIME + FADE_TIME
 	if not _died_fired:
@@ -158,6 +160,7 @@ func _die() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not dead:
+		super._physics_process(delta)  # (2026-08-16 M3.1 T0)：移动/重力/step-up（命令接口驱动；漏掉则 bot 不响应命令）
 		# 出生保护白闪（2026-08-13 用户拍板：2s 内全身白色闪烁）
 		if spawn_protection > 0.0:
 			spawn_protection = maxf(spawn_protection - delta, 0.0)
@@ -188,7 +191,7 @@ func _apply_flash() -> void:
 class HeadHitbox extends StaticBody3D:
 	var enemy: Enemy
 	func _ready() -> void:
-		collision_layer = 1
+		collision_layer = 4  # (2026-08-16 M3.1 T0)：Bots 层——武器命中掩码 5 继续命中头部
 		collision_mask = 0
 		add_to_group("head")
 		var cs := CollisionShape3D.new()

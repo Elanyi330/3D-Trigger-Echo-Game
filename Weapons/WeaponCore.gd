@@ -245,8 +245,7 @@ func _tick_fire_cooldown(delta: float) -> void:
 		_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
 
 
-# ---- hitscan（参考 weapon_proto.gd check_hitscan_collision；全局约束：mask=1 仅 Objects 层） ----
-
+# ---- hitscan（参考 weapon_proto.gd check_hitscan_collision；M3.1 T0：mask=5 = Objects|Bots 层） ----
 func _perform_hitscan(shot_index: int) -> void:
 	if _camera == null:
 		return
@@ -254,7 +253,7 @@ func _perform_hitscan(shot_index: int) -> void:
 	var direction := _ballistic_direction(shot_index)
 	var end := origin + direction * _resource.max_range
 	var query := PhysicsRayQueryParameters3D.create(origin, end)
-	query.collision_mask = 1  # 仅 Objects 层
+	query.collision_mask = 5  # Objects|Bots 层（2026-08-16 M3.1 T0：bot 换层 4 后仍可命中）
 	var result := get_world_3d().direct_space_state.intersect_ray(query)
 	if result.is_empty():
 		# M1 任务15：未命中 → 曳光弹到 max_range 端点（CC0 bullet_tracer）

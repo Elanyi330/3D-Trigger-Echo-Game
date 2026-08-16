@@ -1,6 +1,14 @@
-[gd_scene load_steps=2 format=3 uid="uid://benemy_echo01"]
+[gd_scene load_steps=3 format=3 uid="uid://benemy_echo01"]
 
 [ext_resource type="Script" path="res://Levels/Enemy/Enemy.gd" id="1_enemy"]
 
-[node name="Enemy" type="StaticBody3D"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body01"]
+radius = 0.31
+height = 1.54
+
+[node name="Enemy" type="CharacterBody3D"]
 script = ExtResource("1_enemy")
+
+[node name="Body" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.92, 0)
+shape = SubResource("CapsuleShape3D_body01")
