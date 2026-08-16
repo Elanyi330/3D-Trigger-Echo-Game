@@ -132,14 +132,15 @@ func test_approach_lookahead() -> void:
 	assert_gt(out.y, 0.0, "前瞻转向：仍含前进分量（实际 y %.3f）" % out.y)
 
 
-# ── T2-6：高度门边界——navmesh 空间升程 0.72 内 true / 0.73 false ──
-# 修复轮 1：navmesh 双锚口径——body 侧取最近导航点 y（nav_body_y），与途经点 y
-# （同为 navmesh 空间）比较；导航面 +0.3~0.4 烘焙偏移天然抵消。边界断言
-# 直测纯函数（nav_body_y=0 基准）。
+# ── T2-6：高度门边界——升程 0.72 内 true / 0.73 false ──
+# T2 建门口径：navmesh 双锚。T3 修复轮 1（2026-08-17）：锚基准改「已消费途经点」
+# ——签名参数化 prev_y/point_y（路径点对路径点，同为 navmesh 空间，面缝瞬态消除），
+# 断言语义不变（0.72 内放行 / 0.73 触发），调用机械适配。边界断言直测纯函数
+# （prev_y=0 基准）。
 func test_height_gate_boundary() -> void:
-	assert_true(BotLocomotion.within_height_gate(0.0, Vector3(0, 0.72, 0)),
+	assert_true(BotLocomotion.within_height_gate(0.0, 0.72),
 			"升程 0.72 ≤ HEIGHT_GATE → 门内放行")
-	assert_false(BotLocomotion.within_height_gate(0.0, Vector3(0, 0.73, 0)),
+	assert_false(BotLocomotion.within_height_gate(0.0, 0.73),
 			"升程 0.73 > HEIGHT_GATE → 触发高度门")
 
 

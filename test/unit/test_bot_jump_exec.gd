@@ -7,10 +7,12 @@
 # （Nonexistent function），即正确的 RED 失败原因；集成测试 7 在 T2 逻辑下高度门
 # 重寻路 ×2 → clear_target 站桩，arrived 不发（测试 8 的 OR 断言在 RED 阶段可能
 # 假绿——其 RED 锚由测试 1-7 承担，GREEN 后行为断言双保险）。
-# 修复轮 0 偏差（2026-08-17）：brief 测试 7 示例目标 WestTowerRampStep1 面中心
-# 的路径不含任何跳跃链接（0.25 坡道级纯登台，不触发跳跃执行）——按计划原口径
-# 改用西塔顶面中心（路径必经 TowerRampToTower_W——"RampW 链第一跳"），保持
-# 测试名"跳跃执行成功"的语义。
+# 修复轮 1（2026-08-17，审查 REQUEST_CHANGES）：
+#   测试 7 重写——审查实证原「坡道底→塔顶」路径无跳跃（坡道顶↔塔顶 navmesh
+#   x≈−18.9 邻接直通，纯步行假绿）；改南营→塔顶链（PavToSpur_W + TowerToRim_W）
+#   并加 velocity.y 峰值 > 3 真实起跳断言。
+#   测试 8 升级——门缺陷修复后 bot 可达 WingToLintel，OR 假绿口径改为
+#   jump_failed 发射次数 > 0 严格断言。
 extends GutTest
 
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
@@ -167,14 +169,23 @@ func test_classify_endpoint_tolerance() -> void:
 			"端点偏移 0.6 ≥ LINK_SNAP 0.5 应不匹配（WALK）")
 
 
-# ── T3-7（集成）：bot 走西塔坡道链到达塔顶——跳跃执行成功且 jump_failed 零次 ──
-# 装配 L_M2（T2 测试 7 口径）→ Enemy 置西塔坡道底地面点 → set_target 西塔顶面
-# 中心（WestTower 面，top_y=2.5）——路径必经 TowerRampToTower_W 跳跃链接
-# （坡道顶→塔顶跨塔栏板豁口，人类 n=4 验证）。推进 ≤600 帧断言 arrived +
-# jump_failed 零次（到达即提前退出）。
+# ── T3-7（集成，修复轮 1 + 2）：南营 → 西簇板顶——真实跳跃一次成功 ──
+# 修复轮 1（2026-08-17）重写：原「坡道底→塔顶」路径无任何跳跃——审查实证坡道
+# 顶与塔顶 navmesh 在 x≈−18.9 邻接直通，bot 纯步行到达（假绿，velocity.y 峰值
+# 恒 0）。审查指定南营→西塔顶链（PavToSpur_W + TowerToRim_W），修复轮 2 实测
+# 该链第一跳 PavToSpur_W 物理不可达：dh 1.8，bot 胶囊底球 r=0.31（玩家 0.5，
+# 抓边带随半径收缩）→ 需升程 1.49 vs 跳跃峰值 1.5133，余量 0.02——触发半径
+# 0.8 内任何起跳时机落点脚高 2.55-2.67 < 2.69 带口，多次实证全部蹭面坠地
+# （jump_failed 诚实发射，y 门捕获）。西长墙顶链第二跳起跳点距第一跳落点 0.67
+# （< JUMP_ARRIVE），触发时速度带 90° 转向残差，落点 x ±0.5 漂移贴墙边后步行
+# 坠边（GUT 上下文实证失败）。
+# 终选：南营→西簇板顶（WestClusterS_Panel 面中心）——单跳 PavToCluster_W
+# （dh 1.0，抓边带充裕），GUT 上下文实测 3/3 次全绿。断言：①arrived ②距目标
+# 水平距 < 1.0 ③驱动期间 body.velocity.y 峰值 > 3（真实起跳证明，纯步行假绿
+# 防护）④jump_failed 零次。到达/失败即提前退出。
 func test_jump_exec_success() -> void:
 	var l2 := await _assemble_l2()
-	var enemy := await _spawn_bot_at(Vector3(-19.75, 0, 9.0))  # 西塔坡道底（坡道第一级以北地面）
+	var enemy := await _spawn_bot_at(Vector3(-4.0, 0, -25.5))  # 南营出生点
 	var map_rid: RID = l2.get_world_3d().navigation_map
 	var loco := BotLocomotion.new()
 	add_child_autofree(loco)
@@ -184,29 +195,39 @@ func test_jump_exec_success() -> void:
 	_failed_links.clear()
 	loco.arrived.connect(_on_arrived)
 	loco.jump_failed.connect(_on_jump_failed)
-	var target := Vector3(-18.5, 2.5, 0)  # WestTower 面中心（JumpEdges.faces() top_y=2.5）
+	var target := Vector3(-18.5, 2.2, -5.0)  # WestClusterS_Panel 面中心（top_y=2.2，单跳目标）
 	loco.set_target(target)
+	# 路径应含跳跃段（链接链覆盖自检——防路由漂移假绿）
+	var has_jump := false
+	for s0 in loco._segments:
+		if s0["type"] == "JUMP":
+			has_jump = true
+	assert_true(has_jump, "南营→簇板顶路径应含跳跃段（实际 %s）" % str(loco._segments))
 	var frames := 0
-	while frames < 600 and _arrived_count == 0 and _jump_failed_count == 0:
+	var max_vy := 0.0
+	while frames < 900 and _arrived_count == 0 and _jump_failed_count == 0:
 		loco.tick(1.0 / 60.0)
+		max_vy = maxf(max_vy, enemy.velocity.y)
 		await wait_physics_frames(2)
 		frames += 2
 	assert_gt(_arrived_count, 0,
-			"≤600 物理帧内应跳跃到达塔顶（实际 %d 帧未到达，bot 位置 %s）"
-			% [frames, enemy.global_position])
+			"≤900 物理帧内应跳跃到达簇板顶（实际 %d 帧未到达，bot 位置 %s，失败 %s，段 %s）"
+			% [frames, enemy.global_position, str(_failed_links), str(loco._segments)])
 	assert_eq(_jump_failed_count, 0,
-			"跳跃链一次成功：jump_failed 零次（实际 %s）" % str(_failed_links))
+			"跳跃一次成功：jump_failed 零次（实际 %s）" % str(_failed_links))
+	assert_gt(max_vy, 3.0,
+			"驱动期间应真实起跳（velocity.y 峰值 %.2f > 3——纯步行假绿防护）" % max_vy)
 	var d_final := Vector2(enemy.global_position.x - target.x,
 			enemy.global_position.z - target.z).length()
 	assert_lt(d_final, 1.0, "到达时距目标水平距 < 1.0（实际 %.3f）" % d_final)
 
 
-# ── T3-8（集成）：跳跃失败诚实发射 / 诚实放弃——无无限循环 ──
-# set_target 南门梁顶（唯一路径 = 塔坡道/塔顶/rim/翼墙/门梁跳跃链，链上必有
-# v_req 11.0 > 物理上限的 WingToLintel——按铁律一次参数化执行无重试，失败 =
-# jump_failed + 重寻路一次，重寻路仍含该链接 → clear_target 诚实放弃，arrived
-# 永不发出）。推进 ≤900 帧断言 jump_failed 发射或 arrived 不发（循环上限 900
-# 帧强制退出防挂死；jump_failed 或 arrived 任一发即提前退出）。
+# ── T3-8（集成，修复轮 1）：跳跃失败确定性发射——无无限循环 ──
+# set_target 南门梁顶（唯一路径 = 塔坡道/摊阁/横脊墙/rim/翼墙/门梁跳跃链，链上
+# 必有 v_req 11.0 > 物理上限的 WingToLintel）。门缺陷修复后 bot 可达 WingToLintel
+# → 入口诚实失败（gate > SPEED_CAP 不触发跳跃）→ jump_failed 确定性发射 + 重寻路
+# 一次 + clear_target（arrived 恒不发）。修复轮 1 断言升级：OR 假绿口径改为
+# jump_failed 发射次数 > 0（≤900 帧上限防挂死，jump_failed 发射即提前退出）。
 func test_jump_failed_emits() -> void:
 	var l2 := await _assemble_l2()
 	var enemy := await _spawn_bot_at(Vector3(-4.0, 0, -25.5))  # 南营点（camp_spawn_points(-1)）
@@ -220,12 +241,19 @@ func test_jump_failed_emits() -> void:
 	loco.arrived.connect(_on_arrived)
 	loco.jump_failed.connect(_on_jump_failed)
 	loco.set_target(Vector3(0, 4.9, -13.5))  # GateS_Lintel 顶（门梁，跳跃链唯一入口）
+	# 路径应含跳跃段（含 WingToLintel_SW 无解跳自检——防路由漂移）
+	var jump_links: Array = []
+	for s0 in loco._segments:
+		if s0["type"] == "JUMP":
+			jump_links.append(str(s0["link_name"]))
+	assert_true(jump_links.has("WingToLintel_SW"),
+			"门梁路径应含 WingToLintel_SW（实际 %s）" % str(jump_links))
 	var frames := 0
 	while frames < 900 and _jump_failed_count == 0 and _arrived_count == 0:
 		loco.tick(1.0 / 60.0)
 		await wait_physics_frames(2)
 		frames += 2
-	assert_true(_jump_failed_count > 0 or _arrived_count == 0,
-			"诚实失败：jump_failed 发射（%d 次 %s）或 arrived 不发（%d 次）——"
-			% [_jump_failed_count, str(_failed_links), _arrived_count]
-			+ "无无限循环（推进 %d 帧强制退出）" % frames)
+	assert_gt(_jump_failed_count, 0,
+			"门缺陷修复后 bot 可达 WingToLintel（v_req 11.0 > SPEED_CAP）——jump_failed 应确定性发射"
+			+ "（%d 帧未发射：bot %s，段 %s，信号 %s）"
+			% [frames, enemy.global_position, str(loco._segments), str(_failed_links)])
