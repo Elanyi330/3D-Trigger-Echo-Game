@@ -347,7 +347,9 @@ def build_report(faces_out, checks, no_data, dataset, corpus, auto):
     A("口径说明：真实 n = 真实人类 climb 进面数（含未匹配链接的爬升；同层 traverse 不计入，")
     A("与 Ground 平地跳排除同源）；增强 n = 进面边 human.augmented==true 的 n 之和（单独统计）；")
     A("最优进路 verdict = 全部进面边 link_audit verdict 的最小 rank 值（无进面边 → \"—\"）；")
-    A("失误率 = fail_n/(fail_n+真实 n)，Ground 的 fail 不计（战斗噪声，拍板排除）。")
+    A("失误率 = fail_n/(fail_n+真实 n)，Ground 的 fail 不计（战斗噪声，拍板排除）；")
+    A("可达性按简报判定级联：no_path → 链接 → success → 未实测（stuck/jump_missed 且无链接")
+    A("的面落入「未实测」兜底；auto 无该面数据 latest_verdict 标「无数据」）。")
     A("")
     for t in ("简单", "中等", "困难", "高难"):
         faces = [fo for fo in faces_out if fo["difficulty"]["tier"] == t]

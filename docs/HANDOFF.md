@@ -61,6 +61,7 @@
 |------|------|
 | `docs/PROGRESS-M1-ASSETS.md` | M1/M1.5/M1.75 详细进度 |
 | `docs/superpowers/specs/2026-08-11-m2-echo-altar-v3-design.md` | **M2 v3「回声祭坛」设计文档**（现行布局：调研十条 + 分区几何 + 14 刷怪面 + 模式参数拍板） |
+| `docs/reports/2026-08-16-face-analysis.md` | **面级分析报告**（160 面：可达性/难度四级/参数/数据质量——工具 `tools/analyze_faces.py`；数据哲学：成功训参/失败算难度/难面双降权，增强标记口径） |
 | `docs/superpowers/specs/2026-08-10-m2-tdm-map-design.md` | M2 设计文档（v2 时代；布局教训 §十四仍有效；TDM 复活延迟 3s §九） |
 | `Assets/Models/COMPONENTS.md` | 武器/角色逐组件精确坐标/标记/骨骼/取景总表 |
 | `docs/superpowers/reference/cs2-weapon-data.md` | CS 数据 + 比例权威表（数值对齐唯一参照） |
