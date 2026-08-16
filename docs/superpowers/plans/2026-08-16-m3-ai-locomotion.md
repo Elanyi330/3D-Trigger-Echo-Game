@@ -141,7 +141,9 @@ MovementCommand.crouch: bool         # 预留恒 false
 参照 `test_auto_command.gd` 装配范式（真实 Enemy 实例 + `_make_box` 地面 + 物理帧推进）：
 
 1. `test_bot_move_axis_forward`：cmd.move_axis=(0,1) 60 帧 → -Z 位移 > 0.5，X 位移 ≈ 0
-2. `test_bot_move_follows_yaw`：`enemy.rotation.y = PI/2` + cmd.move_axis=(0,1) → +X 位移 > 0.5
+2. `test_bot_move_follows_yaw`：`enemy.rotation.y = PI/2` + cmd.move_axis=(0,1) → **-X** 位移 > 0.5
+   （Godot 右手系：yaw=+π/2 时 basis.z=+X，本地前进=-basis.z=-X——T1 实现者实测修正，
+   勿照抄旧"+X"；z 残差 <0.2 守卫"严格沿朝向轴"）
 3. `test_bot_jump_edge_consumed`：cmd.jump_pressed=true 一帧 → 后续 `cmd.jump_pressed == false`
    （读取即清零）+ 起跳后 y 上升 > 0.5（玩家同款跳跃，跳高 1.51±0.05 物理语义不测全量，
    仅断言离地）
