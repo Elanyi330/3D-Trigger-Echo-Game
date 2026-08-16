@@ -105,7 +105,7 @@ var _delta_h := 0.0
 var _runup_recover := 0
 var _runup_t := 0.0
 var _speed_gate_relaxed := false  # 小面助跑（可用助跑 <1.2m）→ 速度门 0.6v（2026-08-15 裁决 3）
-var _runup_degenerate := false  # 锚点-起跳点坍缩（<0.3m）：圆盘近静止放行（F-degen）
+var _runup_degenerate := false  # 锚点-起跳点坍缩（<0.6m）：圆盘近静止放行（F-degen）
 var _vertical_jump := false  # 当前跳跃为垂直链接模式（F12）：AIR 零水平输入、停摆唯一触发
 var _to_anchor_max_feet := 0.0    # TO_ANCHOR 期间脚高最大值（坠落判定的假阳性防护，2026-08-15 F7-5）
 var _replan_count := 0               # 重寻路计数（F13 替代 _walk_replanned: bool）
@@ -1092,13 +1092,13 @@ func _enter_jump(seg: Dictionary) -> void:
 	# 加速至 ~3m/s，落点近缘可达。
 	_speed_gate_relaxed = Vector2(_from_point.x - _anchor.x,
 			_from_point.z - _anchor.z).length() < 1.2
-	# F-degen（2026-08-16）：锚点 snap 坍缩到侵蚀导航岛（1m 箱顶：锚点≈起跳点距
-	# 0.02-0.19m）→ F8 转向门对亚 0.2m 目标永不收敛、hspeed=0 被 F9 近静止拒放 →
-	# 8s recover 死循环（实测箱顶冻结 32s 仅靠 recover>3 强制跳有界）。跑道坍缩时
-	# 「加速到门速度」物理不存在——跳跃本质近静止（REST 漂移），圆盘放行即当前
-	# 强制跳同款结果但 ~2s 有界。
+	# F-degen（2026-08-16）：锚点 snap 坍缩到侵蚀导航岛（1m 箱顶锚点≈起跳点——
+	# 北簇实测 0.35-0.4m > 原阈值 0.3 漏判，实机 112s=3 重试×32s 退化循环）。
+	# 阈值 0.6 的物理依据：lerp-8 加速到 relaxed 门 0.6v 需 ~0.5m 助跑——锚点-起跳
+	# 点 < 0.6m 时「加速到门速度」物理不存在，跳跃本质近静止（REST 漂移），
+	# 圆盘放行 = 与强制跳同结果但 ~1s 有界。
 	_runup_degenerate = Vector2(_from_point.x - _anchor.x,
-			_from_point.z - _anchor.z).length() < 0.3
+			_from_point.z - _anchor.z).length() < 0.6
 	# F10 锚点可达性预检：锚点面高 − 脚高 > STEP_MAX(0.62) + 容差 → 步行不可达
 	# （箱顶锚点 + 人在箱底类压墙 23s 的根治——0.8m > step-up 0.62 走不上去）。
 	# 重寻路一次（新路径可含 Crate_WS 类上箱链接 → 正常执行）；仍不可达 → 诚实失败。

@@ -349,12 +349,23 @@ func test_anchor_unreachable_fallback() -> void:
 			"failure_reason 必须含「锚点不可达」，实际 %s" % reason)
 
 
-# 13. 退化跑道活体有界锚（F-degen）：WestClusterS_Panel 从 spawn 驱动 ≤90s——
-#     修复前 3916 帧（箱顶 RUNUP 圆盘死锁冻结 32s，仅靠 recover>3 强制起跳有界）；
-#     F-degen 后锚点≈起跳点（<0.3m）圆盘近静止放行，死锁压缩到 ~2s 级。
-#     断言：per_face 有记录；verdict ∈ {success, jump_missed}；frame_count < 35*60。
+# 13. 退化跑道活体有界锚（F-degen）：["WestClusterS_Panel", "RimN1"] 一次驱动两目标
+#     ≤90s。西簇：修复前 3916 帧（箱顶 RUNUP 圆盘死锁冻结 32s，仅靠 recover>3 强制
+#     起跳有界）→ 修复后死锁压缩（0.53s 冻结）。北簇镜像（RimN1）：实机 r8 数据
+#     112s = 3 重试×32s 退化循环——北簇箱顶锚点坍缩距离实测 0.35-0.4m 恰超原阈值
+#     0.3 漏判；阈值 0.6（lerp-8 加速到 relaxed 门 0.6v 需 ~0.5m 助跑，锚点-起跳点
+#     <0.6m 时「加速到门速度」物理不存在）后放行生效 → 期望 ~10s 内 jump_missed
+#     诚实失败。
+#     断言：per_face 有记录；WestClusterS_Panel verdict ∈ {success, jump_missed} 且
+#     frame_count < 35*60（断点从 40*60 收紧，校准见下）；RimN1 frame_count < 30*60。
 #     导航竞态加固同测试 10 口径。
-#     断点校准（2026-08-16 实现者实测）：修复后 attempt 帧数实测 1933（两次全等，
+#     RimN1 断点校准（2026-08-16 实现者实测）：修复后 RimN1 attempt 实测 1547 帧
+#     （两次全等，确定性）——= spawn 步行 12s（15 段 ~720 帧）+ 三段跳链 ~13s
+#     （Crate_WN 上箱 + CrateToCluster_WN 退化跑道 3 次近静止重试 ~0.9s/次 +
+#     ClusterToRim_WS），最长冻结窗口 0.85s（修复前 32s 级循环×2，5377 帧）。
+#     结局较预期更优：verdict=success。控制器规格断点 15*60 未计入 12s 步行成本；
+#     取 30*60（1800）：> 实测 1547 留 ~4.2s 余量，且 << 修复前 5377 证明死循环已除。
+#     断点校准（2026-08-16 实现者实测）：西簇修复后 attempt 帧数实测 1933（两次全等，
 #     确定性）——由三部分构成：spawn 步行 ~15s（900 帧）+ Crate_WS 上箱落地不稳
 #     （4 次起跳 + 压墙 5s 卡死重寻路 ~13s，非退化跑道、F-degen 不覆盖）+ 面板跳
 #     3 次近静止重试 ~3s。死锁窗口（32.07s 冻结）实测压缩到 0.53s——控制器规格
@@ -365,7 +376,7 @@ func test_degenerate_runup_bounded() -> void:
 	var autopilot: AutoTraversal = a["autopilot"]
 	var record: AutoTraversalRecord = a["record"]
 	autopilot.setup(a["player"], record, Callable())
-	autopilot.set_target_faces(["WestClusterS_Panel"])
+	autopilot.set_target_faces(["WestClusterS_Panel", "RimN1"])
 	autopilot.start()
 	var frames := await _drive(autopilot, record, 90.0)
 	# 装配竞态加固（与测试 10 同口径，2026-08-16 控制器裁决 + R2 审查 Major 1）
@@ -379,33 +390,40 @@ func test_degenerate_runup_bounded() -> void:
 		autopilot = a["autopilot"]
 		record = a["record"]
 		autopilot.setup(a["player"], record, Callable())
-		autopilot.set_target_faces(["WestClusterS_Panel"])
+		autopilot.set_target_faces(["WestClusterS_Panel", "RimN1"])
 		autopilot.start()
 		frames = await _drive(autopilot, record, 90.0)
 		assert_false(frames < 120 and record.summary_dict().get("per_face", {}) \
 				.get("WestClusterS_Panel", {}).get("verdict", "") == "no_path",
 				"导航竞态二次重跑仍失败")
-	var head := {}
+	var heads := {}
 	var adir := DirAccess.open(TMP_DIR.path_join("attempts"))
 	if adir != null:
 		for f in adir.get_files():
 			var h: Dictionary = JSON.parse_string(
 					FileAccess.get_file_as_string(
 					TMP_DIR.path_join("attempts").path_join(f)).split("\n")[0])
-			if h.get("face", "") == "WestClusterS_Panel":
-				head = h
+			if str(h.get("face", "")) in ["WestClusterS_Panel", "RimN1"]:
+				heads[str(h.get("face", ""))] = h
+	var panel_head: Dictionary = heads.get("WestClusterS_Panel", {})
+	var rim_head: Dictionary = heads.get("RimN1", {})
 	print("RUNUP13 frames=", frames, " done=", autopilot.done,
-			" summary=", record.summary_dict(), " head=", head)
+			" summary=", record.summary_dict(),
+			" panel_head=", panel_head, " rim_head=", rim_head)
 	assert_true(autopilot.done,
-			"WestClusterS_Panel 应在 90s 内完成（超时即失败）")
+			"两目标驱动应在 90s 内完成（超时即失败）")
 	var pf: Dictionary = record.summary_dict()["per_face"]
 	assert_true(pf.has("WestClusterS_Panel"), "WestClusterS_Panel 应有 attempt 记录")
 	var verdict: String = str(pf["WestClusterS_Panel"]["verdict"])
 	assert_true(verdict == "success" or verdict == "jump_missed",
 			"verdict 应为 success 或 jump_missed，实际 %s" % verdict)
-	assert_lt(int(head.get("frame_count", 1 << 30)), 35 * 60,
-			"attempt 帧数应 < 35*60（退化跑道死锁压缩），实际 %s"
-			% str(head.get("frame_count")))
+	assert_lt(int(panel_head.get("frame_count", 1 << 30)), 35 * 60,
+			"WestClusterS_Panel attempt 帧数应 < 35*60（退化跑道死锁压缩），实际 %s"
+			% str(panel_head.get("frame_count")))
+	assert_true(pf.has("RimN1"), "RimN1 应有 attempt 记录")
+	assert_lt(int(rim_head.get("frame_count", 1 << 30)), 30 * 60,
+			"RimN1 attempt 帧数应 < 30*60（北簇 0.35-0.4m 坍缩被 0.6 阈值覆盖），实际 %s"
+			% str(rim_head.get("frame_count")))
 
 
 # 14. 途经点进展超时锚（F13）：EastTower（原 71s attempt：34s 转圈 + 21s 楔死冻结样本）
