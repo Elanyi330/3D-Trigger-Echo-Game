@@ -7,6 +7,11 @@
 # jump_failed 事件 + 该链接临时惩罚 + 重寻路一次，重寻路仍含该链接 →
 # clear_target 诚实放弃（决策层 M3.3 接管换目标）。WALK 段保留 T2 原逻辑
 # （高度门重寻路作为无链接路径的兜底）。
+# M3.1 T4（2026-08-17）：卡顿对策——滑墙（切线滑移）/ 踢面正压（正对墙内踢开）/
+# 可攀面豁免（0<高差≤0.62 压入直走）/ 退化跑道（<0.6m 近静止放行）/ 进展超时 +
+# 卡死兜底（途经点消费口径计时，超时重寻路共享 _repath_count 预算，超限
+# clear_target 诚实失败）。全部守卫与 T2/T3 正交：tick 内独立守卫，不改变正常路径
+# 执行流；仅作用于 WALK 段（JUMP 段由状态机提前接管，跳跃有 JUMP_TIMEOUT）。
 class_name BotLocomotion
 extends Node
 
@@ -43,13 +48,24 @@ const RUNUP_ENTRY := 3.0          # m：跳跃段提前交接半径（修复轮 
 	                              #   无最小转弯圆、无原地转速度衰减——遍历器 F8 病理是
 	                              #   机体相对转向的产物，直向投影不存在）
 
+# ── T4 卡顿对策（2026-08-17 M3.1 T4，遍历器退役时代病理教训）──
+const WALL_PRESS_TIME := 0.5      # s：压墙判定（贴墙且水平速度 < 0.05 持续）
+const WALL_SLIDE_TIME := 2.0      # s：切线滑移时长
+const DEGEN_RUNWAY := 0.6         # m：退化跑道圆盘半径（目标点水平距 < 此值近静止放行）
+const PROGRESS_TIMEOUT := 8.0     # s：无进展超时（无途经点消费且未到达累计）
+const STUCK_TIME := 5.0           # s：卡死判定窗口
+const STUCK_DIST := 0.3           # m：卡死窗口路径进展阈值（消费途经点 < 此值计卡死）
+const KICK_NORMAL_TURN := 1.2     # rad：踢面正压转向角（偏离墙平面 1.2 rad 踢开）
+const CLIMB_MAX := 0.62           # m：可攀面豁免高差上限（MovementController.STEP_MAX 只读语义）
+const REPATH_PRECONSUME := 2.0    # m：重寻路后预消费近身途经点半径（卡顿振荡包络防假进展，见 _tick_repath_or_abandon）
+
 var body: CharacterBody3D         # Enemy（读 global_position / rotation.y）
 var map_rid: RID                  # 导航地图 RID（L_M2 get_world_3d().navigation_map）
 var command: MovementCommand      # 指向 body.command_override（同引用，勿新建）
 
 var _path := PackedVector3Array() # 简化后的途经点队列（[0] = 当前目标途经点）
 var _target := Vector3.ZERO       # 原目标（高度门重寻路用）
-var _repath_count := 0            # 高度门重寻路计数（新 set_target 重置）
+var _repath_count := 0            # 重寻路计数（新 set_target 重置；T2 高度门 / T3 跳跃失败 / T4 卡顿共享预算）
 var _segments: Array = []         # (2026-08-17 M3.1 T3)：段分类，与 _path 点对锁步
 	                              #   （_segments[i] 覆盖 _path[i]→_path[i+1]；size = 点对数）
 var _links: Array = []            # (2026-08-17 M3.1 T3)：setup 预对齐链接端点表
@@ -61,6 +77,14 @@ var _off_floor_t := 0.0           # (2026-08-17 M3.1 T3 修复轮 2)：离地宽
 	                              #   才按跌落进 AIR（真实走出边缘坠落恒超宽限）
 var _last_consumed := Vector3.ZERO # (2026-08-17 M3.1 T3 修复轮 1)：最近已消费途经点（高度门锚基准）
 var _has_consumed := false        # (2026-08-17 M3.1 T3 修复轮 1)：_last_consumed 有效性（首途经点前不查门）
+# ── T4 卡顿对策状态（2026-08-17 M3.1 T4；_repath_count 见上，T2/T3/T4 共享预算）──
+var _wall_press_t := 0.0          # 压墙累计（贴墙且水平速度 < 0.05 持续）
+var _wall_slide_t := 0.0          # 切线滑移剩余时长（> 0 = 滑移进行中）
+var _slide_handedness := 0        # 切线滑移手性锁存（首次取 ±1；每次 set_target 清零）
+var _progress_t := 0.0            # 无进展累计（无途经点消费累计，消费即清零）
+var _progress_pos := Vector3.ZERO # 进展锚位置（最近一次途经点消费时记录）
+var _stuck_t := 0.0               # 卡死窗口累计（窗口内无消费累计）
+var _stuck_pos := Vector3.ZERO    # 卡死窗口锚位置（最近一次消费时记录）
 
 static var _dataset_edges: Dictionary = {}  # (2026-08-17 M3.1 T3)：link 名 → 数据集边（静态缓存）
 static var _dataset_loaded := false
@@ -109,6 +133,14 @@ func set_target(pos: Vector3) -> void:
 	_jump_state = {}
 	_last_consumed = Vector3.ZERO
 	_has_consumed = false
+	# (2026-08-17 M3.1 T4)：新目标 = 新 episode——滑移手性/进展/卡死窗口清零重计
+	_slide_handedness = 0
+	_wall_press_t = 0.0
+	_wall_slide_t = 0.0
+	_progress_t = 0.0
+	_progress_pos = body.global_position if body != null else Vector3.ZERO
+	_stuck_t = 0.0
+	_stuck_pos = body.global_position if body != null else Vector3.ZERO
 
 
 ## 清除目标（高度门重寻路超限 / 跳跃失败重寻路仍含该链接的诚实失败；T4 卡顿
@@ -120,6 +152,12 @@ func clear_target() -> void:
 	_jump_state = {}
 	_last_consumed = Vector3.ZERO
 	_has_consumed = false
+	# (2026-08-17 M3.1 T4)：放弃后停摆状态清零（路径空 tick 恒站桩，防残留滑移轴）
+	_wall_press_t = 0.0
+	_wall_slide_t = 0.0
+	_slide_handedness = 0
+	_progress_t = 0.0
+	_stuck_t = 0.0
 
 
 ## 每物理帧推进（Enemy._physics_process 或后续 Brain 调用）：
@@ -131,6 +169,8 @@ func clear_target() -> void:
 ##   当前段为 JUMP → 参数化执行（T3：一次计算起跳参数，无重试无传送）
 ##   高度门（navmesh 空间双锚）→ 重寻路一次（上限 REPATH_LIMIT）→ 超限诚实失败
 ##     （WALK 段兜底；T3 起跳跃段在高度门之前被段分类接管）
+##   T4 卡顿对策（退化跑道/进展超时/卡死兜底/滑墙/踢面——WALK 段守卫，与 T2/T3
+##     正交，不改变正常路径执行流）
 ##   前瞻转向 → 输出 command.move_axis（jump/crouch 由跳跃状态机接管）
 func tick(delta: float) -> void:
 	if command == null or body == null:
@@ -152,6 +192,9 @@ func tick(delta: float) -> void:
 	#   bot 直行穿链接缺口坠落，跳跃状态机接管其到达判定。
 	#   (2026-08-17 M3.1 T3 修复轮 1)：弹点即记录 _last_consumed（高度门锚基准，
 	#   见门注释）。
+	#   (2026-08-17 M3.1 T4)：弹点即置 consumed_this_tick（T4 进展/卡死计时口径——
+	#   途经点消费 = 路径进展）。
+	var consumed_this_tick := false
 	while not _path.is_empty():
 		if not _segments.is_empty() and _segments[0]["type"] == "JUMP":
 			break
@@ -166,6 +209,7 @@ func tick(delta: float) -> void:
 			for k in jj:
 				_last_consumed = _path[0]
 				_has_consumed = true
+				consumed_this_tick = true
 				_path.remove_at(0)
 				_segments.remove_at(0)
 			continue
@@ -174,6 +218,7 @@ func tick(delta: float) -> void:
 		if d_cur < ARRIVE_RADIUS:
 			_last_consumed = _path[0]
 			_has_consumed = true
+			consumed_this_tick = true
 			_path.remove_at(0)
 			if not _segments.is_empty():
 				_segments.remove_at(0)  # 锁步弹段
@@ -184,6 +229,7 @@ func tick(delta: float) -> void:
 			if d_next <= d_cur:
 				_last_consumed = _path[0]
 				_has_consumed = true
+				consumed_this_tick = true
 				_path.remove_at(0)
 				if not _segments.is_empty():
 					_segments.remove_at(0)
@@ -207,16 +253,27 @@ func tick(delta: float) -> void:
 	# tick map_get_closest_point 查询。JUMP 段由状态机接管不查门；首途经点
 	# （_has_consumed 前）不查。
 	# 重寻路直调 _query_path（不重置计数——set_target 归零计数语义下走 set_target
-	# 会让上限永不触发，无限重寻路）。
+	# 会让上限永不触发，无限重寻路）。2026-08-17 M3.1 T4：改用共享重寻路预算
+	# _tick_repath_or_abandon（与 T4 卡顿对策统一）。
 	if _has_consumed and not within_height_gate(_last_consumed.y, _path[0].y):
-		if _repath_count < REPATH_LIMIT:
-			_repath_count += 1
-			_path = _query_path(_target)
-			_segments = classify_segments(_path, _links)  # (2026-08-17 M3.1 T3)：重寻路同步重分类
-		else:
-			clear_target()
-		command.move_axis = Vector2.ZERO
+		_tick_repath_or_abandon()
 		return
+	# ── T4 卡顿对策（2026-08-17 M3.1 T4）──
+	# 退化跑道：目标水平距 < DEGEN_RUNWAY → 近静止放行（不触发超时/滑墙，到达判定
+	# 正常收敛）。其余守卫仅作用于 WALK 段（JUMP 段由状态机提前 return 豁免——跳跃
+	# 有 JUMP_TIMEOUT），与 T2/T3 正交：tick 内独立守卫，不改变正常路径执行流。
+	var dist_t := Vector2(_target.x - body.global_position.x,
+			_target.z - body.global_position.z).length()
+	if dist_t >= DEGEN_RUNWAY:
+		var moved := 1.0 if consumed_this_tick else 0.0  # 消费途经点 = 有进展
+		if progress_stalled(delta, moved, dist_t):
+			_tick_repath_or_abandon()
+			return
+		if _tick_stuck(delta, moved):
+			_tick_repath_or_abandon()
+			return
+		if _tick_wall(delta):
+			return
 	# 前瞻转向（遍历器 fix 8 教训）：当前点距 body < LOOKAHEAD_DIST 时转向基准取
 	# 下一途经点——提前转，不绕最小转弯圆（软加速转向下近角切入仍在到达半径内，
 	# 拐点正常弹出）。
@@ -610,3 +667,175 @@ func _next_jump_index() -> int:
 		if _segments[i]["type"] == "JUMP":
 			return i
 	return -1
+
+
+# ── T4：卡顿对策（2026-08-17 M3.1 T4，遍历器退役时代病理教训）──
+
+## 世界水平方向 → 本地移动轴（static 纯函数，2026-08-17 M3.1 T4）：与 approach_point
+## 同口径右手系投影（T3 修复轮 2 钉死：本地前 = (−sin yaw, −cos yaw)、本地右 =
+## (cos yaw, −sin yaw)）。输出 Vector2(右分量, 前分量) = command.move_axis 语义。
+## 注：brief 接口文档中滑墙公式写的本地前 f = (sin yaw, −cos yaw) 为 T3 已修正的
+## 旧公式（yaw≠0 时镜像——T3 RUNUP 反跑实证），本实现与 approach_point 一致。
+static func _world_to_local_axis(d: Vector3, body_yaw: float) -> Vector2:
+	var d2 := Vector2(d.x, d.z)
+	if d2.length() > 1e-6:
+		d2 = d2.normalized()
+	var rt := Vector2(cos(body_yaw), -sin(body_yaw))    # 本地右 = basis.x（xz 投影）
+	var fw := Vector2(-sin(body_yaw), -cos(body_yaw))   # 本地前 = -basis.z（xz 投影）
+	return Vector2(d2.dot(rt), d2.dot(fw))
+
+
+## 滑墙切线轴（static 纯函数，2026-08-17 M3.1 T4）：墙法向水平投影 n_h=(nx,0,nz)
+## 的切线 t = (n_z, 0, −n_x) × handedness（与墙平行），转本地轴（x=左右/y=前后），
+## 归一化。body_yaw=0（朝 −Z）、北墙法向 (0,0,1)：t = ±(1,0,0) → 输出 (±1, 0)。
+static func slide_axis(body_yaw: float, wall_normal: Vector3, handedness: int) -> Vector2:
+	var n_h := Vector3(wall_normal.x, 0.0, wall_normal.z)
+	var t := Vector3(n_h.z, 0.0, -n_h.x)
+	if handedness < 0:
+		t = -t
+	return _world_to_local_axis(t, body_yaw)
+
+
+## 踢面正压（static 纯函数，2026-08-17 M3.1 T4）：接触法向水平投影 n_h、目标方向
+## 水平投影 d_h（均归一化）。n_h 用 Godot 口径（指向机体、离墙——生产直接传
+## get_slide_collision().get_normal()）。n_h·d_h ≤ −0.7（目标方向正对墙内）→ 踢开：
+## 返回法向绕 +Y 向切线侧偏转（π/2 − KICK_NORMAL_TURN ≈ 0.37 rad，即偏离墙平面
+## 1.2 rad）的方向转本地轴——以离墙为主、切线为辅（进出振荡替代直压，遍历器病理
+## 2 对策；若按切线为主则退化为贴墙滑行、永不脱离正压面）；切线侧取与 d_h 夹角小
+## 的一侧（n_h 与 d_h 反平行时交叉退化 → 确定性取 +1 侧）。非正压 → 返回 d_h 转
+## 本地轴（正常前进，统一调用点）。
+static func kick_turn_axis(body_yaw: float, contact_normal: Vector3,
+		target_dir: Vector3) -> Vector2:
+	var n := Vector3(contact_normal.x, 0.0, contact_normal.z)
+	var d := Vector3(target_dir.x, 0.0, target_dir.z)
+	if n.length() < 1e-6 or d.length() < 1e-6:
+		return _world_to_local_axis(d, body_yaw)
+	n = n.normalized()
+	d = d.normalized()
+	if n.dot(d) <= -0.7:
+		var t := Vector3(n.z, 0.0, -n.x)  # 切线参考向（与 slide_axis 同向）
+		var side := 1.0 if t.dot(d) >= 0.0 else -1.0
+		var ang := side * (PI * 0.5 - KICK_NORMAL_TURN)
+		var dd := Vector3(n.x * cos(ang) + n.z * sin(ang), 0.0,
+				-n.x * sin(ang) + n.z * cos(ang))
+		return _world_to_local_axis(dd, body_yaw)
+	return _world_to_local_axis(d, body_yaw)
+
+
+## 重寻路/放弃（2026-08-17 M3.1 T4；T2 高度门/T3 跳跃失败/T4 卡顿共用
+## _repath_count 预算）：计数 < REPATH_LIMIT → 直调 _query_path 重寻路（不重置
+## 计数——set_target 归零计数语义下走 set_target 会让上限永不触发，无限重寻路，
+## 高度门既有注释口径）+ 段重分类 + 预消费近身途经点；超限 → clear_target 诚实失败
+## （决策层 M3.3 接管换目标）。输出 move_axis ZERO（本帧站桩），调用方 return。
+## 预消费（2026-08-17 M3.1 T4）：重寻路的新路径穿过 bot 当前位置（漂移/振荡包络），
+## 近身途经点在后续 tick 的弹点循环中被消费会被 T4 计时器误计为「进展」——卡顿
+## 场景下每次重寻路清零计时器 → 放弃链无限拉长（诊断实证：900 帧未放弃，计数器
+## 反复被漂移近身点清零）。预消费半径 REPATH_PRECONSUME 覆盖振荡包络（弹点半径
+## 0.8 + 踢面进出振荡幅度 ~1m）；末点保留（防吞掉终点误发 arrived）；JUMP 段起点
+## 不弹（与弹点循环同规则，防跳跃段静默丢失）。
+func _tick_repath_or_abandon() -> void:
+	if _repath_count < REPATH_LIMIT:
+		_repath_count += 1
+		_path = _query_path(_target)
+		_segments = classify_segments(_path, _links)
+		while _path.size() > 1:
+			if not _segments.is_empty() and _segments[0]["type"] == "JUMP":
+				break
+			var d_pre := Vector2(_path[0].x - body.global_position.x,
+					_path[0].z - body.global_position.z).length()
+			if d_pre >= REPATH_PRECONSUME:
+				break
+			_last_consumed = _path[0]
+			_has_consumed = true
+			_path.remove_at(0)
+			if not _segments.is_empty():
+				_segments.remove_at(0)  # 锁步弹段
+	else:
+		clear_target()
+	command.move_axis = Vector2.ZERO
+
+
+## 进展超时判定（2026-08-17 M3.1 T4）：moved = 本 tick 路径进展（消费途经点 =
+## 1.0，无进展 = 0.0）；arrived_radius = 当前到目标水平距。moved < 0.2 且距目标
+## > ARRIVE_RADIUS（未达收敛区）→ 累计 delta，否则清零；返回累计 > PROGRESS_TIMEOUT
+## （调用方裁决重寻路/放弃）。_progress_pos 记最近一次进展位置。
+## 注：brief 接口块标 static——累计语义依赖实例状态 _progress_t（多 bot 各算各的，
+## static 共享会跨实例串账），实现为实例方法，签名照抄。
+## 进展口径取「途经点消费」而非瞬时位移（偏离 brief 字面「位移」）：贴墙病理的
+## 三种振荡（滑墙切移/踢面进出/绕行）都有大瞬时位移但零路径进展——位移口径下
+## 每次振荡清零计时器，计数器永盲（遍历器时代病理的振荡特征）。
+func progress_stalled(delta: float, moved: float, arrived_radius: float) -> bool:
+	if moved < 0.2 and arrived_radius > ARRIVE_RADIUS:
+		_progress_t += delta
+		return _progress_t > PROGRESS_TIMEOUT
+	_progress_t = 0.0
+	_progress_pos = body.global_position if body != null else Vector3.ZERO
+	return false
+
+
+## 卡死兜底（2026-08-17 M3.1 T4）：STUCK_TIME 窗口内路径进展（消费途经点）<
+## STUCK_DIST → 卡死（重寻路/放弃），窗口清零重计；有进展 → 窗口清零重计。
+## moved 口径同 progress_stalled（途经点消费，见其注释）。_stuck_pos 记窗口锚
+## （进展时更新）。返回 true = 卡死触发。
+func _tick_stuck(delta: float, moved: float) -> bool:
+	if moved < STUCK_DIST:
+		_stuck_t += delta
+		if _stuck_t > STUCK_TIME:
+			_stuck_t = 0.0
+			return true
+	else:
+		_stuck_t = 0.0
+		_stuck_pos = body.global_position
+	return false
+
+
+## 滑墙/踢面正压（2026-08-17 M3.1 T4，遍历器病理 1/2）：
+##   未贴墙 → 压计时清零，正常前进
+##   贴墙（get_slide_collision_count > 0）：
+##     可攀面豁免：前方途经点 navmesh 升程 ∈ (0, CLIMB_MAX]（STEP_MAX 0.62 可走上）
+##       → 不滑墙压入直走（高度门同空间口径：_path[0].y − _last_consumed.y 双锚——
+##       路径点对路径点同为 navmesh 空间；混合物理 y 会误读台阶——T3 修复轮 1 教训），
+##       MovementController 自动登台处理
+##     滑移进行中 → slide_axis 切线轴（手性 _slide_handedness 锁存，每次 set_target
+##       清零；滑移结束压计时清零）
+##     踢面正压（目标方向正对墙内 n_h·d_h ≤ −0.7）→ kick_turn_axis 踢开替代直接
+##       前进（统一调用点：非正压时该函数输出即正常前进）
+##     压墙计时（水平速度 < 0.05 持续 WALL_PRESS_TIME）→ 进入切线滑移
+##   返回 true = 已输出 move_axis（调用方 return）。
+func _tick_wall(delta: float) -> bool:
+	if body.get_slide_collision_count() == 0:
+		_wall_press_t = 0.0
+		return false
+	var normal: Vector3 = body.get_slide_collision(0).get_normal()
+	# 可攀面豁免（2026-08-17 M3.1 T4）：navmesh 双锚升程 (0, 0.62] 贴墙压入直走
+	# （登台/坡道走面——T2-8 祭坛台 0.6 直边登台路径依赖此豁免不被误滑）
+	if _has_consumed:
+		var dy := _path[0].y - _last_consumed.y
+		if dy > 0.0 and dy <= CLIMB_MAX:
+			return false
+	if _wall_slide_t > 0.0:
+		_wall_slide_t -= delta
+		command.move_axis = slide_axis(body.rotation.y, normal, _slide_handedness)
+		if _wall_slide_t <= 0.0:
+			_wall_press_t = 0.0  # 滑移结束（brief 语义：压计时清零）
+		return true
+	var d_h := Vector3(_path[0].x - body.global_position.x, 0.0,
+			_path[0].z - body.global_position.z)
+	if d_h.length() > 1e-6:
+		var n2 := Vector3(normal.x, 0.0, normal.z)
+		if n2.length() > 1e-6 and n2.normalized().dot(d_h.normalized()) <= -0.7:
+			command.move_axis = kick_turn_axis(body.rotation.y, normal, d_h)
+			return true
+	var hspeed := Vector2(body.velocity.x, body.velocity.z).length()
+	if hspeed < 0.05:
+		_wall_press_t += delta
+		if _wall_press_t > WALL_PRESS_TIME:
+			_wall_slide_t = WALL_SLIDE_TIME
+			if _slide_handedness == 0:
+				_slide_handedness = 1 if randi() % 2 == 0 else -1  # 首次取 ±1 锁存
+			_wall_press_t = 0.0
+			command.move_axis = slide_axis(body.rotation.y, normal, _slide_handedness)
+			return true
+	else:
+		_wall_press_t = 0.0
+	return false
