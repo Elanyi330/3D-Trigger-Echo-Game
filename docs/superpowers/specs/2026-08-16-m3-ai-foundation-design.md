@@ -205,7 +205,7 @@ bot 新独立物理层（如 layer 4 "Bots"）——bot mask=世界几何（Obje
 
 | 阶段 | 内容 | 产出/验收 |
 |------|------|-----------|
-| M3.1 移动层 | BotLocomotion（路径跟随+跳跃参数化执行+卡顿对策移植）+ Enemy 类改造（StaticBody→CharacterBody+MovementController+碰撞层）+ MovementCommand 复用验证 | 单测：跟随/跳跃执行一次成功/失败事件/卡顿兜底各锚；冒烟：bot 从出生点走到塔顶（链接链） |
+| M3.1 移动层 | BotLocomotion（路径跟随+跳跃参数化执行+卡顿对策移植）+ Enemy 类改造（StaticBody→CharacterBody+MovementController+碰撞层）+ MovementCommand 复用验证 | ✅ **完成（2026-08-17，GUT 407/407）**。冒烟实证：西长墙 M 顶→塔顶单链（TowerToLongWall_W 反向，t=78 登顶 jf=0）。**多链接链受限**（→M3.3 前置）：①反向链接 delta_h/p50 方向性未翻转 ②TRIGGER 无起飞位置窗（窄条提前触发坠边）③反向 gate 过冲出 landing_zone ④dh≥1.5 链接 bot 近不可达（r=0.31 抓边带） |
 | M3.2 感知层 | BotPerception（LOS/听觉/LKP，目标=敌对阵营全体）+ 事件板（死亡事件）+ 黑板 | 单测：遮蔽判定/视锥/事件衰减锚；集成：敌对出现→ALERT |
 | M3.3 决策层 | BotBrain 七状态 + 战术点库（面表派生）+ 难度权重 + 策略选择器（4 策略：触发纯函数/偏置/裁决/冷却/占用上限）+ 武器决策规则 | 状态转移表测试 + 策略触发/偏置/生命周期单测；行为冒烟：策略生效观察 |
 | M3.4 战斗集成 | 射击（准头 ~35% 基线）+ 近战刀人 + 手雷投掷（集群/开路）+ bot 拾弹药箱 + 掩体重选 + 击杀归因（take_damage 攻击者参数三通道） | 实战冒烟：首交火时间、bot 击杀率、归因正确、无挂死 |
