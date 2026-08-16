@@ -210,6 +210,41 @@ func test_jump_episode_integration() -> void:
 	assert_eq(recorder.episode_count(), 1, "episode 计入 manifest")
 
 
+# ================= 7. 语料 3000 上限（FIFO，2026-08-16 用户拍板） =================
+# 用户拍板（2026-08-16）：至多 3000 条上限，继续游玩持续记录，FIFO 淘汰最旧；
+# corpus 有界保证数据集重建时间可控。manifest.episode_count 继续递增 = 唯一 ID 序列，
+# 文件数封顶；setup 时存量 ≤ cap 不裁剪，仅运行时写盘后超限淘汰。
+# 测试注入小 cap=5（_episode_cap 实例字段专为注入而设——const 不可注入）。
+# 文件名口径：首 episode id=0（ep_0000.jsonl，本文件既有用例同口径），brief 的
+# ep_id N（1 起）= 文件 ep_%04d(N-1)。记录 7 条 → 目录剩 5 文件、ep_0000/0001
+# （=ep_id 1/2）被删、ep_0006（=ep_id 7）存在、episode_count==7；再记 1 条 →
+# ep_0002（=ep_id 3）被删、ep_0007（=ep_id 8）存在（FIFO 语义逐次验证）。
+func test_episode_cap_fifo() -> void:
+	recorder.setup(null, V3.all_solids(), "回声祭坛v3", TMP_DIR)
+	recorder._episode_cap = 5  # 注入小 cap（生产值 EPISODE_CAP=3000，const 不可注入）
+	for i in 7:
+		recorder._begin_episode(1.0, "Ground")
+		recorder._sample_frame(_fake_frame(i))
+		recorder._end_episode(1.0, "Ground")
+	assert_eq(_episode_files().size(), 5, "7 条后目录封顶 5 文件")
+	assert_false(FileAccess.file_exists(TMP_DIR + "/episodes/ep_0000.jsonl"),
+			"FIFO：ep_0000（=ep_id 1，最旧）被删")
+	assert_false(FileAccess.file_exists(TMP_DIR + "/episodes/ep_0001.jsonl"),
+			"FIFO：ep_0001（=ep_id 2）被删")
+	assert_true(FileAccess.file_exists(TMP_DIR + "/episodes/ep_0006.jsonl"),
+			"FIFO：ep_0006（=ep_id 7，最新）保留")
+	assert_eq(recorder.episode_count(), 7, "manifest.episode_count 继续递增=7（文件数封顶）")
+	recorder._begin_episode(1.0, "Ground")
+	recorder._sample_frame(_fake_frame(8))
+	recorder._end_episode(1.0, "Ground")
+	assert_eq(_episode_files().size(), 5, "再记 1 条后仍封顶 5 文件")
+	assert_false(FileAccess.file_exists(TMP_DIR + "/episodes/ep_0002.jsonl"),
+			"FIFO：ep_0002（=ep_id 3）被删")
+	assert_true(FileAccess.file_exists(TMP_DIR + "/episodes/ep_0007.jsonl"),
+			"FIFO：ep_0007（=ep_id 8，最新）保留")
+	assert_eq(recorder.episode_count(), 8, "episode_count 继续递增=8")
+
+
 # ---- 夹具与工具 ----
 
 ## 伪造帧行（缝驱动用）
@@ -225,6 +260,17 @@ func _fake_frame(i: int) -> Dictionary:
 ## 读 jsonl 文件全部非空行
 func _read_lines(path: String) -> Array:
 	return FileAccess.get_file_as_string(path).split("\n", false)
+
+
+## episodes 目录内文件列表（cap 断言用）
+func _episode_files() -> Array:
+	var dir := DirAccess.open(TMP_DIR + "/episodes")
+	if dir == null:
+		return []
+	var out: Array = []
+	for f in dir.get_files():
+		out.append(f)
+	return out
 
 
 ## 物理地面（test_controller.gd 同款：Objects 层，顶面 y=0）

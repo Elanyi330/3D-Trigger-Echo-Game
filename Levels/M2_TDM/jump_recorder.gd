@@ -18,6 +18,12 @@ extends Node
 @export var recording_enabled := true
 const MAX_EPISODE_TIME := 5.0     # 单 episode 超时（秒）
 const LANDING_CONFIRM := 0.5      # 落地稳定确认时长（秒）
+# 语料上限（用户 2026-08-16 拍板）：至多 3000 条，继续游玩持续记录，FIFO 淘汰最旧；
+# corpus 有界保证数据集重建时间可控。manifest.episode_count 继续递增 = 唯一 ID 序列，
+# 文件数封顶；setup 时存量 ≤ EPISODE_CAP 不裁剪，仅运行时写盘后超限淘汰。
+const EPISODE_CAP := 3000
+# 实例字段供测试注入小 cap（const 不可注入——test_episode_cap_fifo 直写注入 5）
+var _episode_cap: int = EPISODE_CAP
 # 碰撞法线阈值（F2a-P3）：与玩家 floor_max_angle 同源——setup 时
 # _floor_normal_y := cos(player.floor_max_angle)。与 Player/MovementController.gd
 # step-up 的法线阈值（同为 cos(floor_max_angle)）保持一致，避免 45° 边界坡度
@@ -276,7 +282,23 @@ func _end_episode(end_floor_y: float, end_name: String) -> void:
 	f.close()
 	_episode_count += 1
 	_write_manifest()
+	_prune_episodes_over_cap()
 	_frames = PackedStringArray()
+
+
+## 语料上限淘汰（用户 2026-08-16 拍板）：episodes 目录文件数 > _episode_cap →
+## 按文件名升序（%04d 零填充 = episode_id 数字序）删除最旧文件直至 ≤ _episode_cap。
+## 仅运行时每次写盘后调用；setup 时存量 ≤ cap 不裁剪（铁律：不碰既有语料）。
+func _prune_episodes_over_cap() -> void:
+	var dir := DirAccess.open(_episodes_dir)
+	if dir == null:
+		return
+	var files := dir.get_files()
+	if files.size() <= _episode_cap:
+		return
+	files.sort()
+	for i in files.size() - _episode_cap:
+		dir.remove(_episodes_dir.path_join(files[i]))
 
 
 ## 超时收尾：end 值 = start 值（同面净升 0 → 分类为 fail）

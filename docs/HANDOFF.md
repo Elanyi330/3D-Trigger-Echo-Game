@@ -1,7 +1,7 @@
 # 🤖 新 AI 快速上手（HANDOFF）—— Trigger Echo
 
 > **给下一段对话的 AI**：读这一页即可抓住项目重点与当前里程碑方向，再按需深入下列文档。
-> 最近更新：2026-08-16（**M2 收官 + 自动跳跃遍历器 AutoTraversal 修复链 F1-F13 收官（GUT 403/403）**：4 面 12m 隐形墙仅碰撞不写布局数据（哈希不变记录不丢）→ jump_edges.gd 面级数据结构（面表 160/54 链接归属/54 边组）→ jump_solver.gd 确定性求解器（**真实跳高 1.5133m**，抓边带 0.5）→ jump_edges_dataset.json 语料校准数据集（M4 消费，skill 5 条）→ probe_jump_edges 量化门禁全过；**4 条数据错误链接已按拍板修复**；**AutoTraversal**（P 启动自动遍历 160 面/输入全锁/Esc 直接退出/30 分钟上限+R 重启/8 分钟局时冻结/成功失败数据独立记录——MovementCommand 命令接口即 AI 驱动玩家控制器雏形；**实机修复链 F1-F7**：链接静默丢弃根治（地图同步后创建链接，首注册有效端点）、最小转弯圆转圈、滑墙避障+坠落重规划、循环 liveness 根治——stuck 28→3/100 数据验证）；**F8-F13 执行层优化轮（2026-08-16 收官）**：转圈根治（最小转弯圆轨道 F8 直线助跑+F9 方向锥收紧）+ 四坡道 navmesh 烘焙替身（方案 A：悬空斜多边形根治、布局哈希不变、④ 梯度门禁、1087→1113 多边形）+ 滑墙手性锁存/踢面正压转向/前瞻转向 + F-degen 退化跑道放行（32s 箱顶冻结→0.53s）+ WALK 8s 进展超时 + TRAVERSAL_REV r8；**GUT 403/403**）。
+> 最近更新：2026-08-16（**M2 收官（用户拍板，GUT 369/369）**：数据基础四层齐备——4 面 12m 隐形墙仅碰撞不写布局数据（哈希不变记录不丢）→ jump_edges.gd 面级数据结构（面表 160/54 链接归属/54 边组）→ jump_solver.gd 确定性求解器（**真实跳高 1.5133m**，抓边带 0.5）→ jump_edges_dataset.json 语料校准数据集（M4 消费，skill 5 条）→ probe_jump_edges 量化门禁全过；4 条数据错误链接已按拍板修复；四坡道 navmesh 烘焙替身（方案 A：悬空斜多边形根治、布局哈希不变、④ 梯度门禁、1087→1113 多边形）；**面级分析报告（160 面四档分级，`docs/reports/2026-08-16-face-analysis.md`）**；**自动跳跃遍历器 AutoTraversal 已退役（2026-08-16 用户拍板：数据基础已足，M3 运行时 AI 移动不走遍历范式）**——遍历代码/测试/装配全删，**保留 MovementCommand 命令接口 + command_override（M3 AI 驱动 bot 移动的输入抽象基础）**；**跳跃记录语料上限 3000 条（2026-08-16 用户拍板）**：继续游玩持续记录，FIFO 淘汰最旧，episode_count 唯一 ID 序列递增、文件数封顶）。
 
 ---
 
@@ -39,6 +39,7 @@
 **TDM 模式定稿参数**（用户 2026-08-11 拍板，覆盖企划书旧"不可复活全灭获胜"）：**无限复活、先到 50 杀或 8 分钟击杀多者胜、复活延迟 3s**（计分/复活/胜负框架实现仍待做）。
 
 > ⚠️ **跳跃记录重置铁律（用户拍板，务必遵守）**：地图布局**任何改动** → 启动时布局哈希变更 → `user://jump_training/` **自动清空重建**（JumpRecorder setup 时哈希比对 manifest，无需手动）。记录文件 = `manifest.json` + `episodes/*.jsonl`；用途 = 未来 AI 敌人跳跃学习语料。**不要试图在布局变更后保留旧记录。**
+> **语料上限 3000 条（2026-08-16 用户拍板）**：继续游玩持续记录，**至多 3000 条 FIFO 淘汰最旧**（每次新 episode 写盘后按 episode_id 升序删除最旧文件；manifest.episode_count 继续递增=唯一 ID 序列，文件数封顶；setup 时存量 ≤3000 不裁剪，仅运行时超限淘汰；corpus 有界保证数据集重建时间可控）。
 > **移动机制版本键 MOVEMENT_REV**（2026-08-12 F2b 新增，F6 现值 `move-r3:step0.62+chain+firstframe,air-rest3.0/run0.76`）：`MovementController` 常量，与布局哈希共同构成跳跃记录重置键（JumpRecordCore.map_hash 序列化末尾追加 rev 行再哈希）。**任何移动语义变更（台阶高度/空中控制/速度模型等）必须 bump 此值**——否则布局哈希不变但物理已变，旧录像污染新语料。F2b 已实证：bump rev → 启动自动清空重置；F5（r3）再次实证：登台语义变更（同帧连锁+首帧）+ 门柱尺寸变更 → 双键双保险重置。
 
 **最终门禁（2026-08-13 F7/F8 后全绿，用户实机验收 PASS）**：GUT **276/276**（25 脚本；断言计数随物理帧时序 ±1 波动，以 276 测试数为准）；窄缝扫描 0 处（193 实体无 <1.2m；摊阁台阶↔门柱通道 1.95m、绕墙通道 2.0m）；漫游探针 **79 点**（行走 78 / 瞬移 1=起点；**EXIT 门禁：瞬移>1 即失败**——2026-08-12 F3 返工强化的连通性硬门控，防封路回归）；首交火 t=4.93s（门控 [4,6.5]）；视线硬门控 0 对（战斗矩形 |x|≤23.5 & |z|≤14 内无 >40m 通视）+ 外环基线 **180 对**（灰盒阶段接受，BASELINE_2026-08-12；2026-08-14 A/B 实测修正——旧记 178 系文档过时，边界墙零影响）；俯仰治理审计全通（d_min≤6.0m、高面栏板 ≥3 段）。
@@ -50,9 +51,9 @@
 ## 三、工作目录 / 验证 / 运行
 
 - **工作目录**（单目录）：`/Users/elanyi/Projects/Trigger-Echo`，分支 `feat/m1-assets`。
-- **测试**：`godot --headless --path . -s addons/gut/gut_cmdln.gd`（应全绿，364 测试）。
+- **测试**：`godot --headless --path . -s addons/gut/gut_cmdln.gd`（应全绿，369 测试）。
 - **运行游戏（M2 小图 v3）**：`godot --path . Levels/M2_TDM/L_M2.tscn`（WASD 移动/空格跳/Shift 蹲/左键开火/1-4 切枪/4+长按左键看手雷抛物线；**≤0.62m 台阶直接走上去不用跳、静止起跳空中可按方向键转向**；波次刷新：5 敌/波，全灭 1.5s 下一波；跳跃记录自动启用；**左上角小地图：旋转式蓝图雷达 12m×1.5 倍、12m 内敌人红点——用户实机验收 OK（2026-08-13）**）。
-- **自动跳跃遍历（AutoTraversal，2026-08-14 完成 + F1-F13 实机修复链，用户拍板+验收中）**：游戏中按 **P** 启动——角色自主寻路+行走+跳跃逐个尝试到达全部 160 平台（面级跳跃引擎=求解器参数+人类语料采样；贪心最近未访问，开局会先快速处理出生点附近 22 个无导航面 no_path 属预期）；运行期间**所有操作按钮锁定**（移动/开火/切枪/蹲伏/鼠标视角全部失效），**Esc = 直接退出程序**（训练结束；记录实时落盘）；**单次 30 分钟上限**——到点界面暂停显示**「按 R 重启测试流程」**（进度保留续跑）；训练期间**一局 8 分钟局时临时取消**（冻结计分板时间）。成功+失败数据独立记录到 `user://auto_traversal/`（manifest 哈希随附/TRAVERSAL_REV 版本键（**r8**）/跨会话续跑，人类语料 jump_training 不受污染）；跑完执行 `python3 tools/analyze_auto_traversal.py` 看三源对照报告。**修复链教训（必读）**：F1-F7（链接静默丢弃根治/滑墙/循环 liveness——stuck 28→3/100）见账本；**F8-F13 执行层优化轮（2026-08-16 收官，GUT 403/403）**——转圈根治=最小转弯圆 R_min=v/ω 轨道（F8 直线助跑转向门 0.3rad + F9 方向锥 ±25°/近静止按路径声明）；**四坡道 navmesh 烘焙替身（用户拍板方案 A）**——台阶整高盒放大重叠埋掉顶面→悬空斜多边形（poly 637 实锤），烘焙几何改真斜坡替身（游戏几何/布局哈希不动、记录不重置，navmesh 1087→1113）+ probe_navmesh ④ 梯度门禁；滑墙手性锁存+可攀面不介入+踢面正压转向（碰撞法向朝玩家侧 pos−cn）+可攀点前瞻转向；RUNUP 压墙 recover；锚点可达性预检+**F-degen 退化跑道放行**（锚点 snap 坍缩→转向门永不收敛→32s 箱顶冻结死锁→0.53s）；WALK 途经点 8s 超时+计时重置位移门+重寻路 MAX_REPLANS=2；optimize=false 走廊忠实路径（拉直切角穿墙根因）；垂直链接模式 F12 为防御层（当前 navmesh 惰性，测试 9 锚守护）。**箱顶→簇板链（CrateToCluster）执行留待 M4 zone 级**（规划层已由 test_chain_plan_two_links 锚定）。**MovementCommand 命令接口 = 未来 M3/M4 AI 驱动玩家同款控制器的雏形**（跳跃引擎即 ②(4) 接口执行原型）。
+- **自动跳跃遍历（AutoTraversal）已退役（2026-08-16 用户拍板）**：数据基础已足——人类语料 706 条（继续游玩持续记录，**至多 3000 条 FIFO**）+ 面级分析报告 160 面四档分级 + 54 边求解器验证，**M3 运行时 AI 移动不走遍历范式**。`auto_traversal.gd`/`auto_traversal_record.gd`/`tools/analyze_auto_traversal.py` 与全部遍历测试、L_M2 装配已删除；`user://auto_traversal/` 旧记录留磁盘只读（`tools/analyze_faces.py` 对照读取不崩）。**保留并沿用**：`Player/MovementCommand.gd` + `MovementController.command_override` 接口 + `test_auto_command.gd`——M3 AI 驱动 bot 移动的输入抽象基础（与遍历器解耦独立）。
 - **M1 靶场**：`godot --path . Levels/Main/L_Main.tscn`。
 
 ## 四、文档 / 资产地图（按需深入）
@@ -112,4 +113,4 @@
 
 **给用户的开场提示词（复制即用）**：
 
-> 读 `docs/HANDOFF.md`，了解 Trigger Echo 当前状态（**M2 收官 + 面级跳跃边四层 1+2+3 + 自动跳跃遍历器 AutoTraversal 修复链 F1-F13 收官（用户实机验收中）**：小图 v3「回声祭坛」+ TDM 框架 + navmesh 全流程（1087 多边形/54 跳跃链接）+ jump_solver 确定性求解器（真实跳高 1.5133m）+ jump_edges_dataset.json（M4 消费）+ **AutoTraversal**（P 启动/输入全锁/Esc 直接退出/30 分钟+R 重启/局时冻结/TRAVERSAL_REV r8/转圈根治（直线助跑+方向锥收紧）+四坡道烘焙替身+踢面正压+前瞻转向+F-degen+WALK 8s 超时——stuck 大幅压缩数据待实机重跑）；**GUT 403/403**；**已知边界：箱顶→簇板链留待 M4 zone 级执行**）。我们在单目录 `/Users/elanyi/Projects/Trigger-Echo`（分支 feat/m1-assets）上继续 **M2 收尾 → M3 AI 基础**。本轮我想做的是：【在此填你的需求】
+> 读 `docs/HANDOFF.md`，了解 Trigger Echo 当前状态（**M2 收官（2026-08-16 用户拍板）**：小图 v3「回声祭坛」+ TDM 框架 + navmesh 全流程（1113 多边形/54 跳跃链接）+ jump_solver 确定性求解器（真实跳高 1.5133m）+ jump_edges_dataset.json（M4 消费）+ **面级分析报告（160 面四档分级）**；**自动跳跃遍历器已退役**（数据基础已足，M3 运行时 AI 移动不走遍历范式；MovementCommand/command_override 接口保留作 M3 bot 移动输入抽象）；**跳跃记录语料 3000 上限 FIFO**；**GUT 369/369**）。我们在单目录 `/Users/elanyi/Projects/Trigger-Echo`（分支 feat/m1-assets）上继续 **M3 AI 基础**。本轮我想做的是：【在此填你的需求】
