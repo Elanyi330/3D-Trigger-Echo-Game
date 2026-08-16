@@ -35,6 +35,7 @@ var _recorder: JumpRecorder
 var _spawn_serial := 0   # 敌人名序号（同面一敌一名会撞名——Godot 撞名会重置为 @Class@id）
 
 # ---- TDM 框架（2026-08-13）----
+var _board: EventBoard          # 事件板（2026-08-17 M3.2 T9）：死亡事件 TTL 30s 阵营共享
 var _match: TdmMatch
 var _life: PlayerLife
 var _stats: TdmStats
@@ -83,6 +84,10 @@ func _ready() -> void:
 	_head = _player.get_node("Head")
 	_setup_weapons()
 	_setup_hud()
+	# 事件板（2026-08-17 M3.2 T9）：死亡事件 TTL 30s 阵营共享——M3.3 策略层消费
+	_board = EventBoard.new()
+	_board.name = "EventBoard"
+	add_child(_board)
 	# TDM 框架：北营点池（玩家+友军）→ 比赛状态机 → 敌营补位 → 玩家生命
 	_setup_tdm()
 	# 导航（2026-08-13 navmesh 阶段 2/3）：烘焙网格 + 28 处人类验证跳跃链接（M3 AI 寻路消费）
@@ -373,6 +378,7 @@ func _on_enemy_died(e: Node) -> void:
 		_enemy_names.push_back(e.display_name)  # 名字回队尾（补位敌继承身份）
 	_stats.add_kill(_stats.player_name)  # M2 仅玩家击杀（M3 队友击杀归因接入点）
 	_match.add_friendly_kill()
+	_board.record_death("enemy", e.global_position)  # 事件板（2026-08-17 M3.2 T9）：不含击杀者位置
 
 
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
@@ -671,6 +677,7 @@ func _on_player_died() -> void:
 	_update_death_label()
 	_match.add_enemy_kill()  # 玩家死亡 → 敌方总分 +1（M3 归因到具体敌人）
 	_stats.add_death(_stats.player_name)
+	_board.record_death("friendly", _player.global_position)  # 事件板（2026-08-17 M3.2 T9）
 
 
 func _on_player_respawned() -> void:
@@ -731,6 +738,7 @@ func _restart_match() -> void:
 
 
 func _process(delta: float) -> void:
+	_board.tick(delta)  # 事件板 TTL 剔除（2026-08-17 M3.2 T9，每帧驱动）
 	# 死亡倒计时刷新（死亡黑幕可见时）
 	if _death_overlay.visible:
 		_death_remaining -= delta
