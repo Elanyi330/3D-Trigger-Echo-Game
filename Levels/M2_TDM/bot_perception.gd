@@ -4,6 +4,12 @@
 # Enemy（≤9 个零成本）+ player_target，过滤敌对阵营（is_hostile）与死亡目标，
 # 逐目标三级裁剪（视距 → 视锥 → 视线射线）后发 hostile_visible；上周期可见本周期
 # 不可见 → hostile_lost（T8 LKP 消费）。
+# M3.2 T8（2026-08-17）：LKP 威胁记忆——最后已知位置 + 不可见计时。可见时（节流扫描）
+# 记录发射位置、invisible_t 清零 + lkp_updated(true)（每节流周期重复发射即位置刷新机制）；
+# 不可见起 invisible_t 每 tick 累计（delta），超 LKP_TTL 8s 遗忘（条目删除 +
+# lkp_updated(ZERO, false)）；死亡/已释放目标即时删除（不报信号——is_instance_valid
+# 守卫，T6 审查 Minor 1 移交口径：hostile_lost 可能对已释放目标发射）。位置冻结：
+# 不可见期间仅计时不刷新，无外推（感知不决策铁律；外推 M4 范围）。
 # M3.2 T7（2026-08-17）：听觉节扩展——噪音事件队列（_heard_events）+ TTL 衰减
 # （枪声/爆炸 3s、脚步 1.5s）+ 阵营过滤（同阵营源跳过）+ 距离判定
 # （heard_at：耳位 body+EYE_OFFSET 到声源 ≤ radius）通过则发 heard_event
@@ -24,6 +30,7 @@ extends Node
 signal hostile_visible(target: Node, pos: Vector3)   # 视线内敌对出现（节流周期上报）
 signal hostile_lost(target: Node)                    # 目标离开视线（不可见计时起）
 signal heard_event(kind: String, pos: Vector3)       # 敌对噪音被听到（距离 ≤ radius；M3.3 决策层消费）
+signal lkp_updated(target: Node, pos: Vector3, visible: bool)  # LKP 变化通知（M3.3 决策层消费）
 
 const CONE_HALF_ANGLE := deg_to_rad(60.0)  # 半视锥角（全锥 120°）
 const VIEW_RANGE := 40.0                   # 视距（m）
@@ -36,6 +43,7 @@ const SAMPLE_SPREAD := 0.3                 # m：中间采样点横向散布（�
 const GUNSHOT_TTL := 3.0                   # s：枪声事件衰减
 const FOOTSTEP_TTL := 1.5                  # s：脚步事件衰减
 const EXPLOSION_TTL := 3.0                 # s：爆炸事件衰减（同枪声口径）
+const LKP_TTL := 8.0                       # s：LKP 记忆时长（不可见后遗忘）
 
 var body: CharacterBody3D        # 宿主 Enemy
 var faction: String              # "enemy" | "friendly"（Enemy.get_faction 口径）
@@ -45,6 +53,7 @@ var _throttle_t := 0.0
 var _visible: Dictionary = {}    # target -> true（可见集合，T8 LKP / T10 黑板读取）
 var _elapsed := 0.0              # 感知内部单调时钟（delta 求和，tick 首行累计——测试可控）
 var _heard_events: Array = []    # 噪音事件队列 [{pos, radius, t, kind, source}]
+var _lkp: Dictionary = {}        # target -> {pos: Vector3, invisible_t: float}（LKP 威胁记忆）
 
 
 func setup(b: CharacterBody3D, f: String, player: Node3D) -> void:
@@ -65,6 +74,7 @@ func tick(delta: float) -> void:
 		_throttle_t = 0.0
 		_scan()
 	_hearing_tick()
+	_lkp_tick(delta)
 
 
 ## 噪音事件注入（噪音总线接线与测试共用）：追加 {pos, radius, t=_elapsed, kind, source}。
@@ -104,7 +114,44 @@ func _hearing_tick() -> void:
 	_heard_events = kept
 
 
-## 节流周期扫描：枚举目标 → 单目标裁剪 → 发信号 + 维护 _visible 集合。
+## LKP 记忆节（每物理帧，听觉节之后）：已释放/死亡目标即时删除（不报信号，
+## is_instance_valid 先判短路）→ 不可见条目 invisible_t 累计（delta）→ 超
+## LKP_TTL 遗忘（条目删除 + lkp_updated(ZERO, false)）。可见条目跳过（位置由
+## _scan 刷新、invisible_t 已清零）。keys() 快照迭代——循环内 erase 安全。
+## 位置冻结铁律：本函数不触碰条目 pos（无外推——感知不决策铁律）。
+func _lkp_tick(delta: float) -> void:
+	for target in _lkp.keys():
+		if not is_instance_valid(target) or _is_dead(target):
+			_lkp.erase(target)
+			continue
+		if _visible.has(target):
+			continue
+		var entry: Dictionary = _lkp[target]
+		entry["invisible_t"] = entry["invisible_t"] + delta
+		if entry["invisible_t"] > LKP_TTL:
+			_lkp.erase(target)
+			lkp_updated.emit(target, Vector3.ZERO, false)
+
+
+## LKP 查询（M3.3 决策层消费）：最后已知位置；无条目返回 Vector3.ZERO。
+func last_known_pos(target: Node) -> Vector3:
+	if not _lkp.has(target):
+		return Vector3.ZERO
+	return _lkp[target]["pos"]
+
+
+## 不可见累计时长查询（s）；无条目返回 -1。
+func invisible_time(target: Node) -> float:
+	if not _lkp.has(target):
+		return -1.0
+	return _lkp[target]["invisible_t"]
+
+
+## 节流周期扫描：枚举目标 → 单目标裁剪 → 发信号 + 维护 _visible 集合与 _lkp。
+## 可见目标：刷新 LKP（pos = 发射位置，invisible_t 清零）+ lkp_updated(true)——
+## hostile_visible 每节流周期重复发射即 LKP 位置更新机制本体。
+## 丢失目标：死亡/已释放即时删除（不报信号，is_instance_valid 守卫——T6 审查
+## Minor 1 移交：hostile_lost 可能对已释放目标发射）；存活条目留存仅计时。
 func _scan() -> void:
 	var space := body.get_world_3d().direct_space_state
 	var seen: Dictionary = {}
@@ -112,9 +159,13 @@ func _scan() -> void:
 		if _visible_for(target, space):
 			seen[target] = true
 			hostile_visible.emit(target, target.global_position)
+			_lkp[target] = {"pos": target.global_position, "invisible_t": 0.0}
+			lkp_updated.emit(target, target.global_position, true)
 	for t in _visible.keys():
 		if not seen.has(t):
 			hostile_lost.emit(t)
+			if not is_instance_valid(t) or _is_dead(t):
+				_lkp.erase(t)
 	_visible = seen
 
 
