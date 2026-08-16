@@ -241,7 +241,10 @@ static func pick_jump_speed(delta_h: float, dist: float, human_p50: float,
 #   真实人类 p50（augmented=false 且 human 非空）→ 原值
 #   增强样本 p50（augmented=true）→ p50 × 0.9（置信折扣）
 #   无人类数据 → 求解器 v_req × 1.15
-# 最终钳制：clamp(v, JumpSolver.feasibility(delta_h, dist)["v_min"], ["v_max"])
+# 最终钳制：clamp(v, r.v_req, r.v_hi)——r = JumpSolver.required_speed(delta_h, dist)
+# （v_hi 可为 INF，GDScript clamp 对 INF 上界安全）；r.ok=false → 返回 v_req×1.15
+# 且调用方不触发跳跃（诚实失败路径）。注意：feasibility 返回键为
+# {ok, verdict, v_req, margin}（无 v_min/v_max，勿照抄早期计划笔误）。
 
 # 实例方法（T3 新增）
 var _jump: Dictionary   # 执行中跳跃状态 {from, to, link_name, t}
