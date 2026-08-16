@@ -70,7 +70,8 @@ func _ready() -> void:
 	# 不在 _ready 默认开启：既有测试与训练场场景的 Enemy 直建实例不受影响。
 	# (2026-08-16 M3.1 T0)：bot 在 Bots 层（4），仅与世界几何（Objects 层 1）碰撞——
 	# bot 间互不碰撞；躯干碰撞形状移入 Enemy.tscn scene 声明（@onready _col_cached
-	# 在树进入时查找，代码内 _ready 创建会错过缓存窗口）。
+	# 在树进入时查找，代码内 _ready 创建会错过缓存窗口）。胶囊 r0.31/h1.69 @ (0, 0.845, 0)：
+	# 底=原点（脚底贴地，落定 y=0 与原静态桩站位一致）、顶=1.69（颈界与头 hitbox 1.70 无缝）。
 	collision_layer = BOT_LAYER
 	collision_mask = 1
 	command_override = MovementCommand.new()  # (2026-08-16 M3.1 T0)：恒设——无 Brain 时站桩，防读玩家真实输入

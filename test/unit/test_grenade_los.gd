@@ -17,6 +17,23 @@ const ENEMY_SCENE := "res://Levels/Enemy/Enemy.tscn"
 
 func before_each() -> void:
 	m67 = load("res://Weapons/weapon_m67.tres")
+	# M3.1 T0（2026-08-16）控制器裁决：Enemy 改造为重力物理体后，无地板夹具中会下落
+	# 改变伤害距离断言——before_each 加地面盒让敌人落定 y=0（= 原静态桩站位），断言一字未改。
+	_make_floor()
+
+
+# 测试辅助：地面盒构造器——BoxShape3D StaticBody（Objects 层 1，顶面 y=0；同 test_auto_command.gd）
+func _make_floor() -> void:
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(40, 1, 40)
+	col.shape = shape
+	body.add_child(col)
+	body.position = Vector3(0, -0.5, 0)
+	add_child_autofree(body)
 
 
 func _spawn_enemy(at: Vector3) -> Enemy:
