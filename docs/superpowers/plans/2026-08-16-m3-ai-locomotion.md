@@ -192,13 +192,21 @@ static func within_height_gate(body_pos: Vector3, point: Vector3) -> bool
    ≥0.2 的点必保留（坡道/台阶走面信息不丢——遍历器时代验证参数）。
 3. `tick`：
    - `_path` 空 → return
-   - 当前途经点到达判定：水平距 < ARRIVE_RADIUS → 弹下一途经点；弹到空 → `arrived.emit()`
-   - **高度门**：下一途经点 y − body y > HEIGHT_GATE → T3 跳跃段路径（T2 内：重寻路一次，
-     失败 `arrived` 不发、`jump_failed` 不发——T3 接管此分支）
+   - **到达弹点优先于高度门**（修复轮 1：终点在高面时先到达后门）：当前途经点水平距 <
+     ARRIVE_RADIUS → 弹下一途经点；弹到空 → `arrived.emit()`
+   - **高度门（navmesh 空间双锚——修复轮 1 裁决，勿照抄旧"途经点 y − body y"口径）**：
+     `point.y − map_get_closest_point(map_rid, body 位置).y > HEIGHT_GATE` → T3 跳跃段路径
+     （T2 内：重寻路一次，失败 `arrived` 不发、`jump_failed` 不发——T3 接管此分支）。
+     两端同为 navmesh 空间 y，面偏移 +0.3~0.4 天然抵消：微台阶 0.6 ≤ 0.72 放行、链接段
+     ≥1.0 触发。旧口径混合坐标系（body 物理 y）会在任何台阶路径误触停摆（审查 v4 实证）。
+     亦勿用"途经点间 y 差"——稠密插值摊薄链接段 y 跳变漏检（审查实测）。
    - `approach_point`（前瞻转向，遍历器 fix 8 教训）：朝当前点移动，但转向目标 = 看下段——
      若 next_point 存在且当前点距 body < 1.5，转向基准取 next_point（提前转，不绕最小转弯圆）
+   - **到达"越过"规则**（审查接受偏差）：距下一途经点 ≤ 距当前途经点即弹点（循环）——
+     纯半径判定在锐角弯切角半径 >0.8 时永不到达转圈卡死
    - 输出：`command.move_axis = approach_point(...)`（y=前后）；无 crouch/jump（T3 接管 jump）
-4. `within_height_gate`：`point.y - body_pos.y <= HEIGHT_GATE`。
+4. `within_height_gate`：navmesh 双锚比较（签名可调整为含 map_rid 或预取 closest 点的
+   等价形式——实现者自选最简可单测方案，注释说明）。
 
 ### 测试规格（test/unit/test_bot_locomotion_path.gd，TDD）
 
