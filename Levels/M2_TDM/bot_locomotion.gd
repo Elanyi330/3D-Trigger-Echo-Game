@@ -61,24 +61,14 @@ func clear_target() -> void:
 
 ## 每物理帧推进（Enemy._physics_process 或后续 Brain 调用）：
 ##   _path 空 → 站桩（move_axis ZERO）
-##   高度门 → 重寻路一次（上限 REPATH_LIMIT）→ 超限诚实失败（T3 接管跳跃执行）
-##   到达（水平距 < ARRIVE_RADIUS）→ 弹下一途经点；弹空 → arrived.emit() + 站桩
+##   到达/越过（水平距）→ 弹点；弹空 → arrived.emit() + 站桩——先于高度门
+##     （修复轮 1 Minor 4：终点恰在高面时先判到达，防高面终点永不到达）
+##   高度门（navmesh 空间双锚）→ 重寻路一次（上限 REPATH_LIMIT）→ 超限诚实失败
 ##   前瞻转向 → 输出 command.move_axis（jump/crouch 不碰——T3 接管）
 func tick(delta: float) -> void:
 	if command == null or body == null:
 		return
 	if _path.is_empty():
-		command.move_axis = Vector2.ZERO
-		return
-	# 高度门（2026-08-16 M3.1 T2）：下一途经点 y − body y > HEIGHT_GATE →
-	# 重寻路一次；超限诚实失败。重寻路直调 _query_path（不重置计数——
-	# set_target 归零计数语义下走 set_target 会让上限永不触发，无限重寻路）。
-	if not within_height_gate(body.global_position, _path[0]):
-		if _repath_count < REPATH_LIMIT:
-			_repath_count += 1
-			_path = _query_path(_target)
-		else:
-			clear_target()
 		command.move_axis = Vector2.ZERO
 		return
 	# 到达/越过判定（水平距，2026-08-16 M3.1 T2）：
@@ -103,6 +93,21 @@ func tick(delta: float) -> void:
 		break
 	if _path.is_empty():
 		arrived.emit()
+		command.move_axis = Vector2.ZERO
+		return
+	# 高度门（2026-08-16 M3.1 T2 修复轮 1）：navmesh 空间双锚——body 侧锚 =
+	# map_get_closest_point(body 位置).y（navmesh 空间），与途经点 y（同为 navmesh
+	# 空间）比较，导航面 +0.3~0.4 烘焙偏移天然抵消（见 within_height_gate 注释）。
+	# 重寻路直调 _query_path（不重置计数——set_target 归零计数语义下走 set_target
+	# 会让上限永不触发，无限重寻路）。
+	var nav_body_y := NavigationServer3D.map_get_closest_point(
+			map_rid, body.global_position).y
+	if not within_height_gate(nav_body_y, _path[0]):
+		if _repath_count < REPATH_LIMIT:
+			_repath_count += 1
+			_path = _query_path(_target)
+		else:
+			clear_target()
 		command.move_axis = Vector2.ZERO
 		return
 	# 前瞻转向（遍历器 fix 8 教训）：当前点距 body < LOOKAHEAD_DIST 时转向基准取
@@ -185,9 +190,16 @@ static func approach_point(body_pos: Vector3, body_yaw: float,
 	return Vector2(d2.dot(rt), d2.dot(fw))
 
 
-## 高度门（static 纯函数）：point.y − body_pos.y ≤ HEIGHT_GATE 即放行。
-## 边界口径：Vector3 分量 32 位存储——0.72 经 float32 舍入为 0.72000003，与双精度
-## 0.72 直比会误拒边界（brief 边界断言要求 0.72 放行；GDScript float() 是 64 位
-## 恒等转换无 float32 构造器），故门值经 Vector3 存储口径取整到 float32 再比较。
-static func within_height_gate(body_pos: Vector3, point: Vector3) -> bool:
-	return point.y - body_pos.y <= Vector3(0, HEIGHT_GATE, 0).y
+## 高度门（static 纯函数，2026-08-16 M3.1 T2 修复轮 1：navmesh 空间双锚比较）。
+## nav_body_y = body 位置最近导航点 y（map_get_closest_point，navmesh 空间；由 tick
+## 查询传入），point = 途经点（本身即 navmesh 空间 y）——两端同空间，导航面
+## +0.3~0.4 烘焙偏移天然抵消，差值为真实可走升程：0.6m 台阶面（navmesh 1.0）对
+## 地面（navmesh 0.4）量出 0.6 ≤ 0.72 放行；跳跃链接段落差 ≥1.0 正确触发。
+## 旧口径（途经点 y − body 物理 y）把偏移计入门值——0.6 台面误判跳跃段 → 重寻路
+## 超限站桩（审查者 v4 实证停摆）。
+## 选型注记：map 查询留 tick 实例侧，本函数保持 static 纯（可脱离场景单测，边界
+## 断言直测）——"static 纯函数优先"取可单测最简方案。float32 边界 workaround 保留：
+## Vector3 分量 32 位存储，0.72 舍入 0.72000003 与双精度直比误拒边界（GDScript
+## float() 为 64 位恒等转换、无 float32 构造器），门值经 Vector3 存储口径取整再比较。
+static func within_height_gate(nav_body_y: float, point: Vector3) -> bool:
+	return point.y - nav_body_y <= Vector3(0, HEIGHT_GATE, 0).y

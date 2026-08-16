@@ -2,9 +2,12 @@
 # M3.1 T2（2026-08-16）：BotLocomotion 路径跟随测试（TDD，先 RED 后 GREEN）。
 # 目标：navmesh 寻路 + 途经点简化 + 前瞻转向 + 高度门 + 到达判定。
 #   static 纯函数（simplify_path/approach_point/within_height_gate）脱离场景直接单测；
-#   集成测试装配真实 L_M2（导航两轮迭代 + 链接注册链）驱动 bot 走完 ~20m 平地路径。
+#   集成测试装配真实 L_M2（导航两轮迭代 + 链接注册链）驱动 bot 走完平地/登台路径。
 # RED 锚：生产类 BotLocomotion 尚不存在——本脚本引用该类即编译失败，7 测试全部报错
 #   （错误信息 = "Could not find type BotLocomotion" 类加载错误，即正确的 RED 失败原因）。
+# 修复轮 1（2026-08-17）追加 T2-8：登台回归（高度门 navmesh 双锚口径）——
+#   修复前该测试复现停摆（台面 navmesh y=1.0 对 body 物理 y=0 量出 1.0 > 0.72 误判
+#   跳跃段 → 重寻路 ×2 → clear_target 站桩），修复后 GREEN。
 extends GutTest
 
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
@@ -16,6 +19,66 @@ var _arrived_count := 0
 
 func _on_arrived() -> void:
 	_arrived_count += 1
+
+
+# ── 测试辅助 ──
+
+## 装配 L_M2 场景 + 立即 queue_free 场景内 JumpRecorder（防测试帧污染
+##   user://jump_training 人类语料——项目铁律）+ 等导航两轮迭代（迭代 id ≥ 基值 +2，
+##   同 L_M2._create_nav_links_after_sync 口径）+ 再等 60 物理帧（54 链接注册余量，
+##   call_deferred 异步链，L_M2 F4 教训）。返回已同步的场景实例。
+func _assemble_l2() -> Node3D:
+	var l2: Node3D = load("res://Levels/M2_TDM/L_M2.tscn").instantiate()
+	add_child_autofree(l2)
+	var recorder: Node = l2.get_node_or_null("JumpRecorder")
+	assert_not_null(recorder, "前置：L_M2._ready 应创建 JumpRecorder 子节点")
+	if recorder:
+		recorder.queue_free()
+	var map_rid: RID = l2.get_world_3d().navigation_map
+	var base_iter := NavigationServer3D.map_get_iteration_id(map_rid)
+	var synced := false
+	for i in 120:
+		await wait_physics_frames(1)
+		if NavigationServer3D.map_get_iteration_id(map_rid) >= base_iter + 2:
+			synced = true
+			break
+	assert_true(synced, "导航地图应在 120 帧内完成两轮迭代")
+	await wait_physics_frames(60)
+	return l2
+
+
+## 北营地面点生成落定 Enemy：取距静止玩家最远点（玩家 1/10 随机点位，重叠会被去穿透
+## 推开；玩家身体可挡 bot 走廊——T4 卡顿对策前取最远点防路径被玩家身体卡死）。
+## 定位先于入树（T0 教训：入树后再设会陈旧形状一帧注册进物理空间）；返回时已落定。
+func _spawn_bot_at_north_camp(l2: Node3D) -> Enemy:
+	var player: Node3D = l2.get_node("Player")
+	var spawn := Vector3.ZERO
+	var best_d := -1.0
+	for p0 in LAYOUT.camp_spawn_points(1):
+		var p: Vector3 = p0
+		var d := Vector2(p.x - player.global_position.x,
+				p.z - player.global_position.z).length()
+		if d > best_d:
+			best_d = d
+			spawn = p
+	var enemy := Enemy.new()
+	enemy.position = spawn
+	add_child_autofree(enemy)
+	await wait_physics_frames(25)  # 落定后再 set_target（brief 口径）
+	return enemy
+
+
+## loco 驱动：每 2 物理帧 tick（与生产物理帧节奏同构），≤max_frames 帧，
+## arrived 即提前退出。返回 [推进帧数, arrived 计数]。
+func _drive(loco: BotLocomotion, max_frames: int) -> Array:
+	_arrived_count = 0
+	loco.arrived.connect(_on_arrived)
+	var frames := 0
+	while frames < max_frames and _arrived_count == 0:
+		loco.tick(1.0 / 60.0)
+		await wait_physics_frames(2)
+		frames += 2
+	return [frames, _arrived_count]
 
 
 # ── T2-1：L 形路径简化后保留拐点（拐点=方向变化点，误丢则直线切角穿墙）──
@@ -69,72 +132,60 @@ func test_approach_lookahead() -> void:
 	assert_gt(out.y, 0.0, "前瞻转向：仍含前进分量（实际 y %.3f）" % out.y)
 
 
-# ── T2-6：高度门边界——高差 0.72 内 true / 0.73 false ──
+# ── T2-6：高度门边界——navmesh 空间升程 0.72 内 true / 0.73 false ──
+# 修复轮 1：navmesh 双锚口径——body 侧取最近导航点 y（nav_body_y），与途经点 y
+# （同为 navmesh 空间）比较；导航面 +0.3~0.4 烘焙偏移天然抵消。边界断言
+# 直测纯函数（nav_body_y=0 基准）。
 func test_height_gate_boundary() -> void:
-	assert_true(BotLocomotion.within_height_gate(Vector3(0, 0, 0), Vector3(0, 0.72, 0)),
-			"高差 0.72 ≤ HEIGHT_GATE → 门内放行")
-	assert_false(BotLocomotion.within_height_gate(Vector3(0, 0, 0), Vector3(0, 0.73, 0)),
-			"高差 0.73 > HEIGHT_GATE → 触发高度门")
+	assert_true(BotLocomotion.within_height_gate(0.0, Vector3(0, 0.72, 0)),
+			"升程 0.72 ≤ HEIGHT_GATE → 门内放行")
+	assert_false(BotLocomotion.within_height_gate(0.0, Vector3(0, 0.73, 0)),
+			"升程 0.73 > HEIGHT_GATE → 触发高度门")
 
 
 # ── T2-7（集成）：真实 L_M2 导航装配 + bot 走完 ~20m 平地路径到达 ──
-# 装配口径（brief）：L_M2 实例 → 立即 queue_free JumpRecorder（防测试帧污染
-#   user://jump_training 人类语料——项目铁律）→ 等导航两轮迭代（迭代 id ≥ 基值 +2，
-#   同 L_M2._create_nav_links_after_sync）→ 再等 60 物理帧（54 链接注册余量）→
-#   Enemy.new() 置北营地面点（取距静止玩家最远点——玩家身体挡走廊时 T2 无卡顿对策，
-#   最远点最大化路径净空）→ 落定 ~25 帧 → BotLocomotion.setup + set_target →
-#   tick 驱动 ≤600 物理帧断言 arrived 发射 + 距目标水平距 < 1.0（到达即提前退出）。
 func test_follow_short_path() -> void:
-	var l2: Node3D = load("res://Levels/M2_TDM/L_M2.tscn").instantiate()
-	add_child_autofree(l2)
-	# 项目铁律：装配后立即释放 JumpRecorder（L_M2._ready 已创建并 setup）
-	var recorder: Node = l2.get_node_or_null("JumpRecorder")
-	assert_not_null(recorder, "前置：L_M2._ready 应创建 JumpRecorder 子节点")
-	if recorder:
-		recorder.queue_free()
-	# 等导航地图两轮迭代（门槛 = 函数入口基值 +2，L_M2 F4 口径：iter 1 时查询仍悬空）
+	var l2 := await _assemble_l2()
+	var enemy := await _spawn_bot_at_north_camp(l2)
 	var map_rid: RID = l2.get_world_3d().navigation_map
-	var base_iter := NavigationServer3D.map_get_iteration_id(map_rid)
-	var synced := false
-	for i in 120:
-		await wait_physics_frames(1)
-		if NavigationServer3D.map_get_iteration_id(map_rid) >= base_iter + 2:
-			synced = true
-			break
-	assert_true(synced, "导航地图应在 120 帧内完成两轮迭代")
-	await wait_physics_frames(60)  # 54 链接注册余量（call_deferred 异步链，L_M2 F4 教训）
-	# Enemy 置北营地面点：距静止玩家最远点（玩家 1/10 随机点位，重叠会被去穿透推开；
-	# 玩家身体可挡 bot 走廊——T4 卡顿对策前取最远点防路径被玩家身体卡死）
-	var player: Node3D = l2.get_node("Player")
-	var spawn := Vector3.ZERO
-	var best_d := -1.0
-	for p0 in LAYOUT.camp_spawn_points(1):
-		var p: Vector3 = p0
-		var d := Vector2(p.x - player.global_position.x,
-				p.z - player.global_position.z).length()
-		if d > best_d:
-			best_d = d
-			spawn = p
-	var enemy := Enemy.new()
-	enemy.position = spawn  # 定位先于入树（T0 教训：入树后再设会陈旧形状一帧注册进物理空间）
-	add_child_autofree(enemy)
-	await wait_physics_frames(25)  # 落定后再 set_target（brief 口径）
 	var loco := BotLocomotion.new()
 	add_child_autofree(loco)
 	loco.setup(enemy, map_rid)
-	_arrived_count = 0
-	loco.arrived.connect(_on_arrived)
 	# 目标：北营正南 ~20m 平地（rim 北墙豁口绕行，全程地面无跳跃段——T2 只测路径跟随）
 	var target := Vector3(0, 0, 5.5)
 	loco.set_target(target)
-	var frames := 0
-	while frames < 600 and _arrived_count == 0:
-		loco.tick(1.0 / 60.0)
-		await wait_physics_frames(2)
-		frames += 2
-	assert_gt(_arrived_count, 0,
+	var drive := await _drive(loco, 600)
+	assert_gt(drive[1], 0,
 			"≤600 物理帧内应到达并发射 arrived（实际 %d 帧未到达，bot 位置 %s）"
-			% [frames, enemy.global_position])
+			% [drive[0], enemy.global_position])
+	var d_final := Vector2(enemy.global_position.x - target.x,
+			enemy.global_position.z - target.z).length()
+	assert_lt(d_final, 1.0, "到达时距目标水平距 < 1.0（实际 %.3f）" % d_final)
+
+
+# ── T2-8（集成回归，修复轮 1）：北营 → 祭坛台面点，地面→台面 0.6 直边登台 ──
+# 修复前 RED 锚：台面 navmesh y=1.0（物理 0.6 + 烘焙偏移 0.4）对 body 物理 y=0
+# 量出 1.0 > 0.72 → 高度门误判跳跃段 → 重寻路 ×2 → clear_target 站桩，arrived 不发
+# （审查者 v4 实证停摆机制）。修复后（navmesh 双锚）1.0−0.4=0.6 ≤ 0.72 放行，
+# bot 经 step-up（STEP_MAX 0.62 ≥ 0.6）直边登台到达。
+# 目标点选型（实测修正）：台心 (0,0.6,0) 被钟楼基座覆盖不在导航面上（投影 ~2.3m
+# 超断言口径）；微台阶线上点 (0,0.6,2.5) 路径先经 0.3+0.3 微台阶面（navmesh 0.7）——
+# 旧门在 body 爬升后检查（0.7/1.0 − 0.3/0.6 ≤ 0.72）不触发，RED 不成立（实测假绿）。
+# (2.5,0.6,1.5) 在微台阶（x∈[-1,1]）以东：rim 豁口走廊直下直边 0.6，途经点
+# 地面面(0.4)→台面(1.0) 无中间面，旧门 1.0−0=1.0 必触发——停摆确定性复现。
+func test_follow_to_altar_platform() -> void:
+	var l2 := await _assemble_l2()
+	var enemy := await _spawn_bot_at_north_camp(l2)
+	var map_rid: RID = l2.get_world_3d().navigation_map
+	var loco := BotLocomotion.new()
+	add_child_autofree(loco)
+	loco.setup(enemy, map_rid)
+	var target := Vector3(2.5, 0.6, 1.5)  # 祭坛台面（基座/斜板/坡道/微台阶投影外）
+	loco.set_target(target)
+	var drive := await _drive(loco, 600)
+	assert_gt(drive[1], 0,
+			"≤600 物理帧内应登台到达并发射 arrived（实际 %d 帧未到达，bot 位置 %s）"
+			% [drive[0], enemy.global_position])
 	var d_final := Vector2(enemy.global_position.x - target.x,
 			enemy.global_position.z - target.z).length()
 	assert_lt(d_final, 1.0, "到达时距目标水平距 < 1.0（实际 %.3f）" % d_final)
