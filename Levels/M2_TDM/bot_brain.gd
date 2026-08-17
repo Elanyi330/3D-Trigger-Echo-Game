@@ -8,10 +8,18 @@
 # CHASE LKP 跟踪刷新（>0.5m 重 set_target）+ 累计路径 30m 上限、ENGAGE 掩体重选
 # （3-6s 周期；候选 ∈[8,15]m + tier ≤ medium + 对敌 LOS 断点 → 取最近）、目标管理
 # （接敌取最近可见、死亡/失效清目标回 PATROL）。
+# M3.3 T16（2026-08-17）：武器决策——赶路切刀（PATROL/ALERT/CHASE 路程 >8m 且最近
+# 已知敌对 >15m → switch_intent(2)；敌对 ≤15m → 切回 0）/弹尽切手枪（ENGAGE +
+# mag_frac ≤0.2 + 无掩体或最近掩体 >5m + Glock 有弹 → switch_intent(1)；有掩体或
+# Glock 空 → RELOAD）/集群扔雷（ENGAGE/ALERT ≥2 敌对间距 <10m 质心 ≤20m →
+# throw_intent(质心)；Hunter 突入开路分支优先）/近身刀人（敌对 <2m → melee_intent +
+# switch_intent(2)）/弹药箱寻路（reserve==0 或 grenade_left==0 → 最近弹药箱点，
+# ENGAGE 禁止）。M3.3 只发意图信号 + 黑板记录（M3.4 接线真实武器）；意图信号幂等
+# 铁律（发前与黑板意图键比较）。
 # 决策层消费感知铁律：只读黑板/感知信号/查询，不反向写感知状态；感知不决策、
 # 决策不感知（企划书铁律 + 项目 CLAUDE.md 技术陷阱 6）。
 # 未实现部分以默认行为运行（注释注明「Tn 实现」，不允许占位假行为）：
-#   无切枪/无扔雷（T16）；strategy 恒 null（T15 装配）。
+#   strategy 由 T17/T18 装配（T16 只读 params() 决策点）；reload_done 由 M3.4 设。
 # tick 由 Enemy._physics_process 链驱动（60Hz tick 铁律）；Brain 为感知/移动的装配
 # 驱动方（perception.tick / locomotion.tick 由本节点统一驱动——T18 装配一次接线）。
 # M3.3 bot 不开枪：fire_intent 等仅发信号（M3.4 接线射击），T13 测试断言信号与时序
@@ -21,7 +29,7 @@ extends Node
 
 signal state_changed(from: String, to: String)
 signal fire_intent(target: Node)            # M3.4 接线
-signal switch_intent(slot: int)             # M3.4 接线（0=AK 1=Glock 2=刀 3=雷）
+signal switch_intent(slot: int)             # M3.4 接线（0=AK 1=Glock 2=刀 3=雷；T16 起发）
 signal throw_intent(target_pos: Vector3)    # M3.4 接线（T16 起发）
 signal melee_intent(target: Node)           # M3.4 接线（T16 起发）
 
@@ -39,6 +47,19 @@ const POST_HOLD_MAX := 4.0        # s：驻点时长上限
 const ALERT_NO_FIND := 5.0        # s：ALERT 到达 LKP 无发现超时 → PATROL
 const COVER_RESELECT_MIN := 3.0   # s：ENGAGE 掩体重选周期下限（随机区间）
 const COVER_RESELECT_MAX := 6.0   # s：ENGAGE 掩体重选周期上限
+# ── T16 常量（2026-08-17 M3.3 T16，接口块）──
+const KNIFE_RUN_DIST := 8.0      # m：切刀赶路阈值（目标导航剩余路程）
+const KNIFE_SAFE_DIST := 15.0    # m：切刀安全距离（最近已知敌对 > 此值才切刀）
+const PISTOL_MAG_THRESHOLD := 0.2  # 弹匣 ≤20% 触发切手枪评估
+const COVER_DIST_MAX := 5.0      # m：无掩体判定（最近掩体 > 此值 → 切手枪续战）
+const MELEE_RANGE := 2.0         # m：近身刀人
+const GRENADE_CLUSTER_DIST := 10.0  # m：≥2 敌间距 < 此值 = 集群
+const GRENADE_RANGE := 20.0      # m：雷程（与 BotStrategy.GRENADE_RANGE 同值同源——
+                                 #   T15 策略常量；Hunter 开路/集群质心门控共用）
+# ── T16 实现常量（2026-08-17 M3.3 T16，语义规格值；未列入接口块）──
+const THROW_HOLD := 2.0          # s：掷雷意图保持（信号发后切回主枪）
+const AMMO_AT_BOX_DIST := 1.0    # m：站于箱旁守卫（到达清键后原地不重设目标）
+const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")  # ammo_box_points 位置表
 # ── 实现常量（2026-08-17 M3.3 T13，语义规格值；未列入接口块）──
 const FIRE_THROTTLE := 0.2  # s：fire_intent 节流周期（同感知节流 BotPerception.THROTTLE）
 const RETREAT_TIMEOUT := 8.0  # s：RETREAT 超时 → PATROL
@@ -48,9 +69,9 @@ var perception: BotPerception      # 只读（LKP 查询/信号）
 var blackboard: BotBlackboard      # 输入存储（只读 + 标准键写）
 var locomotion: BotLocomotion      # 移动输出（set_target）
 var tactical: TacticalPoints        # 战术点库
-var strategy = null                 # BotStrategy（T15 装配；T13 恒 null 默认 roam 语义）
-                                    # 注：BotStrategy 类 T15 才存在，T13 无法声明类型
-                                    # （接口块偏差注记——T15 时改类型注解）
+var strategy: BotStrategy = null   # 策略选择器（T17/T18 装配；T16 只读 params()
+                                    # 决策点。类型注解兑现 T13 注记「T15 时改」——
+                                    # BotStrategy 类 T15 已存在）
 
 var state := State.IDLE
 var current_target: Node = null     # 当前敌对目标（接敌后 = 玩家/敌对实体）
@@ -76,6 +97,11 @@ var _last_chase_pos := Vector3.ZERO  # CHASE 位移累计锚（上一帧 body �
 var _last_lkp := Vector3.ZERO        # CHASE 最近一次 set_target 的 LKP（>0.5m 刷新比较基准）
 var _retreat_t := 0.0               # RETREAT 计时（自进入累计）
 var _dead := false                  # 死亡停止（Enemy.died；M3.5 复活新实例自然重置）
+# ── T16 实例状态（2026-08-17 M3.3 T16，接口块）──
+var _weapon_slot := 0              # 当前槽（0=AK 1=Glock 2=刀 3=雷；黑板 weapon_slot 同步）
+var _known: Dictionary = {}        # target -> pos：已知敌对位置（hostile_visible/lkp_updated
+                                   #   信号维护——视线可见 + LKP 全体目标口径）
+var _throw_hold_t := 0.0           # 掷雷意图保持倒计时（>0 = 掷后保持；归零切回主枪）
 
 
 ## 装配（tick 前调用）：绑定宿主/感知/黑板/移动/战术点 + 感知信号接线。
@@ -91,14 +117,18 @@ func setup(b: Enemy, perc: BotPerception, bb: BotBlackboard, loco: BotLocomotion
 	perception.hostile_visible.connect(_on_hostile_visible)
 	perception.hostile_lost.connect(_on_hostile_lost)
 	perception.heard_event.connect(_on_heard_event)
+	perception.lkp_updated.connect(_on_lkp_updated)  # (2026-08-17 M3.3 T16) 已知敌对位置维护
 	locomotion.arrived.connect(_on_arrived)
 	if body != null:
 		body.died.connect(_on_died)
+	# (2026-08-17 M3.3 T16) 初始槽从黑板读（装配方预写；缺省 0=AK）
+	_weapon_slot = int(blackboard.get_value("weapon_slot", 0))
 
 
 ## 每物理帧调用（Enemy._physics_process 链；60Hz tick 铁律）。
-## tick 顺序（简报）：感知先行 → 状态机转移判定 → 移动推进 → 状态行为
-## （每状态一个分支）→ 黑板标准键写（state 字符串名/target/target_lkp）。
+## tick 顺序（简报）：感知先行 → 状态机转移判定 → 移动推进 → 武器决策（T16，
+## 先于状态行为——弹药箱到达清键需 _arrived 先于 PATROL 驻点消费）→ 状态行为
+## （每状态一个分支）→ 黑板标准键写（state 字符串名/target/target_lkp/weapon_slot）。
 func tick(delta: float) -> void:
 	if body == null or _dead or perception == null or blackboard == null \
 			or locomotion == null or tactical == null:
@@ -106,6 +136,7 @@ func tick(delta: float) -> void:
 	perception.tick(delta)        # Brain 为感知装配驱动方（信号即时喂状态机）
 	_evaluate_transitions(delta)  # 状态机转移判定
 	locomotion.tick(delta)        # 移动推进（arrived 信号即入 _arrived 旗，状态行为同 tick 消费）
+	_tick_weapon(delta)           # 武器决策（T16 独立守卫，按状态门控）
 	_tick_state(delta)            # 状态行为（每状态一个分支）
 	_write_blackboard()           # 黑板标准键写
 
@@ -128,6 +159,12 @@ func _set_state(to: State) -> void:
 	if _dead:
 		return  # 死亡后不再转移（Brain 停止）
 	var from := state
+	# (2026-08-17 M3.3 T16) 状态转移清空过期意图键（幂等铁律配套，简报规格 6）：
+	# melee/throw 意图仅在其决策状态内有效，转移即过期；intent_switch 保留
+	# （PATROL/ALERT/CHASE 切刀意图跨状态延续；进入 ENGAGE 由 _enter_engage
+	# 切回主枪、掷雷保持期由 _tick_weapon 计时切回）。
+	blackboard.set_value("intent_melee_target", null)
+	blackboard.set_value("intent_throw_pos", Vector3.ZERO)
 	if from == State.ENGAGE and to != State.ENGAGE:
 		_clear_cover()  # ENGAGE 退出掩体状态清理（T14 规格 4）
 	if from == State.CHASE and to != State.CHASE:
@@ -162,6 +199,7 @@ func _evaluate_transitions(delta: float) -> void:
 		var dead_target := current_target
 		current_target = null
 		_seen.erase(dead_target)
+		_known.erase(dead_target)  # (2026-08-17 M3.3 T16) 已知敌对位置剔除
 		_set_state(State.PATROL)
 		return
 	match state:
@@ -187,7 +225,18 @@ func _evaluate_transitions(delta: float) -> void:
 			if blackboard.get_value("hp", 100.0) < 30.0:
 				_set_state(State.RETREAT)
 			elif blackboard.get_value("mag_frac", 1.0) < 0.3:
-				_set_state(State.RELOAD)
+				# (2026-08-17 M3.3 T16) 弹尽切手枪细化（简报规格 2）：mag_frac ≤
+				# PISTOL_MAG_THRESHOLD 且无掩体（或最近掩体 > COVER_DIST_MAX）且
+				# Glock 有弹 → 不转 RELOAD——留 ENGAGE 续战（_tick_weapon 发
+				# switch_intent(1)）；有掩体 → RELOAD 路径（T13 已接：mag<0.3 →
+				# RELOAD，本任务细化注释衔接）；glock_frac==0 → 强制 RELOAD
+				# （switch_intent 不发。缺省键口径：glock_frac 缺省 0 = 无备用弹匣
+				# 保守换弹——T13 测试锚「mag_frac=0.2 未注 glock → RELOAD」据此成立）。
+				if blackboard.get_value("mag_frac", 1.0) <= PISTOL_MAG_THRESHOLD \
+						and _pistol_condition():
+					pass  # 切手枪续战（不转 RELOAD）
+				else:
+					_set_state(State.RELOAD)
 		State.CHASE:
 			# (2026-08-17 M3.3 T14；hp 判定 = T13 审查移交 Minor 1)：CHASE 中低血
 			# 优先撤退——同帧失视+低血时失视先赢（hostile_lost 信号先于本判定完成
@@ -298,6 +347,10 @@ func _enter_engage() -> void:
 	locomotion.clear_target()
 	_cover_t = randf_range(COVER_RESELECT_MIN, COVER_RESELECT_MAX)
 	_cover_target = {}
+	# (2026-08-17 M3.3 T16) ENGAGE 不切刀（简报规格 1）：进入交火即切回主枪——
+	# 切刀赶路/掷雷保持期残留槽清零（幂等：槽已 0 不发）。
+	if _weapon_slot != 0:
+		_emit_switch(0)
 
 
 ## ENGAGE 行为（T14 扩展）：掩体重选倒计时（先于反应处理——每 ENGAGE tick 递减）
@@ -417,6 +470,7 @@ func _write_blackboard() -> void:
 	blackboard.set_value("target_lkp", lkp)
 	blackboard.set_value("patrol_target", _patrol_target)  # T14 规格 1
 	blackboard.set_value("cover_target", _cover_target)    # T14 规格 4
+	blackboard.set_value("weapon_slot", _weapon_slot)      # T16 当前槽记录（接口块写键）
 
 
 # ── 感知信号处理器（setup 时接线；信号驱动转移即时完成）──
@@ -425,6 +479,7 @@ func _write_blackboard() -> void:
 ## 规格 5）+ IDLE/PATROL/ALERT/CHASE 状态转 ENGAGE（反应时间随 ENGAGE 进入重置）。
 func _on_hostile_visible(target: Node, _pos: Vector3) -> void:
 	_seen[target] = true
+	_known[target] = _pos  # (2026-08-17 M3.3 T16) 已知敌对位置维护（发射位置即 LKP 刷新）
 	current_target = _nearest_seen()
 	if state == State.IDLE or state == State.PATROL or state == State.ALERT \
 			or state == State.CHASE:
@@ -456,6 +511,16 @@ func _on_heard_event(_kind: String, pos: Vector3) -> void:
 		_alert_watching = false
 		blackboard.set_value("alert_pos", pos)
 		locomotion.set_target(pos)
+
+
+## lkp_updated（T16 接线）：已知敌对位置维护——非零位置记录（可见刷新/不可见冻结），
+## ZERO = 感知遗忘 → 剔除。决策层只读感知信号铁律（不反向写感知状态）。
+func _on_lkp_updated(target: Node, pos: Vector3, _visible: bool) -> void:
+	if pos != Vector3.ZERO:
+		if not _target_dead(target):
+			_known[target] = pos
+	else:
+		_known.erase(target)
 
 
 ## locomotion.arrived：到达旗（PATROL 驻点/ALERT 计时/RETREAT 回巡逻消费）。
@@ -567,3 +632,292 @@ func _los_exclude_rids(target: Node) -> Array[RID]:
 			if c is CollisionObject3D:
 				out.append((c as CollisionObject3D).get_rid())
 	return out
+
+
+# ── T16：武器决策（2026-08-17 M3.3 T16）──
+
+## 武器决策步（tick 第 4 步，先于状态行为——独立守卫，按状态门控）：
+## 掷雷保持倒计时（归零且槽 3 → 切回主枪）→ 状态门控决策分支
+## （ENGAGE：近身刀人 → 集群扔雷 → 弹尽切手枪；ALERT：集群扔雷；PATROL：Hunter
+## 开路分支）→ 赶路切刀（PATROL/ALERT/CHASE）→ 弹药箱寻路（ENGAGE 禁止）。
+## M3.3 只发意图信号 + 黑板记录（M3.4 接线真实武器）；全部意图发前与黑板意图键
+## 比较（幂等铁律——状态不变不重发）。
+func _tick_weapon(delta: float) -> void:
+	if _throw_hold_t > 0.0:
+		_throw_hold_t -= delta
+		if _throw_hold_t <= 0.0:
+			_throw_hold_t = 0.0
+			if _weapon_slot == 3:
+				_emit_switch(0)  # 掷后 2s 切回主枪（weapon_slot 回 0 意图）
+				blackboard.set_value("intent_throw_pos", Vector3.ZERO)  # 过期意图清空
+	match state:
+		State.ENGAGE:
+			_decide_melee()
+			_decide_grenade()
+			_decide_pistol()
+		State.ALERT:
+			_decide_grenade()
+		State.PATROL:
+			_decide_grenade()  # 仅 Hunter 开路分支（集群分支状态门控内建）
+		_:
+			pass  # CHASE/RELOAD/RETREAT/IDLE 无武器决策（掷雷保持由上方计时处理）
+	if state == State.PATROL or state == State.ALERT or state == State.CHASE:
+		_decide_knife()
+	_tick_ammo()
+
+
+## 赶路切刀（简报规格 1）：最近已知敌对 ≤ KNIFE_SAFE_DIST → 切回主枪
+## （switch_intent(0)，幂等守卫：槽已 0 不发）；否则导航剩余路程 > KNIFE_RUN_DIST
+## → switch_intent(2)。掷雷保持期（槽 3）不切刀。ENGAGE 不切刀（状态门控在
+## _tick_weapon，交火即切回主枪见 _enter_engage）。
+func _decide_knife() -> void:
+	if _weapon_slot == 3:
+		return  # 掷雷保持期不切刀（掷后切回主枪由保持计时处理）
+	var nearest := _nearest_known_hostile_dist()
+	if nearest <= KNIFE_SAFE_DIST:
+		if _weapon_slot != 0:
+			_emit_switch(0)  # 敌对进入安全距离 → 切回 AK 主枪
+		return
+	if _path_remaining() > KNIFE_RUN_DIST:
+		_emit_switch(2)
+
+
+## 弹尽切手枪（简报规格 2）：mag_frac ≤ PISTOL_MAG_THRESHOLD 且无掩体（或最近掩体
+## > COVER_DIST_MAX）且 glock_frac>0 → switch_intent(1)。RELOAD 门控在转移判定用
+## 同一谓词（_pistol_condition）——两处同源；有掩体/Glock 空走 RELOAD（不发 switch）。
+func _decide_pistol() -> void:
+	if blackboard.get_value("mag_frac", 1.0) <= PISTOL_MAG_THRESHOLD \
+			and _pistol_condition():
+		_emit_switch(1)
+
+
+## 切手枪条件（简报规格 2）：Glock 有弹（glock_frac>0；缺省 0 = 无备用弹匣保守
+## 口径）且 无掩体或最近掩体 > COVER_DIST_MAX——掩体 = T14 重选 _cover_target
+## （黑板 cover_target 由 _write_blackboard 同源同步）。
+func _pistol_condition() -> bool:
+	if blackboard.get_value("glock_frac", 0.0) <= 0.0:
+		return false  # Glock 亦空 → 强制 RELOAD（switch_intent 不发）
+	if _cover_target.is_empty():
+		return true
+	var c: Vector3 = _cover_target.get("center", Vector3.INF)
+	return _horiz(c, body.global_position) > COVER_DIST_MAX
+
+
+## 集群扔雷 / Hunter 开路（简报规格 3）：掷雷保持期或 grenade_left==0 → 跳过。
+## Hunter 分支优先（策略与集群不叠加）——strategy.params().type=="hunter" 且
+## grenade_open → 朝 C 区（centroid 半径 25m）内 LKP 扔雷开路（同雷程门控）。
+## 集群分支（ENGAGE/ALERT）：≥2 敌对已知位置（视线可见 + LKP）两两最小水平距
+## < GRENADE_CLUSTER_DIST 且质心距 body ≤ GRENADE_RANGE → throw_intent(质心)。
+## 发射即黑板记录 grenade_left 减一语义 + weapon_slot 3（掷后保持计时切回主枪）。
+func _decide_grenade() -> void:
+	if _throw_hold_t > 0.0:
+		return
+	if int(blackboard.get_value("grenade_left", 1)) <= 0:
+		return
+	if strategy != null and strategy.params().get("type") == "hunter" \
+			and strategy.params().get("grenade_open", false):
+		var open_pos := _hunter_open_pos()
+		if open_pos != Vector3.ZERO:
+			_emit_throw(open_pos)
+			return
+	if state != State.ENGAGE and state != State.ALERT:
+		return  # 集群分支状态门控（PATROL 仅 Hunter 开路）
+	var centroid := _cluster_centroid()
+	if centroid != Vector3.ZERO:
+		_emit_throw(centroid)
+
+
+## Hunter 开路掷点：黑板 target_lkp 在 C 区（距 centroid ≤ params.radius，默认
+## BotStrategy.HUNTER_RADIUS 25m）且距 body ≤ GRENADE_RANGE → 返回 LKP；
+## 否则 ZERO（不掷）。
+func _hunter_open_pos() -> Vector3:
+	var p: Dictionary = strategy.params()
+	var centroid: Vector3 = p.get("centroid", Vector3.ZERO)
+	var radius: float = p.get("radius", BotStrategy.HUNTER_RADIUS)
+	var lkp: Vector3 = blackboard.get_value("target_lkp", Vector3.ZERO)
+	if lkp == Vector3.ZERO or _horiz(lkp, centroid) > radius:
+		return Vector3.ZERO
+	if _horiz(lkp, body.global_position) > GRENADE_RANGE:
+		return Vector3.ZERO
+	return lkp
+
+
+## 集群判定：已知敌对位置两两最小水平距 < GRENADE_CLUSTER_DIST 的配对质心；
+## 质心距 body > GRENADE_RANGE → ZERO（雷程门控）。<2 位置 → ZERO。
+func _cluster_centroid() -> Vector3:
+	var pts: Array[Vector3] = []
+	for t in _known.keys():
+		if not is_instance_valid(t) or _target_dead(t):
+			continue
+		pts.append(_known[t])
+	if pts.size() < 2:
+		return Vector3.ZERO
+	var best_d := INF
+	var ia := 0
+	var ib := 0
+	for i in pts.size():
+		for j in range(i + 1, pts.size()):
+			var d := _horiz(pts[i], pts[j])
+			if d < best_d:
+				best_d = d
+				ia = i
+				ib = j
+	if best_d >= GRENADE_CLUSTER_DIST:
+		return Vector3.ZERO
+	var centroid := (pts[ia] + pts[ib]) / 2.0
+	if _horiz(centroid, body.global_position) > GRENADE_RANGE:
+		return Vector3.ZERO
+	return centroid
+
+
+## 近身刀人（简报规格 4）：_seen 中任一敌对水平距 < MELEE_RANGE → melee_intent(最近)
+## + switch_intent(2)（切刀语义）；无敌对进入近身 → 清过期 melee 意图 + 槽 2 切回
+## 主枪（melee 意图仅 ENGAGE 有效——跨状态清键见 _set_state）。
+func _decide_melee() -> void:
+	var t := _nearest_seen_within(MELEE_RANGE)
+	if t != null:
+		_emit_melee(t)
+		return
+	var cur: Variant = blackboard.get_value("intent_melee_target", null)
+	if cur != null:
+		blackboard.set_value("intent_melee_target", null)  # 过期意图清空（幂等铁律）
+		if _weapon_slot == 2:
+			_emit_switch(0)  # 刀回主枪
+
+
+## 弹药箱寻路（简报规格 5）：reserve==0 或 grenade_left==0 → 最近弹药箱点
+## （LAYOUT.ammo_box_points() 10 点预置）→ locomotion.set_target(点) + 黑板
+## ammo_box_target；到达（arrived 且 ammo_box_target 非空）→ 清键（M3.4 接线拾取）。
+## ENGAGE 中不寻路弹药箱（保战斗优先）；RETREAT 中允许。幂等守卫：已设目标不重设；
+## 站于箱旁（< AMMO_AT_BOX_DIST）不重设（到达清键后原地等待 M3.4 拾取，防 60Hz
+## 重设目标抖动）。M3.3 无拾取——若仍缺弹，状态机换点（巡逻驻点/警戒超时）移离后
+## 会重新寻路弹药箱（ping-pong 由 M3.4 拾取闭环消除）。
+func _tick_ammo() -> void:
+	if state == State.ENGAGE:
+		return  # 保战斗优先（简报规格 5）
+	var box_v: Variant = blackboard.get_value("ammo_box_target", {})
+	var has_box := (box_v is Dictionary) and not (box_v as Dictionary).is_empty()
+	if has_box and _arrived:
+		blackboard.set_value("ammo_box_target", {})  # 到达清键（M3.4 接线拾取）
+		return
+	if has_box:
+		return  # 寻路中（幂等：不重设目标）
+	var reserve := int(blackboard.get_value("reserve", 1))
+	var grenade := int(blackboard.get_value("grenade_left", 1))
+	if reserve == 0 or grenade == 0:
+		var box := _nearest_ammo_box()
+		if not box.is_empty() \
+				and _horiz(box["pos"], body.global_position) > AMMO_AT_BOX_DIST:
+			locomotion.set_target(box["pos"])
+			blackboard.set_value("ammo_box_target", box)
+
+
+## 最近弹药箱点（水平距；表序首个最小者——并列时确定性）。
+func _nearest_ammo_box() -> Dictionary:
+	var best := {}
+	var best_d := INF
+	for p0 in LAYOUT.ammo_box_points():
+		var p: Dictionary = p0
+		var d := _horiz(p["pos"], body.global_position)
+		if d < best_d:
+			best = p
+			best_d = d
+	return best
+
+
+## 最近已知敌对水平距（_known 全体目标最小距离；无已知敌对 → INF——切刀安全）。
+func _nearest_known_hostile_dist() -> float:
+	var best := INF
+	for t in _known.keys():
+		if not is_instance_valid(t) or _target_dead(t):
+			continue
+		var d := _horiz(_known[t], body.global_position)
+		if d < best:
+			best = d
+	return best
+
+
+## 导航剩余路程：黑板键 path_remaining（装配方写；缺键回退 body 距当前移动目标——
+## PATROL 巡逻点 / ALERT 事件位置 / CHASE 追踪 LKP；无目标 → 0 = 不切刀）。
+func _path_remaining() -> float:
+	var pr: Variant = blackboard.get_value("path_remaining", -1.0)
+	if typeof(pr) == TYPE_FLOAT or typeof(pr) == TYPE_INT:
+		if float(pr) >= 0.0:
+			return float(pr)
+	var goal := Vector3.ZERO
+	match state:
+		State.PATROL:
+			if not _patrol_target.is_empty():
+				goal = _patrol_target["center"]
+		State.ALERT:
+			goal = _alert_pos
+		State.CHASE:
+			goal = _last_lkp
+			if goal == Vector3.ZERO and current_target != null \
+					and is_instance_valid(current_target):
+				goal = perception.last_known_pos(current_target)
+	if goal == Vector3.ZERO:
+		return 0.0
+	return _horiz(goal, body.global_position)
+
+
+## 可见敌对中近身最近者（水平距 < max_dist；无 → null）。
+func _nearest_seen_within(max_dist: float) -> Node:
+	var best: Node = null
+	var best_d := INF
+	for t in _seen.keys():
+		if not is_instance_valid(t):
+			continue
+		var n3 := t as Node3D
+		if n3 == null or _target_dead(n3):
+			continue
+		var d := _horiz(n3.global_position, body.global_position)
+		if d < max_dist and d < best_d:
+			best = n3
+			best_d = d
+	return best
+
+
+## switch_intent 发射（幂等铁律）：发前与黑板 intent_switch 比较，相同不发；
+## 发射即写黑板 intent_switch + weapon_slot（意图即当前槽记录，M3.4 接线消费）。
+func _emit_switch(slot: int) -> void:
+	var cur: Variant = blackboard.get_value("intent_switch", -1)
+	if typeof(cur) == TYPE_INT and int(cur) == slot:
+		return  # 幂等：状态不变不重发
+	switch_intent.emit(slot)
+	_weapon_slot = slot
+	blackboard.set_value("intent_switch", slot)
+	blackboard.set_value("weapon_slot", slot)
+
+
+## throw_intent 发射（幂等铁律）：发前与黑板 intent_throw_pos 比较（容差 1e-4），
+## 相同不发。发射即写 intent_throw_pos + grenade_left 减一语义（M3.3 黑板记录；
+## M3.4 由真实武器系统接管）+ weapon_slot/intent_switch 3 + 掷雷保持计时。
+func _emit_throw(pos: Vector3) -> void:
+	var cur: Variant = blackboard.get_value("intent_throw_pos", Vector3.INF)
+	if typeof(cur) == TYPE_VECTOR3 and (cur as Vector3).distance_to(pos) < 1e-4:
+		return  # 幂等：状态不变不重发
+	throw_intent.emit(pos)
+	blackboard.set_value("intent_throw_pos", pos)
+	var gl := int(blackboard.get_value("grenade_left", 1))
+	blackboard.set_value("grenade_left", maxi(gl - 1, 0))
+	_weapon_slot = 3
+	blackboard.set_value("weapon_slot", 3)
+	blackboard.set_value("intent_switch", 3)
+	_throw_hold_t = THROW_HOLD
+
+
+## melee_intent 发射（幂等铁律）：发前与黑板 intent_melee_target 比较，相同不发；
+## 发射即写 intent_melee_target + 伴随 switch_intent(2)（切刀语义，简报规格 4）。
+func _emit_melee(target: Node) -> void:
+	var cur: Variant = blackboard.get_value("intent_melee_target", null)
+	if cur == target:
+		return  # 幂等：状态不变不重发
+	melee_intent.emit(target)
+	blackboard.set_value("intent_melee_target", target)
+	_emit_switch(2)
+
+
+## 水平距离（x/z——项目战术距离口径，同 BotStrategy/BotPerception）。
+static func _horiz(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
