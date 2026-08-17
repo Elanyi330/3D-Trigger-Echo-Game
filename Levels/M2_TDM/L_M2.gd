@@ -490,9 +490,20 @@ func _attach_bot_ai(e: Enemy) -> void:
 	e.add_child(brain)
 	brain.setup(e, perc, bb, loco, _tactical)
 	brain.strategy = strat  # T17/T18 装配注入
-	# 噪音总线 → 该 bot 感知（简报口径：M3.3 总线源仅玩家 = friendly）
-	_noise_bus.noise_event.connect(func(kind: String, pos: Vector3, radius: float) -> void:
-		perc._push_noise_event(kind, pos, radius, "friendly"))
+	# 噪音总线 → 该 bot 感知（简报口径：M3.3 总线源仅玩家 = friendly）。
+	# (2026-08-17 M3.3 T18 修复轮 1)：连接生命周期化——bot 死亡即断总线连接
+	# （died 在 _die() 同步发射，早于淡出与 queue_free，断开窗口安全），防 lambda
+	# 捕获已释放感知（实机 bug：玩家脚步触发已释放捕获 → SCRIPT ERROR 刷屏）；
+	# lambda 内 is_instance_valid 为防御纵深双保险（覆盖无 died 的释放路径——
+	# 重开清场 queue_free/场景释放顺序）。
+	var bus_conn := func(kind: String, pos: Vector3, radius: float) -> void:
+		if not is_instance_valid(perc):
+			return  # 已释放感知静默丢弃（双保险）
+		perc._push_noise_event(kind, pos, radius, "friendly")
+	_noise_bus.noise_event.connect(bus_conn)
+	e.died.connect(func() -> void:
+		if _noise_bus != null and _noise_bus.noise_event.is_connected(bus_conn):
+			_noise_bus.noise_event.disconnect(bus_conn))
 
 
 ## 玩家武器枪声 → 总线（bind 半径后接 shot_fired 弹药参数）。

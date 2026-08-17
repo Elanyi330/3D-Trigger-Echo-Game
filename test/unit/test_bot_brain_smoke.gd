@@ -7,7 +7,8 @@
 # 冒烟口径（简报）：test 1 出生保护结束 + ≤300 帧 5 bot 全 PATROL 且真巡逻（各移动
 # ≥0.5m）；test 2 噪音总线注入枪声（bot 30m 内）→ ≤120 帧 ALERT 且警戒目标 ≈ 枪声
 # 位置（容差 5m）；test 3 玩家入视线（10m 无遮挡）→ ≤120 帧 ENGAGE + 反应时间后
-# fire_intent ≥1，移出视线（锥外站位）→ ≤120 帧 CHASE。
+# fire_intent ≥1，移出视线（锥外站位）→ ≤120 帧 CHASE；test 4（修复轮 1 回归）死
+# bot 总线连接生命周期——击杀→淡出→注入事件零脚本错误 + 活 bot 仍收。
 extends GutTest
 
 const BOT_PERCEPTION := preload("res://Levels/M2_TDM/bot_perception.gd")
@@ -272,3 +273,44 @@ func test_bot_engages_on_sight() -> void:
 		return _bb(bot).get_value("state", "") == "CHASE", 120)
 	assert_true(chasing, "目标移出视线 ≤120 帧内 bot 应 CHASE（实际状态 %s）"
 			% _bb(bot).get_value("state", ""))
+
+
+# ── 冒烟 4：死 bot 总线连接生命周期（2026-08-17 M3.3 T18 修复轮 1 回归）──
+# 实机 bug：噪音总线 lambda 捕获 bot 感知，bot 死亡淡出 queue_free 后 lambda 仍挂
+# 总线，玩家每走一步触发已释放捕获 → SCRIPT ERROR 刷屏（GUT 冒烟未抓到：原测试
+# 从不击杀 bot 后发噪音）。RED 锚：修复前本测试注入事件必触发脚本错误，GUT 对
+# 测试期间脚本错误自动判失败。
+# 断言口径：无脚本错误（GUT 自动）+ 存活 bot 感知队列非空（断开只影响死 bot）。
+func test_dead_bot_bus_silent() -> void:
+	var l2 := await _assemble_l2()
+	var bus: Node = l2.get_node_or_null("NoiseBus")
+	assert_not_null(bus, "前置：NoiseBus 应存在")
+	var bots := _enemy_bots(l2)
+	assert_eq(bots.size(), 5, "前置：L_M2 应产出 5 敌 bot")
+	if bus == null or bots.size() != 5:
+		return
+	# 击杀一名敌 bot（出生保护已过期——_assemble_l2 已等 PATROL；999 伤害即死）
+	var victim: Enemy = bots[0]
+	assert_false(victim.dead, "前置：受害 bot 应存活")
+	victim.take_damage(999.0)
+	assert_true(victim.dead, "前置：take_damage 999 应立即致死（died 已同步发射）")
+	# 等死亡淡出结束（倒地 0.3s + 淡出 0.5s = 48 帧；60 帧余量）→ 尸体已 queue_free
+	await wait_physics_frames(60)
+	assert_false(is_instance_valid(victim), "前置：死亡淡出后敌 bot 尸体应已释放")
+	# 经总线注入脚步/枪声 ×3（修复前：已释放 lambda 捕获被触发 → SCRIPT ERROR）
+	for k in 3:
+		bus.noise_event.emit("footstep", Vector3(0, 0, 5), 20.0)
+		bus.noise_event.emit("gunshot", Vector3(0, 0, 5), 100.0)
+		await wait_physics_frames(1)
+	# 推进若干帧（无脚本错误即本测试核心断言——GUT 自动判失败，无额外错误断言）
+	await wait_physics_frames(10)
+	# 存活 bot 仍正常收到事件（事件队列在 TTL 内非空——断开只影响死 bot 不影响活 bot）
+	var alive_got := false
+	for b in bots:
+		if not is_instance_valid(b):
+			continue
+		var perc: Node = (b as Node).get_node_or_null("BotPerception")
+		if perc != null and not (perc.get("_heard_events") as Array).is_empty():
+			alive_got = true
+			break
+	assert_true(alive_got, "存活 bot 应仍经总线收到噪音事件（断开仅限死 bot）")
