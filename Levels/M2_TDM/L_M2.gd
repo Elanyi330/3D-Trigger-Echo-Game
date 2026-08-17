@@ -22,6 +22,7 @@ const WEAPON_MODELS := [
 ]
 const GREYBOX := preload("res://Levels/M2_TDM/map_greybox.gd")
 const LAYOUT := preload("res://Levels/M2_TDM/map_layout_v3.gd")
+const JUMP_EDGES := preload("res://Levels/M2_TDM/jump_edges.gd")  # (2026-08-17 M3.3 T17/T18) TacticalPoints 面表来源
 const ENEMY_SCRIPT := preload("res://Levels/Enemy/Enemy.gd")
 const FRIENDLY_TINT := Color(0.3, 0.65, 0.35)  # 友方绿（与玩家本色一致）
 
@@ -43,6 +44,11 @@ var _north_pool: SpawnPool   # 北营点池（玩家 + 4 友军共用，防重�
 var _respawner: TdmRespawner  # 南营敌补位器
 var _friendly_names: Array = []  # 4 友军名字（本局）
 var _enemy_names: Array = []     # 5 敌名队列（死→名回队尾，补位敌取队首——身份恒 5/局）
+
+# ---- M3.3 AI 装配（2026-08-17 T17/T18）----
+var _noise_bus: NoiseBus             # 噪音总线（T7 契约：new + add_child）
+var _player_steps: FootstepEmitter   # 玩家脚步发射器（敌 bot 听觉的脚步声源）
+var _tactical: TacticalPoints        # 战术点库（共享单实例，T12 build_from_faces 一次构建）
 
 # ---- HUD ----
 var _ammo_label: Label
@@ -148,6 +154,10 @@ func _setup_tdm() -> void:
 	_setup_ammo_boxes()
 	_on_health_changed(_life.health)
 	_begin_player_protection()
+	# M3.3 AI 装配（2026-08-17 T17/T18）：respawner.start() 已同步产出 5 敌——
+	# 共享实例（NoiseBus/TacticalPoints）+ 玩家脚步/枪声接线 + 补挂 5 敌 AI 链；
+	# 此后补位敌在 _spawn_enemy 即时挂链。
+	_setup_bot_ai()
 
 
 ## 导航装配（2026-08-13 navmesh 阶段 2/3）：烘焙网格区域 + 跳跃链接。
@@ -367,6 +377,10 @@ func _spawn_enemy() -> Node:
 	e.spawn_protection = Enemy.SPAWN_PROTECTION  # 出生保护（生成方显式设置）
 	add_child(e)
 	e.rotation.y = PI + randf_range(-PI / 6.0, PI / 6.0)
+	# (2026-08-17 M3.3 T17/T18) 补位敌即时挂 AI 链；开局 5 敌先于 _setup_bot_ai 产出
+	# （respawner.start 在 bus 创建前）——其链由 _setup_bot_ai 遍历补挂。
+	if _noise_bus != null:
+		_attach_bot_ai(e)
 	return e
 
 
@@ -379,6 +393,177 @@ func _on_enemy_died(e: Node) -> void:
 	_stats.add_kill(_stats.player_name)  # M2 仅玩家击杀（M3 队友击杀归因接入点）
 	_match.add_friendly_kill()
 	_board.record_death("enemy", e.global_position)  # 事件板（2026-08-17 M3.2 T9）：不含击杀者位置
+
+
+# ---- M3.3 AI 装配（2026-08-17 T17/T18；最小侵入：仅本文件新增 + _spawn_enemy 挂链）----
+
+## AI 装配总入口（_setup_tdm 末尾调用）：
+##   - NoiseBus（T7 契约：new + add_child）+ 玩家枪声/脚步 → 总线接线；
+##     Grenade.exploded → "explosion"(50) 接线留注记：L_M2 无 Grenade 引用
+##     （WeaponManager._throw_grenade 动态生成），M3.4 战斗集成时接——本任务接 shot_fired。
+##     M67 投掷不发声：THROWABLE 核心不发 shot_fired（WeaponCore._execute_shot 门控），
+##     「扔出无声、炸响另行接线」T7 契约自然成立。
+##   - TacticalPoints 共享单实例（T12：JumpEdges.faces() 面表一次构建）。
+##   - 开局 5 敌 AI 链**等导航首同步后**补挂（见 _attach_bots_after_sync——修复 1：
+##     BotLocomotion.setup 需 map_get_closest_point 对齐链接端点，首同步前查询报错
+##     且返回零点，链接表永久错位；respawner.start() 已同步产出 5 敌，早于同步）。
+func _setup_bot_ai() -> void:
+	_noise_bus = NoiseBus.new()
+	_noise_bus.name = "NoiseBus"
+	add_child(_noise_bus)
+	# 玩家各武器核心枪声 → 总线（res.noise_radius == 0 的静默武器不接线——现四武器全 >0）
+	for i in 4:
+		var core := _manager.get_core(i)
+		var res := _manager.get_resource(i)
+		if core == null or res == null or res.noise_radius <= 0.0:
+			continue
+		core.shot_fired.connect(_on_shot_fired.bind(res.noise_radius))
+	# 玩家脚步发射器（敌 bot 听觉的脚步声源；60Hz tick 见 _physics_process）
+	_player_steps = FootstepEmitter.new()
+	_player_steps.name = "PlayerFootsteps"
+	_player.add_child(_player_steps)
+	_player_steps.setup(_player)
+	_player_steps.footstep.connect(_on_player_footstep)
+	# 战术点库（共享单实例；140 点 = 160 面 − 20 导航不可达）
+	_tactical = TacticalPoints.build_from_faces(JUMP_EDGES.faces())
+	# 开局 5 敌补挂 AI 链（等导航同步——此后补位敌在 _spawn_enemy 即时挂链）
+	_attach_bots_after_sync.call_deferred()
+
+
+## 等导航地图两轮迭代后补挂开局 5 敌 AI 链（2026-08-17 M3.3 T17/T18 修复 1）：
+## BotLocomotion.setup 用 map_get_closest_point 对齐 54 链接端点——首同步前查询
+## 报错（GUT 记 Unexpected Errors 判测试失败）且返回零点 → 链接表永久错位、跳跃段
+## 分类静默丢失。等待口径同 _create_nav_links_after_sync：iter ≥ 基值 +2（≤120 帧
+## 兜底——最坏退回旧行为）。出生保护 2s（120 帧）内挂链完成，无行为影响。
+func _attach_bots_after_sync() -> void:
+	var map_rid := get_world_3d().navigation_map
+	var base_iter := NavigationServer3D.map_get_iteration_id(map_rid)
+	for i in 120:
+		await get_tree().physics_frame
+		if NavigationServer3D.map_get_iteration_id(map_rid) >= base_iter + 2:
+			break
+	for c in get_children():
+		if c is Enemy and (c as Enemy).is_enemy:
+			_attach_bot_ai(c)
+
+
+## 单敌 AI 链装配：Enemy → BotPerception（faction="enemy"、player_target=_player）→
+## FootstepEmitter → BotBlackboard（初始键：hp=100/mag_frac=1.0/glock_frac=1.0/
+## grenade_left=1/reserve=1/spawn_protection_left=body 实时值）→ BotLocomotion
+## （map_rid）→ BotStrategy（event_board）→ BotBrain（strategy 由装配方注入——T16
+## 决策点只读 params()）。tick 由 L_M2._physics_process 统一驱动（60Hz 铁律）；
+## Brain.tick 内职责边界：先 perception.tick → 状态机转移 → locomotion.tick 末
+## （BotBrain.tick 注释）。
+## 敌 bot 脚步 → 总线接线留 M3.4（NoiseBus 无 source 字段——现接线会以 friendly
+## 源注入敌 bot 自己，同阵营过滤失效；M3.4 友军听觉装配时一并解决）。
+func _attach_bot_ai(e: Enemy) -> void:
+	if e.get_node_or_null("BotBrain") != null:
+		return  # 幂等（重开/重复调用防双链）
+	var perc := BotPerception.new()
+	perc.name = "BotPerception"
+	e.add_child(perc)
+	perc.setup(e, "enemy", _player)
+	var steps := FootstepEmitter.new()
+	steps.name = "FootstepEmitter"
+	e.add_child(steps)
+	steps.setup(e)
+	var bb := BotBlackboard.new()
+	bb.name = "BotBlackboard"
+	e.add_child(bb)
+	# 黑板初始键（简报装配语义规格）
+	bb.set_value("hp", 100.0)
+	bb.set_value("mag_frac", 1.0)
+	bb.set_value("glock_frac", 1.0)
+	bb.set_value("grenade_left", 1)
+	bb.set_value("reserve", 1)
+	bb.set_value("spawn_protection_left", e.spawn_protection)
+	var loco := BotLocomotion.new()
+	loco.name = "BotLocomotion"
+	e.add_child(loco)
+	loco.setup(e, get_world_3d().navigation_map)
+	var strat := BotStrategy.new()
+	strat.name = "BotStrategy"
+	e.add_child(strat)
+	strat.setup("enemy", _board, bb, e)
+	var brain := BotBrain.new()
+	brain.name = "BotBrain"
+	e.add_child(brain)
+	brain.setup(e, perc, bb, loco, _tactical)
+	brain.strategy = strat  # T17/T18 装配注入
+	# 噪音总线 → 该 bot 感知（简报口径：M3.3 总线源仅玩家 = friendly）
+	_noise_bus.noise_event.connect(func(kind: String, pos: Vector3, radius: float) -> void:
+		perc._push_noise_event(kind, pos, radius, "friendly"))
+
+
+## 玩家武器枪声 → 总线（bind 半径后接 shot_fired 弹药参数）。
+func _on_shot_fired(radius: float, _ammo_left: int) -> void:
+	_noise_bus.noise_event.emit("gunshot", _player.global_position, radius)
+
+
+## 玩家脚步 → 总线（敌 bot 听觉源；半径由 FootstepEmitter 分级）。
+func _on_player_footstep(pos: Vector3, radius: float) -> void:
+	_noise_bus.noise_event.emit("footstep", pos, radius)
+
+
+## 导航剩余路程（2026-08-17 M3.3 T16 注记：黑板键 path_remaining 由装配方写——
+## Brain._path_remaining 缺键回退直线距，写键后转精确路径剩余；BotStrategy 路径长
+## 同键消费）。BotLocomotion 无公开剩余路程接口（本任务禁改其文件），装配方直读其
+## _path（GDScript 无强制私有；水平距口径与到达判定一致）。
+func _locomotion_path_remaining(loco: BotLocomotion, body: Node3D) -> float:
+	if loco == null or body == null:
+		return 0.0
+	var pts: PackedVector3Array = loco.get("_path")
+	if pts.is_empty():
+		return 0.0
+	var total := Vector2(pts[0].x - body.global_position.x,
+			pts[0].z - body.global_position.z).length()
+	for i in range(1, pts.size()):
+		total += Vector2(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z).length()
+	return total
+
+
+## AI tick 链（2026-08-17 M3.3 T17/T18；60Hz 物理帧铁律）：
+## 玩家脚步发射器 → 每敌 bot：黑板装配方键 → strategy.tick → brain.tick
+## （Brain 内先 perception.tick + 状态机 + locomotion.tick 末）。
+## 装配方黑板键（审查移交口径）：
+##   spawn_protection_left：直映射 body.spawn_protection 实时值（每 tick 刷新——
+##     T13 审查 Minor 2，禁止另起独立倒计时防双计时；Enemy._physics_process 已递减）；
+##   alive_own/alive_enemy：双键同 tick 原子写全（T15 审查注记，供 Hold 策略）；
+##   path_remaining：精确路径剩余（T16 注记，见 _locomotion_path_remaining）。
+## M3.3 bot 不开枪：意图信号不接武器（M3.4 接线），既有对局行为零回归。
+func _physics_process(delta: float) -> void:
+	if _noise_bus == null:
+		return  # 装配前（_ready 早期帧）零运行
+	if _player_steps != null:
+		_player_steps.tick(delta)
+	# 存活统计（同 tick 算一次，双键写全——原子口径）
+	var alive_own := 0
+	var alive_enemy := 0
+	for c in get_children():
+		if c is Enemy and not (c as Enemy).dead:
+			if (c as Enemy).is_enemy:
+				alive_own += 1
+			else:
+				alive_enemy += 1
+	if _life != null and not _life.dead:
+		alive_enemy += 1
+	for c in get_children():
+		if not (c is Enemy) or not (c as Enemy).is_enemy or (c as Enemy).dead:
+			continue
+		var brain: Node = c.get_node_or_null("BotBrain")
+		if brain == null:
+			continue
+		var bb: Node = c.get_node_or_null("BotBlackboard")
+		var loco: Node = c.get_node_or_null("BotLocomotion")
+		var strat: Node = c.get_node_or_null("BotStrategy")
+		var steps: Node = c.get_node_or_null("FootstepEmitter")
+		bb.set_value("spawn_protection_left", (c as Enemy).spawn_protection)
+		bb.set_value("alive_own", alive_own)
+		bb.set_value("alive_enemy", alive_enemy)
+		bb.set_value("path_remaining", _locomotion_path_remaining(loco as BotLocomotion, c))
+		strat.tick(delta)   # 策略先于 Brain（Brain 消费 params()；state 键上一帧已写）
+		brain.tick(delta)
+		steps.tick(delta)   # 脚步发射器 60Hz 驱动（现无订阅方——M3.4 接线消费）
 
 
 # ---- 武器装配（移植自 L_Main.gd，同款：逻辑挂 Player 下，表现挂 Head 下）----
