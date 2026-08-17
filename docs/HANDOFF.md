@@ -1,7 +1,7 @@
 # 🤖 新 AI 快速上手（HANDOFF）—— Trigger Echo
 
 > **给下一段对话的 AI**：读这一页即可抓住项目重点与当前里程碑方向，再按需深入下列文档。
-> 最近更新：2026-08-16（**M2 收官（用户拍板，GUT 369/369）**：数据基础四层齐备——4 面 12m 隐形墙仅碰撞不写布局数据（哈希不变记录不丢）→ jump_edges.gd 面级数据结构（面表 160/54 链接归属/54 边组）→ jump_solver.gd 确定性求解器（**真实跳高 1.5133m**，抓边带 0.5）→ jump_edges_dataset.json 语料校准数据集（M4 消费，skill 5 条）→ probe_jump_edges 量化门禁全过；4 条数据错误链接已按拍板修复；四坡道 navmesh 烘焙替身（方案 A：悬空斜多边形根治、布局哈希不变、④ 梯度门禁、1087→1113 多边形）；**面级分析报告（160 面四档分级，`docs/reports/2026-08-16-face-analysis.md`）**；**自动跳跃遍历器 AutoTraversal 已退役（2026-08-16 用户拍板：数据基础已足，M3 运行时 AI 移动不走遍历范式）**——遍历代码/测试/装配全删，**保留 MovementCommand 命令接口 + command_override（M3 AI 驱动 bot 移动的输入抽象基础）**；**跳跃记录语料上限 3000 条（2026-08-16 用户拍板）**：继续游玩持续记录，FIFO 淘汰最旧，episode_count 唯一 ID 序列递增、文件数封顶）。
+> 最近更新：2026-08-17（**M3 AI 基础三层完成（GUT 482/482）**：M3.1 移动层 407/407——Enemy 改造为 CharacterBody3D+MovementController（Bots 物理层/命令接口）+ BotLocomotion（navmesh 路径跟随+跳跃一次参数化执行+卡顿对策+反向链接方向性修正）；M3.2 感知层 432/432——视线（120°/40m/0.2s 节流/散布采样防穿缝）+ 听觉（噪音半径入 .tres 45/30/2/50+脚步 2.5m 步幅+TTL）+ LKP（8s 遗忘）+ 事件板（死亡 30s TTL）+ 黑板；M3.3 决策层 482/482——七状态 HSM + 战术点库（160 面四档权重）+ **4 策略选择器**（Hunter 复仇突入/Flanker 绕道侧袭/Hold 劣势收缩/roam，全量化触发+裁决+冷却+槽位 ≤2）+ 武器决策五规则（切刀赶路/弹尽切手枪/集群扔雷/近身刀人/弹药箱寻路）+ L_M2 装配 5 敌 bot 60Hz 全链；**实机 playtest 抓出死 bot 噪音总线 lambda 泄漏已修复闭环**；**下一步 M3.4 战斗集成（计划就绪 T19-T25：归因通道/bot 武器+射击 35%/近战/扔雷/拾弹药箱/噪音余项/实战冒烟）**，其后 M3.5 友军接入、M3.6 收尾）。
 
 ---
 
@@ -9,7 +9,8 @@
 
 - **纯离线 3D 第一人称 5v5 竞技射击**（玩家 + 4 AI 队友 vs 5 AI 敌人），Godot 4.7.1，macOS，方块/Minecraft 美术风，GUT 测试。
 - **全面参考 CS 手感**：武器数值、人物身高/命中判定、移动速度、后坐力/散布、近战、开镜——全部对标 CS。
-- **当前进度**：M0 + M1 + M1.5 + M1.75 全部完成；**M2 完成（2026-08-13 用户实测验收）**：小图 v3「回声祭坛」（布局重写 + 波次退役改敌营补位，v2 已退役）+ 手感修复轮（step-up 0.62m 可行走登台 / 空中控制 / 横脊墙×4 / F5-F8 手感微调）+ 两轮战斗修复 + 小地图 + **模块主题配色**（纹理级升级已取消回退）+ **TDM 框架全落地**（计分/复活/胜负/R 重开、友军×4、出生保护、禁友伤、头顶名、结算 KD、有限弹药+弹药箱×10）。
+- **当前进度**：M0-M2 全部完成；**M3 AI 基础三层完成（2026-08-17，GUT 482/482）**——bot 已在游戏中自主巡逻/听觉警戒/视线接敌/发战斗意图（**还不开枪**，M3.4 战斗集成）。**M3.4 计划就绪待实施**（bot 开枪/近战/扔雷/拾弹药箱/击杀归因）。
+- **bot 三层架构**（企划书铁律：感知与决策分离）：BotBrain（七状态 HSM+4 策略+武器决策，读黑板）→ BotPerception（视线/听觉/LKP，只上报不决策）→ BotLocomotion（复用玩家 MovementController 物理，MovementCommand 命令接口）。
 
 ## 二、M2 小图 v3「回声祭坛」+ 手感修复轮当前状态（2026-08-13，用户实机验收 PASS）
 
@@ -51,24 +52,28 @@
 ## 三、工作目录 / 验证 / 运行
 
 - **工作目录**（单目录）：`/Users/elanyi/Projects/Trigger-Echo`，分支 `feat/m1-assets`。
-- **测试**：`godot --headless --path . -s addons/gut/gut_cmdln.gd`（应全绿，369 测试）。
-- **运行游戏（M2 小图 v3）**：`godot --path . Levels/M2_TDM/L_M2.tscn`（WASD 移动/空格跳/Shift 蹲/左键开火/1-4 切枪/4+长按左键看手雷抛物线；**≤0.62m 台阶直接走上去不用跳、静止起跳空中可按方向键转向**；波次刷新：5 敌/波，全灭 1.5s 下一波；跳跃记录自动启用；**左上角小地图：旋转式蓝图雷达 12m×1.5 倍、12m 内敌人红点——用户实机验收 OK（2026-08-13）**）。
-- **自动跳跃遍历（AutoTraversal）已退役（2026-08-16 用户拍板）**：数据基础已足——人类语料 706 条（继续游玩持续记录，**至多 3000 条 FIFO**）+ 面级分析报告 160 面四档分级 + 54 边求解器验证，**M3 运行时 AI 移动不走遍历范式**。`auto_traversal.gd`/`auto_traversal_record.gd`/`tools/analyze_auto_traversal.py` 与全部遍历测试、L_M2 装配已删除；`user://auto_traversal/` 旧记录留磁盘只读（`tools/analyze_faces.py` 对照读取不崩）。**保留并沿用**：`Player/MovementCommand.gd` + `MovementController.command_override` 接口 + `test_auto_command.gd`——M3 AI 驱动 bot 移动的输入抽象基础（与遍历器解耦独立）。
+- **测试**：`godot --headless --path . -s addons/gut/gut_cmdln.gd`（应全绿，**482 测试**）。
+- **运行游戏（M2 小图 v3 + 5 敌 bot AI）**：`godot --path . Levels/M2_TDM/L_M2.tscn`（WASD 移动/空格跳/Shift 蹲/左键开火/1-4 切枪/4+长按左键看手雷抛物线；≤0.62m 台阶直接走上去；K 自杀测试键/R 重开/Esc 退出；左上角小地图）。**M3 现状：5 敌 bot 自主巡逻/听觉警戒/视线接敌/追击（不开枪）**——M3.4 战斗集成后 bot 才会开枪/扔雷/刀人。
 - **M1 靶场**：`godot --path . Levels/Main/L_Main.tscn`。
+- **新 class_name 脚本铁律**：任何新建 `class_name` 脚本后必须跑 `godot --headless --path . --import` 重扫全局类缓存，否则 GUT/运行时类名解析失败。
 
 ## 四、文档 / 资产地图（按需深入）
 
 | 文档 | 内容 |
 |------|------|
 | `docs/PROGRESS-M1-ASSETS.md` | M1/M1.5/M1.75 详细进度 |
-| `docs/superpowers/specs/2026-08-11-m2-echo-altar-v3-design.md` | **M2 v3「回声祭坛」设计文档**（现行布局：调研十条 + 分区几何 + 14 刷怪面 + 模式参数拍板） |
-| `docs/reports/2026-08-16-face-analysis.md` | **面级分析报告**（160 面：可达性/难度四级/参数/数据质量——工具 `tools/analyze_faces.py`；数据哲学：成功训参/失败算难度/难面双降权，增强标记口径） |
-| `docs/superpowers/specs/2026-08-10-m2-tdm-map-design.md` | M2 设计文档（v2 时代；布局教训 §十四仍有效；TDM 复活延迟 3s §九） |
+| `docs/superpowers/specs/2026-08-16-m3-ai-foundation-design.md` | **M3 设计文档**（用户拍板全量：9 bot 同参数/武器自主决策/策略层 4 目录/准头 35%/阶段表实时状态） |
+| `docs/superpowers/plans/2026-08-16-m3-ai-locomotion.md` | M3.1 移动层计划（T0-T5，已完成） |
+| `docs/superpowers/plans/2026-08-17-m3-ai-perception.md` | M3.2 感知层计划（T6-T10，已完成） |
+| `docs/superpowers/plans/2026-08-17-m3-ai-decision.md` | M3.3 决策层计划（T11-T18，已完成） |
+| `docs/superpowers/plans/2026-08-17-m3-ai-combat.md` | **M3.4 战斗集成计划（T19-T25，待实施——下一步从这里开始）** + M3.5/M3.6 大纲 |
+| `docs/superpowers/ledger/2026-08-16-m3-ledger.md` | M3 SDD 账本（任务状态/决策记录/M3.4 移交注记/M3.3 前置清单归档） |
+| `docs/superpowers/specs/2026-08-11-m2-echo-altar-v3-design.md` | M2 v3「回声祭坛」设计文档（现行布局） |
+| `docs/reports/2026-08-16-face-analysis.md` | 面级分析报告（160 面四档分级） |
 | `Assets/Models/COMPONENTS.md` | 武器/角色逐组件精确坐标/标记/骨骼/取景总表 |
-| `docs/superpowers/reference/cs2-weapon-data.md` | CS 数据 + 比例权威表（数值对齐唯一参照） |
+| `docs/superpowers/reference/cs2-weapon-data.md` | CS 数据 + 比例权威表 |
 | `docs/PROGRESS.md` / `FEATURES.md` | 总进度路线图 / 功能清单 |
 | `docs/2026-08-06-trigger-echo-design.md` | 项目企划书（最终设计规格） |
-| `Assets/Models/README.md` | 资产规范（目录/命名/许可/新增武器流程） |
 
 ## 五、核心约定（勿踩坑）
 
@@ -86,6 +91,14 @@
   1. **窄缝扫描角部盲区**：仅角部相接的夹点（如缺口门墙与长墙角对角相切）实际可通行但 scan_gaps 不可见 → **"扫描绿 ≠ 可通行"**，必须由 `probe_v3_walk` 连通性门禁（行走遍历 + 瞬移≤1 EXIT 门控）兜底
   2. **封豁事故**：2.5m 外环豁口 + 满宽门墙 + 两端还想留通道 = **数学不可能**（2.5m − 1.0m 门墙 = 1.5m，两端各分 <1.2m 窄缝红线）。铁律：**加墙必须给通行留 ≥1.2m，或完全不放**。涉事缺口门墙×4 被审查否决后返工删除（07352f3），豁口恢复全通行
 - **方法论**：Superpowers 流程；**TDD 先写失败测试**；**验证（跑测试/渲染亲眼看）后才声明完成**。
+- **M3 开发铁律（2026-08-17 沉淀，勿踩）**：
+  1. **60Hz tick 口径**：凡集成测试驱动循环必须每物理帧 tick（`wait_physics_frames(1)` + tick），旧 wait_physics_frames(2)=30Hz 模式在刀锋窗口任务（跳跃触发）上与生产不同频（T3 审查实证打回）。
+  2. **集成测试装配 L_M2 后必须立即 queue_free JumpRecorder**（防测试污染 user://jump_training 人类语料）。
+  3. **bot 可达性铁律**：bot 胶囊底球 r=0.31（玩家 0.5）→ 抓边带收缩，所需升程 = dh − 0.31；dh≥1.5 链接（PavToSpur 系）对 bot 近不可达。M4 数据消费必须补 bot 可达性过滤；T5 冒烟路径选择避开此类链接。
+  4. **前向公式口径**：本地前 = (−sin yaw, −cos yaw)（Godot 右手系，yaw=π/2 时前=−X）；旧 (sin,−cos) 仅 yaw=0 成立（T2 bug 教训，T3 修正）。坐标：+Z=north。
+  5. **感知时间戳用 _elapsed 单调累计**（delta 求和），不用 Time.get_ticks（测试可控）。
+  6. **感知与决策分离**：感知只发信号+存状态；决策只读感知不反写；信号订阅者死亡必须断开（死 bot 噪音总线 lambda 泄漏——实机 playtest 抓出的真实 bug 教训）。
+  7. **跳跃记录重置铁律不变**：MOVEMENT_REV 全程未 bump（bot 复用玩家物理零改动）；任何移动语义变更仍须 bump。
 
 ## 六、可复用的验证工具
 
@@ -113,4 +126,4 @@
 
 **给用户的开场提示词（复制即用）**：
 
-> 读 `docs/HANDOFF.md`，了解 Trigger Echo 当前状态（**M2 收官（2026-08-16 用户拍板）**：小图 v3「回声祭坛」+ TDM 框架 + navmesh 全流程（1113 多边形/54 跳跃链接）+ jump_solver 确定性求解器（真实跳高 1.5133m）+ jump_edges_dataset.json（M4 消费）+ **面级分析报告（160 面四档分级）**；**自动跳跃遍历器已退役**（数据基础已足，M3 运行时 AI 移动不走遍历范式；MovementCommand/command_override 接口保留作 M3 bot 移动输入抽象）；**跳跃记录语料 3000 上限 FIFO**；**GUT 369/369**）。我们在单目录 `/Users/elanyi/Projects/Trigger-Echo`（分支 feat/m1-assets）上继续 **M3 AI 基础**。本轮我想做的是：【在此填你的需求】
+> 读 `docs/HANDOFF.md`，了解 Trigger Echo 当前状态（**M3 AI 基础三层完成（2026-08-17，GUT 482/482）**：M3.1 移动层——Enemy 改造 + BotLocomotion（寻路/跳跃参数化/卡顿对策）；M3.2 感知层——视线/听觉/LKP/事件板/黑板；M3.3 决策层——七状态 HSM + 4 策略选择器 + 武器决策五规则 + L_M2 装配 5 敌 bot；实机 playtest 修复死 bot 总线泄漏）。我们在单目录 `/Users/elanyi/Projects/Trigger-Echo`（分支 feat/m1-assets）上继续 **M3.4 战斗集成**（计划 `docs/superpowers/plans/2026-08-17-m3-ai-combat.md` 已就绪：T19 伤害归因 → T20 bot 武器+射击 35% → T21 近战 → T22 扔雷 → T23 拾弹药箱 → T24 噪音余项 → T25 实战冒烟+实机验收）。本轮我想做的是：【在此填你的需求】
