@@ -42,6 +42,7 @@ func test_set_get_roundtrip() -> void:
 
 # ── T10-2：写入发 key_changed 且 key 正确；同值重写仍发（无去重）──
 func test_key_changed_signal() -> void:
+	_changed_keys.clear()  # 清基线：GUT 复用脚本实例，前序测试写入的信号会累积到本数组
 	var board := _make_board()
 	board.set_value("hostiles", [1, 2, 3])
 	assert_eq(_changed_keys.size(), 1, "set_value 发一次 key_changed")
