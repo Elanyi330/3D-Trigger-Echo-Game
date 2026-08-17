@@ -20,18 +20,23 @@ func _on_strategy_changed(from: int, to: int) -> void:
 	_changes.append([from, to])
 
 
-## 测试夹具：独立 EventBoard + BotBlackboard + BotStrategy（body=null——
-## Flanker 候选自动跳过；body 仅 Flanker 评估需要）。
-func _make_rig(faction: String) -> Dictionary:
+## 测试夹具：独立 EventBoard + BotBlackboard + BotStrategy。with_body=true 时注入
+## 真实 CharacterBody3D（global_position 默认 ZERO）——T15-6 判别力（审查 Minor 1）：
+## FLANKER 候选需要 body 非 null 才真实成立，注入后优先级规则被真实受测。
+func _make_rig(faction: String, with_body: bool = false) -> Dictionary:
 	var board := EventBoard.new()
 	add_child_autofree(board)
 	var bb := BotBlackboard.new()
 	add_child_autofree(bb)
 	var st := BotStrategy.new()
 	add_child_autofree(st)
-	st.setup(faction, board, bb, null)
+	var bd: CharacterBody3D = null
+	if with_body:
+		bd = CharacterBody3D.new()
+		add_child_autofree(bd)
+	st.setup(faction, board, bb, bd)
 	st.strategy_changed.connect(_on_strategy_changed)
-	return {"strategy": st, "board": board, "blackboard": bb}
+	return {"strategy": st, "board": board, "blackboard": bb, "body": bd}
 
 
 ## 60Hz 步进：strategy 与 board 同步 tick（同锁步口径——board._elapsed 与
@@ -93,6 +98,26 @@ func test_flanker_eligible_boundary() -> void:
 			"path/直线 1.4 < 1.5 → false")
 
 
+# ── T15-4b（审查裁决修复 1，2026-08-17）：FLANKER 出口 10m 与 ≥15m 触发无重叠 ──
+# 目标直线 20m（旧 [15,30) 重叠区间）触发 FLANKER → 推进若干帧不立即退出（仍
+# FLANKER——Flanker 在逼近 15m→10m 全程有效）；目标移到 9m → 接敌出口回 ROAM。
+func test_flanker_exit_10m_regression() -> void:
+	var rig := _make_rig("enemy", true)
+	rig["blackboard"].set_value("state", "PATROL")
+	rig["blackboard"].set_value("target_lkp", Vector3(20, 0, 0))  # 直线 20m ∈ 旧重叠区间
+	rig["blackboard"].set_value("path_remaining", 40.0)          # 比率 2.0 ≥ 1.5
+	rig["strategy"].tick(1.0 / 60.0)
+	assert_eq(rig["strategy"].current(), BotStrategy.Strategy.FLANKER,
+			"前置：直线 20m 触发 FLANKER")
+	_step(rig, 1.0)  # 推进 60 帧
+	assert_eq(rig["strategy"].current(), BotStrategy.Strategy.FLANKER,
+			"出口 10m：20m 不立即退出（与 ≥15m 触发无重叠）")
+	rig["blackboard"].set_value("target_lkp", Vector3(9, 0, 0))  # 目标逼近 9m
+	rig["strategy"].tick(1.0 / 60.0)
+	assert_eq(rig["strategy"].current(), BotStrategy.Strategy.ROAM,
+			"目标 9m < 10m → 接敌出口回 ROAM")
+
+
 # ── T15-5：存活少 + ≥2 阵亡非簇 → true；簇 → false；存活持平 → false ──
 func test_hold_eligible_conditions() -> void:
 	assert_true(BotStrategy.hold_eligible(2, 4, 2, false), "存活少 + 2 阵亡非簇 → true")
@@ -104,7 +129,9 @@ func test_hold_eligible_conditions() -> void:
 # ── T15-6：当前 HUNTER 遇 FLANKER 候选 → 不切换；当前 ROAM 遇 HOLD 候选 → 切换 ──
 func test_priority_arbitration() -> void:
 	# A：HUNTER（最高优先级）遇 FLANKER 候选 → 不切换（防横跳）
-	var rig := _make_rig("enemy")
+	# body 注入（审查 Minor 1 判别力）：FLANKER 候选真实成立（而非 body=null 候选
+	# 缺失假通过）——优先级规则被真实受测。
+	var rig := _make_rig("enemy", true)
 	rig["blackboard"].set_value("state", "PATROL")
 	rig["board"].record_death("enemy", Vector3(0, 0, 0))
 	rig["board"].record_death("enemy", Vector3(5, 0, 0))  # 间距 5 → 簇 → HUNTER
@@ -116,6 +143,8 @@ func test_priority_arbitration() -> void:
 	# Flanker 候选：目标 LKP 直线 40m、path_remaining 100（比率 2.5 ≥ 1.5）
 	rig["blackboard"].set_value("target_lkp", Vector3(40, 0, 0))
 	rig["blackboard"].set_value("path_remaining", 100.0)
+	assert_true(BotStrategy.flanker_eligible(Vector3.ZERO, Vector3(40, 0, 0), 100.0),
+			"判别力前置：FLANKER 候选真实成立（body 非 null + 直线 40m + path 100）")
 	_step(rig, 0.5)  # 0.5s（远小于 HUNTER 45s 生命周期与 20s 离 C 连续计时）
 	assert_eq(rig["strategy"].current(), BotStrategy.Strategy.HUNTER,
 			"HUNTER 优先级最高，FLANKER 候选不切换")

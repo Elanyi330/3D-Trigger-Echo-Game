@@ -34,7 +34,10 @@ const LOS_PATH_WEIGHT := 2.0  # Flanker LOS 段加权系数（路径成本语义
                               # 路线选择偏置：Brain 选点时对目标有 LOS 的方向加罚）
 # ── 实现常量（2026-08-17 M3.3 T15，语义规格值；未列入接口块）──
 const HUNTER_QUIT_TIME := 20.0   # s：目标离开 C 区连续计时上限
-const FLANKER_END_DIST := 30.0   # m：Flanker 接敌结束判定（目标距 body）
+# FLANKER_END_DIST：2026-08-17 控制器裁决（审查确认），勿改回 30——出口 = state
+# 变 ENGAGE 或目标距 body <10m：与 ≥15m 触发无重叠（Flanker 在逼近 15m→10m 全程
+# 有效）；真正接敌半径（近身 10m 内必已触发 ENGAGE/CHASE 双出口冗余）。
+const FLANKER_END_DIST := 10.0   # m：Flanker 接敌结束判定（目标距 body）
 const HUNT_BIAS := 3.0           # Hunter 簇内目标权重（params.bias）
 
 var faction: String            # 己方阵营（"enemy"/"friendly"——阵亡统计口径）
@@ -294,9 +297,11 @@ func _enter_flanker(target_pos: Vector3) -> void:
 	_set_strategy(Strategy.FLANKER)
 
 
-## FLANKER 生命周期（简报）：进入接敌（黑板 state 变 ENGAGE 或目标距 body < 30m）
-## → 结束回 ROAM。目标位置失效（LKP 过期清零）→ 用入口位置兜底——防无目标
-## 信息永久滞留（2026-08-17 M3.3 T15 实现口径注记）。
+## FLANKER 生命周期：进入接敌（黑板 state 变 ENGAGE 或目标距 body < 10m）→
+## 结束回 ROAM。出口 10m（FLANKER_END_DIST 注：控制器裁决，勿改回 30）——
+## 与 ≥15m 触发无重叠，Flanker 在逼近 15m→10m 全程有效；保留死目标/入口位置
+## 兜底（偏差 ②：目标位置失效（LKP 过期清零）→ 用入口位置兜底，防无目标信息
+## 永久滞留）与 ENGAGE 出口（2026-08-17 M3.3 T15 修复 1）。
 func _tick_flanker() -> void:
 	if blackboard.get_value("state", "") == "ENGAGE":
 		_end_strategy()
