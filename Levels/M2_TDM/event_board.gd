@@ -39,3 +39,25 @@ func tick(delta: float) -> void:
 	for i in range(_deaths.size() - 1, -1, -1):
 		if _elapsed - _deaths[i]["t"] > DEATH_TTL:
 			_deaths.remove_at(i)
+
+
+# ── T15 槽位扩展（2026-08-17 M3.3 T15，计划授权范围）──
+# Hunter 同阵营占用先到先得：全局一板（T9 装配、两阵营共享）天然生效——
+# strategy_name -> count。
+
+var strategy_slots: Dictionary = {}   # strategy_name -> count
+
+## 槽位申请：count < cap → +1 返回 true（先到先得）；否则 false。
+func acquire_slot(name: String, cap: int) -> bool:
+	var n: int = strategy_slots.get(name, 0)
+	if n < cap:
+		strategy_slots[name] = n + 1
+		return true
+	return false
+
+
+## 槽位释放：count > 0 → −1（配对释放——离开 HUNTER 任一出口都 release）。
+func release_slot(name: String) -> void:
+	var n: int = strategy_slots.get(name, 0)
+	if n > 0:
+		strategy_slots[name] = n - 1
