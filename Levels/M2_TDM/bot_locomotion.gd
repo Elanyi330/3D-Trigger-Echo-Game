@@ -31,6 +31,18 @@ const RUNUP_TURN_GATE := 0.3      # rad：助跑转向门（遍历器 F8 验证�
 	                              #   注释——RUNUP 改 approach_point 直向转向后机体原地转机制
 	                              #   不再需要，常量保留作接口与遍历器参数记录）
 const RUNUP_GATE_SPEED := 4.0     # m/s：触发速度门（遍历器验证值）
+const REVERSE_GATE_FLOOR := 5.5   # m/s：反向穿越触发门地板（2026-08-17 M3.3 T11）——反向
+		                              #   助跑方向常与跳跃方向近垂直（窄面贴边链接：西长墙 1m
+		                              #   顶条北向南助跑 vs 东偏南跳向），反向参数修正后 pick 走
+		                              #   v_req×1.15（如 TowerToLongWall_W 反向 5.17）低于地板 →
+		                              #   触发帧落在速度刚入方向锥边沿（θ≈−50.7°，锥界 ±25°），
+		                              #   弹道落点距 seg.to 1.92 > LAND_TOLERANCE 1.5（60Hz 实证：
+		                              #   门 5.17 帧 4 触发落塔顶西南角失败；门 ≥5.4 帧 6 触发
+		                              #   落点 0.78 < 1.5——修正前正向 p50 门 5.631 帧 7 触发
+		                              #   T5 3/3 通过同口径）。空中无修正能力（RUN 档 air wish
+		                              #   帽 0.76 ≪ 起跳速，弹道恒定），触发帧即决定落点；地板
+		                              #   让触发帧推迟到速度已转向段方向的帧（帧 6），恢复修正
+		                              #   前验证轨迹。物理可达：修正前门 5.631 可达实证。
 const TRIGGER_CONE := 0.9         # 方向锥 cos 系数（±25°，遍历器 F9 验证值）
 const JUMP_TIMEOUT := 2.5         # s：起跳→落地判定超时
 const JUMP_ARRIVE := 0.8          # m：助跑到达起跳点判定半径（水平距）
@@ -428,6 +440,62 @@ static func classify_segments(points: PackedVector3Array, links: Array) -> Array
 	return out
 
 
+## 方向翻转参数计算（static 纯函数，2026-08-17 M3.3 T11）：路径穿越方向与链接
+## 注册正向一致（水平点积 ≥0）→ forward=true：delta_h 原值、human p50 原值
+## （数据集 human 均为正向校准——T5 审查结论）。反向穿越（forward=false）：
+## delta_h 取负；human p50 无效 → NAN + augmented=false（pick 走 v_req×1.15
+## 无真实回退链——T5 审查结论：反向靠 LAND_TOLERANCE 侥幸通过的缺陷本体之一即
+## 反向仍直读正向 dh/p50，触发门与求解器全错）。v_req 恒取 physics.v_req
+## （方向无关）。
+static func directed_edge_params(edge: Dictionary, forward: bool) -> Dictionary:
+	var dh: float = float(edge["delta_h"])
+	if not forward:
+		dh = -dh
+	var p50 := NAN
+	var augmented := false
+	if forward:
+		var human: Variant = edge.get("human")
+		if human != null:
+			p50 = float(human["takeoff_speed"]["p50"])
+			augmented = bool(human.get("augmented", false))
+	return {"delta_h": dh, "human_p50": p50, "augmented": augmented,
+			"v_req": float(edge["physics"]["v_req"])}
+
+
+## 水平 zone 包含判定（static 纯函数，2026-08-17 M3.3 T11）：xz 投影在
+## center ± (size/2 + expand) 内。
+static func _zone_contains(zone: Dictionary, p: Vector3, expand: float) -> bool:
+	var c: Dictionary = zone["center"]
+	var s: Dictionary = zone["size"]
+	return absf(p.x - float(c["x"])) <= float(s["x"]) * 0.5 + expand \
+			and absf(p.z - float(c["z"])) <= float(s["z"]) * 0.5 + expand
+
+
+## 触发位置窗（static 纯函数，2026-08-17 M3.3 T11；T5 审查疑虑 1②——起跳位置
+## 不受约束，速度/锥满足即可触发）：起跳点水平投影须落在方向感知起飞区
+## （forward → takeoff_zone；反向 → landing_zone 作为起飞区，center±size/2
+## 膨胀 0.5）内才允许触发；无条目/无 zone → 回退距 seg.from 水平距 ≤
+## JUMP_ARRIVE(0.8) 圆盘（T3 原口径——RUNUP 交接即 ≤0.8，回退口径不新增约束）。
+static func trigger_zone_ok(edge: Dictionary, forward: bool,
+		body_pos: Vector3, seg_from: Vector3) -> bool:
+	if not edge.is_empty():
+		var zone: Dictionary = edge.get("takeoff_zone" if forward else "landing_zone", {})
+		if not zone.is_empty():
+			return _zone_contains(zone, body_pos, 0.5)
+	return Vector2(body_pos.x - seg_from.x, body_pos.z - seg_from.z).length() \
+			<= JUMP_ARRIVE
+
+
+## 方向感知落区水平判定（static 纯函数，2026-08-17 M3.3 T11；T5 审查疑虑 1①——
+## 原逻辑恒查 landing_zone，反向穿越落点在注册 from 侧（takeoff_zone），zone
+## 恒不匹配，反向跳全靠 LAND_TOLERANCE 侥幸通过）：forward → landing_zone；
+## 反向 → takeoff_zone（center±size/2 膨胀 0.5 水平包含）。无 zone → false
+## （调用方回退 LAND_TOLERANCE 1.5 水平距——T3 原口径）。
+static func landed_zone_ok(edge: Dictionary, forward: bool, p: Vector3) -> bool:
+	var zone: Dictionary = edge.get("landing_zone" if forward else "takeoff_zone", {})
+	return not zone.is_empty() and _zone_contains(zone, p, 0.5)
+
+
 ## 起跳速度（static 纯函数，2026-08-17 M3.1 T3；消费口径 = 设计 §4.6 拍板哲学）：
 ##   真实人类 p50（augmented=false 且 human 非空）→ 原值
 ##   增强样本 p50（augmented=true）→ p50 × 0.9（置信折扣）
@@ -517,8 +585,11 @@ func _tick_runup(_delta: float) -> void:
 
 
 ## TRIGGER：沿段方向前进；hspeed ≥ 触发速度门且 速度方向·段方向 ≥ TRIGGER_CONE
-## × hspeed → command.jump_pressed = true（单帧边沿，控制器读取即清零）→ AIR。
-## 超 TRIGGER_TIMEOUT 未触发（转向不到位）→ 退回 RUNUP 重对准；行进中跌落 → AIR。
+## × hspeed 且起跳点在方向感知起飞区（T11 触发位置窗，膨胀 0.5——速度+锥+位置
+## 三条件全满足）→ command.jump_pressed = true（单帧边沿，控制器读取即清零）→
+## AIR。位置窗失败不触发、不进入 AIR、不计数失败（继续 RUNUP 调整位置，超
+## TRIGGER_TIMEOUT 回 RUNUP——T3 既有语义）。超 TRIGGER_TIMEOUT 未触发（转向
+## 不到位）→ 退回 RUNUP 重对准；行进中跌落 → AIR。
 func _tick_trigger(delta: float) -> void:
 	var seg: Dictionary = _jump_state["seg"]
 	if not body.is_on_floor():
@@ -540,6 +611,14 @@ func _tick_trigger(delta: float) -> void:
 	var hspeed := hv.length()
 	var d2 := Vector2(dir.x, dir.z)
 	if hspeed >= float(_jump_state["gate"]) and hv.dot(d2) >= TRIGGER_CONE * hspeed:
+		# (2026-08-17 M3.3 T11) 触发位置约束（T5 审查疑虑 1②）：速度+锥满足后
+		# 再查起跳位置窗——起跳点水平投影须落在方向感知起飞区（膨胀 0.5）内；
+		# 无数据集条目回退 seg.from 圆盘（trigger_zone_ok 内实现）。
+		var edge: Variant = _ensure_dataset().get(str(seg["link_name"]))
+		var fwd: bool = bool(_jump_state.get("forward", true))
+		if not trigger_zone_ok(edge if edge != null else {}, fwd,
+				body.global_position, seg["from"]):
+			return
 		command.jump_pressed = true
 		_jump_state["phase"] = "AIR"
 		_jump_state["t"] = 0.0
@@ -573,37 +652,59 @@ func _tick_air(delta: float) -> void:
 			_on_jump_failed(str(seg["link_name"]))
 
 
-## 进入跳跃段（2026-08-17 M3.1 T3）：查数据集边（delta_h/dist_zone/human p50/
-## augmented/physics.v_req）→ pick_jump_speed（消费口径 + 钳制带）→ 触发速度门
-## 动态值 = max(v, RUNUP_GATE_SPEED)——人类 p50 高于基门时按 p50 起跳（参数化
-## 执行本体）。求解器窗口无解（r.ok=false）或 v 超物理上限 SPEED_CAP（如
-## WingToLintel v_req 11.0 > 6.35）→ 不触发跳跃，直接诚实失败（防无限
-## TRIGGER↔RUNUP 振荡——速度门物理不可达）。无数据集边 → 纯默认门。
+## 进入跳跃段（2026-08-17 M3.1 T3；2026-08-17 M3.3 T11 改方向感知参数消费）：
+## 先判段方向与链接注册正向水平点积（< 0 → 反向穿越，T5 审查疑虑 1③——原逻辑
+## 直读 edge["delta_h"]/human p50 不翻转，反向跳 dh 取正 → 触发门与求解器全错，
+## 靠 LAND_TOLERANCE 侥幸通过），再经 directed_edge_params 得方向化参数 →
+## pick_jump_speed（消费口径 + 钳制带）→ 触发速度门动态值 = max(v,
+## RUNUP_GATE_SPEED)——人类 p50 高于基门时按 p50 起跳（参数化执行本体）。
+## 求解器窗口无解（r.ok=false）或 v 超物理上限 SPEED_CAP（如 WingToLintel
+## v_req 11.0 > 6.35）→ 不触发跳跃，直接诚实失败（防无限 TRIGGER↔RUNUP
+## 振荡——速度门物理不可达）。无数据集边 → 纯默认门。
 func _enter_jump(seg: Dictionary) -> void:
-	_jump_state = {"phase": "RUNUP", "seg": seg, "t": 0.0, "gate": RUNUP_GATE_SPEED}
+	_jump_state = {"phase": "RUNUP", "seg": seg, "t": 0.0, "gate": RUNUP_GATE_SPEED,
+			"forward": true}
 	_off_floor_t = 0.0
 	var link_name: String = seg["link_name"]
+	# (2026-08-17 M3.3 T11)：段方向 = (seg.to − seg.from) 水平投影；与注册正向
+	# (link.to − link.from) 水平投影点积 < 0 → 反向（正交点积 0 保持正向口径——
+	# 无位移差）。链接不在 _links（setup 预对齐表）→ 默认正向。
+	for l0 in _links:
+		var l: Dictionary = l0
+		if str(l["name"]) == link_name:
+			var lf: Vector3 = l["from"]
+			var lt: Vector3 = l["to"]
+			var reg := Vector3(lt.x - lf.x, 0.0, lt.z - lf.z)
+			var seg_dir := Vector3(float(seg["to"].x) - float(seg["from"].x), 0.0,
+					float(seg["to"].z) - float(seg["from"].z))
+			if reg.dot(seg_dir) < 0.0:
+				_jump_state["forward"] = false
+			break
 	var edge: Variant = _ensure_dataset().get(link_name)
 	if edge == null:
 		return
-	var dh: float = float(edge["delta_h"])
+	# (2026-08-17 M3.3 T11)：参数消费全部改经 directed_edge_params（禁止再直读
+	# edge["delta_h"] / human p50——原直读点即缺陷本体）。
+	var directed: Dictionary = directed_edge_params(edge, bool(_jump_state["forward"]))
+	var dh: float = float(directed["delta_h"])
 	var dist: float = float(edge["dist_zone"])
-	var pv_req: float = float(edge["physics"]["v_req"])
 	var r: Dictionary = JumpSolver.required_speed(dh, dist)  # 修复轮 1 Minor：一次计算，结果传 pick
 	if not r.ok:
 		_on_jump_failed(link_name)
 		return
-	var p50 := NAN
-	var augmented := false
-	var human: Variant = edge.get("human")
-	if human != null:
-		p50 = float(human["takeoff_speed"]["p50"])
-		augmented = bool(human.get("augmented", false))
-	var v: float = pick_jump_speed(dh, dist, p50, augmented, pv_req, r)
+	var v: float = pick_jump_speed(dh, dist, float(directed["human_p50"]),
+			bool(directed["augmented"]), float(directed["v_req"]), r)
 	if v > JumpSolver.SPEED_CAP:
 		_on_jump_failed(link_name)
 		return
 	_jump_state["gate"] = maxf(v, RUNUP_GATE_SPEED)
+	# (2026-08-17 M3.3 T11)：反向穿越触发门地板（REVERSE_GATE_FLOOR 常量注释）——
+	# 方向化参数修正后 pick 走 v_req×1.15 档，反向窄面链接门值可能落在速度刚入
+	# 方向锥边沿的触发帧（实证 TowerToLongWall_W 反向门 5.17 帧 4 触发 → 落点
+	# 1.92 > LAND_TOLERANCE 失败；地板 5.5 帧 6 触发 → 0.78 < 1.5 通过，与修正前
+	# 正向 p50 门 5.631 的 T5 验证轨迹同口径）。
+	if not bool(_jump_state["forward"]):
+		_jump_state["gate"] = maxf(float(_jump_state["gate"]), REVERSE_GATE_FLOOR)
 
 
 ## 失败处理（2026-08-17 M3.1 T3 跳跃执行铁律）：jump_failed 事件 + 该链接临时
@@ -622,30 +723,28 @@ func _on_jump_failed(link_name: String) -> void:
 			return
 
 
-## 落点成败（2026-08-17 M3.1 T3）：距段 to 点水平距 < LAND_TOLERANCE 且竖向
-## 落差不超高度门（修复轮 2 加竖向门；修复轮 3 改 navmesh 空间锚——落地锚 =
+## 落点成败（2026-08-17 M3.1 T3；2026-08-17 M3.3 T11 改方向感知）：竖向门沿用
+## navmesh 双锚口径（修复轮 2 加竖向门；修复轮 3 改 navmesh 空间锚——落地锚 =
 ## 落点 map_get_closest_point 的 navmesh y，与 seg.to（同为 navmesh 空间）比较，
 ## 与高度门同源口径：烘焙偏移 0.3~0.4 天然抵消，dh≤0.8 的跌落缝隙余量 0.8+ >
 ## HEIGHT_GATE 0.72 干净分离——旧口径 to.y（navmesh）− 身体 y（物理）混合空间，
-## 1.2 容差对 0.8+偏移 0.3~0.4 太贴刀锋）；或数据集边存在时落点 x/z 在
-## landing_zone（center±size/2，膨胀 0.5）内且竖向同样达标。
+## 1.2 容差对 0.8+偏移 0.3~0.4 太贴刀锋）。水平判定（T11）：方向感知 zone
+## （forward → landing_zone；反向 → takeoff_zone，center±size/2 膨胀 0.5）优先
+## ——原逻辑恒查 landing_zone，反向穿越落点在注册 from 侧 zone 恒不匹配，反向跳
+## 全靠 LAND_TOLERANCE 侥幸通过（T5 审查疑虑 1①）；zone 不匹配或无条目 →
+## LAND_TOLERANCE 1.5 水平距兜底（T3 原口径保留——T3 测试 7 正向 dh=0 跳落点
+## 贴回廊西缘在 landing_zone 外，靠该口径收敛，既有跳跃测试不得回归）。
 func _landed_ok(seg: Dictionary) -> bool:
 	var p := body.global_position
 	var to: Vector3 = seg["to"]
 	if to.y - NavigationServer3D.map_get_closest_point(map_rid, p).y > HEIGHT_GATE:
 		return false  # 落点低于目标面超过高度门 → 失败（跌落缝隙）
-	if Vector2(to.x - p.x, to.z - p.z).length() < LAND_TOLERANCE:
-		return true
 	var edge: Variant = _ensure_dataset().get(str(seg["link_name"]))
 	if edge != null:
-		var zone: Dictionary = edge.get("landing_zone", {})
-		if not zone.is_empty():
-			var c: Dictionary = zone["center"]
-			var s: Dictionary = zone["size"]
-			if absf(p.x - float(c["x"])) <= float(s["x"]) * 0.5 + 0.5 \
-					and absf(p.z - float(c["z"])) <= float(s["z"]) * 0.5 + 0.5:
-				return true
-	return false
+		var fwd: bool = bool(_jump_state.get("forward", true))
+		if landed_zone_ok(edge, fwd, p):
+			return true
+	return Vector2(to.x - p.x, to.z - p.z).length() < LAND_TOLERANCE
 
 
 ## 段水平方向（2026-08-17 M3.1 T3）：from→to xz 归一化；垂直段（原地跳，如
